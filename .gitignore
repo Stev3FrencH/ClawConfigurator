@@ -1,0 +1,56 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa]pp[Pp]ackages/
+[Bb]undle[Aa]rtifacts/
+*.appx
+*.appxbundle
+*.appxupload
+*.msix
+*.msixbundle
+dist/
+
+# Signing material — never commit
+*.pfx
+*.snk
+*.cer
+*.p12
+
+# Hardware discovery artifacts (Phase 0). The *notes* are checked in
+# (docs/hardware-notes.md); the raw dumps are large, machine-specific
+# and may embed serial numbers.
+/acpi/
+*.aml
+*.dsl
+*.etl
+*.pml
+Diagnostics/transcripts/
+Diagnostics/*.reg
+
+# Decompiler scratch — see LICENSE-NOTES.md. Never commit third-party
+# binaries or their decompiled sources.
+/decompiled/
+/thirdparty-bin/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+*.userprefs
+_ReSharper*/
+
+# macOS
+.DS_Store
+
+# NuGet
+*.nupkg
+packages/
+!**/packages.config
+
+# Logs
+*.log

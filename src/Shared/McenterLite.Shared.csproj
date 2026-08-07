@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    netstandard2.0 is REQUIRED, not a preference: this assembly is consumed by the
+    UWP widget, which compiles with .NET Native / Microsoft.NETCore.UniversalWindowsPlatform.
+
+    Deliberately zero package and framework references. The reference project's equivalent
+    assembly carries a hardcoded HintPath to Windows.winmd purely so its pipe message type
+    can speak WinRT ValueSet, which breaks on any machine without that exact SDK installed.
+    Our wire format is plain JSON text, so this project builds anywhere - including macOS.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>McenterLite.Shared</RootNamespace>
+    <AssemblyName>McenterLite.Shared</AssemblyName>
+  </PropertyGroup>
+
+</Project>
