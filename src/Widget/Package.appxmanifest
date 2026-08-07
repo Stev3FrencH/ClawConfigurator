@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+  MINIMAL manifest, for building the widget project on its own.
+
+  The manifest that actually ships is src/Package/Package.appxmanifest, owned by the packaging
+  project. That is the one that declares the Game Bar widget extension and the full-trust helper,
+  because those need the helper binary that only the package pulls in.
+
+  Keep the Identity and Application Id in sync between the two.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity
+    Name="McenterLite"
+    Publisher="CN=msi-mcenter-lite"
+    Version="0.1.0.0" />
+
+  <Properties>
+    <DisplayName>M Center Lite</DisplayName>
+    <PublisherDisplayName>msi-mcenter-lite</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22000.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-US" />
+  </Resources>
+
+  <Applications>
+    <Application Id="App"
+      Executable="$targetnametoken$.exe"
+      EntryPoint="McenterLite.Widget.App">
+      <uap:VisualElements
+        DisplayName="M Center Lite"
+        Description="Power, fan and lighting controls for the MSI Claw 8 EX AI+"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:SplashScreen Image="Assets\SplashScreen.png" />
+        <uap:AppListEntry>none</uap:AppListEntry>
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+</Package>

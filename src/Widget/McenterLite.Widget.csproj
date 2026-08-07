@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Old-style UAP project. This CANNOT be built by `dotnet build` - it needs MSBuild from
+  Visual Studio 2022 with the "Universal Windows Platform development" workload and the
+  Windows 11 SDK 10.0.26100. Everything else in this solution builds anywhere, including macOS;
+  this project and the .wapproj are the two exceptions.
+
+  x64 only. The reference project carries x86 configurations for older handhelds; this targets a
+  single x64 device, and the extra configurations are only a source of build permutations that
+  are never exercised.
+-->
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props"
+          Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
+    <ProjectGuid>{7B2C4E10-9A55-4E3B-9C1D-2F8A6D4B7E90}</ProjectGuid>
+    <OutputType>AppContainerExe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>McenterLite.Widget</RootNamespace>
+    <AssemblyName>McenterLite.Widget</AssemblyName>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <TargetPlatformIdentifier>UAP</TargetPlatformIdentifier>
+    <TargetPlatformVersion>10.0.26100.0</TargetPlatformVersion>
+    <TargetPlatformMinVersion>10.0.22000.0</TargetPlatformMinVersion>
+    <MinimumVisualStudioVersion>14</MinimumVisualStudioVersion>
+    <FileAlignment>512</FileAlignment>
+    <ProjectTypeGuids>{A5A43C5B-DE2A-4C0C-9213-0A381AF9435A};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <EnableDotNetNativeCompatibleProfile>true</EnableDotNetNativeCompatibleProfile>
+    <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
+    <LangVersion>7.3</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <OutputPath>bin\x64\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE;NETFX_CORE;WINDOWS_UWP</DefineConstants>
+    <NoWarn>;2008</NoWarn>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <ErrorReport>prompt</ErrorReport>
+    <Optimize>false</Optimize>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <OutputPath>bin\x64\Release\</OutputPath>
+    <DefineConstants>TRACE;NETFX_CORE;WINDOWS_UWP</DefineConstants>
+    <Optimize>true</Optimize>
+    <NoWarn>;2008</NoWarn>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <ErrorReport>prompt</ErrorReport>
+    <UseDotNetNativeToolchain>true</UseDotNetNativeToolchain>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- App -->
+    <ApplicationDefinition Include="App.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </ApplicationDefinition>
+    <Compile Include="App.xaml.cs">
+      <DependentUpon>App.xaml</DependentUpon>
+    </Compile>
+
+    <!-- Main widget page -->
+    <Page Include="MainWidget.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Compile Include="MainWidget.xaml.cs">
+      <DependentUpon>MainWidget.xaml</DependentUpon>
+    </Compile>
+
+    <!-- IPC -->
+    <Compile Include="Ipc\NamedPipeClient.cs" />
+    <Compile Include="Ipc\HelperConnection.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AppxManifest Include="Package.appxmanifest">
+      <SubType>Designer</SubType>
+    </AppxManifest>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      No <Project> GUID element: McenterLite.Shared is an SDK-style project and has none.
+      Supplying a made-up GUID here is a common way to get a confusing load failure in VS.
+    -->
+    <ProjectReference Include="..\Shared\McenterLite.Shared.csproj">
+      <Name>McenterLite.Shared</Name>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETCore.UniversalWindowsPlatform">
+      <Version>6.2.9</Version>
+    </PackageReference>
+
+    <!-- The Game Bar widget host types (XboxGameBarWidget and friends). -->
+    <PackageReference Include="Microsoft.Gaming.XboxGameBar">
+      <Version>7.3.2506120</Version>
+    </PackageReference>
+
+    <PackageReference Include="Microsoft.UI.Xaml">
+      <Version>2.8.7</Version>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Required for FullTrustProcessLauncher, which is how the widget starts the helper. Without
+      this SDK reference the type does not resolve and the widget has no way to reach hardware.
+    -->
+    <SDKReference Include="WindowsDesktop, Version=10.0.26100.0">
+      <Name>Windows Desktop Extensions for the UWP</Name>
+    </SDKReference>
+  </ItemGroup>
+
+  <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
+    <VisualStudioVersion>14.0</VisualStudioVersion>
+  </PropertyGroup>
+
+  <Import Project="$(MSBuildExtensionsPath)\Microsoft\WindowsXaml\v$(VisualStudioVersion)\Microsoft.Windows.UI.Xaml.CSharp.targets" />
+
+</Project>
