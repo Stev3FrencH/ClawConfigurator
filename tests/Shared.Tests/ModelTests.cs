@@ -188,6 +188,7 @@ namespace McenterLite.Shared.Tests
                 FullSpeed = false,
                 Rpm = 3571,
                 Temps = new[] { 44, 54, 64, 74, 82 },
+                Matches = false,
             };
 
             var parsed = FanState.Parse(state.Serialize());
@@ -198,6 +199,17 @@ namespace McenterLite.Shared.Tests
             Assert.False(parsed.FullSpeed);
             Assert.Equal(3571, parsed.Rpm);
             Assert.Equal(state.Temps, parsed.Temps);
+            Assert.False(parsed.Matches);
+        }
+
+        [Fact]
+        public void Parse_DefaultsMatchesToTrueWhenAbsent()
+        {
+            // A payload without the trailing field must not be read as "mismatch" - that would
+            // put a permanent warning under the fan card for a state nobody actually reported.
+            var parsed = FanState.Parse("0,0,40,49,58,67,75,94|1|1|0|3571|44,54,64,74,82");
+
+            Assert.True(parsed.Matches);
         }
 
         [Fact]

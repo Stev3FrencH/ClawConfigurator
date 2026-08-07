@@ -63,10 +63,11 @@ namespace McenterLite.Shared.Fan
 
         /// <summary>Quiet Idle lowers the bottom of the curve and leaves the top alone.</summary>
         /// <remarks>
-        /// On the Claw 8 EX the firmware holds an idle duty floor around 58, so the first three
-        /// points here sit below what the hardware will actually honour at idle. Expect this
-        /// preset to differ from Default only under mid load on that model. Measure before
-        /// presenting it as a distinct "quiet" mode.
+        /// These are the raw preset values. On a device with a duty floor they are RAISED to it by
+        /// <see cref="EnforceDutyFloor"/> before any write - on the Claw 8 EX the first three points
+        /// all sit below its floor of 58, so what actually reaches the EC is closer to
+        /// <c>{58, 59, 60, 67, 75}</c>. Whether that is audibly quieter than Default depends
+        /// entirely on the EX's own factory curve, which must be read from the device.
         /// </remarks>
         public static int[] QuietIdleDuties() => new[] { 20, 30, 45, 67, 75 };
 
@@ -89,12 +90,18 @@ namespace McenterLite.Shared.Fan
         /// The device's own factory duty curve, read from the EC. Null falls back to
         /// <see cref="FallbackDuties"/>.
         /// </param>
+        /// <param name="dutyFloor">
+        /// The model's idle duty floor, from <c>DeviceCaps.FanDutyFloor</c> (58 on the Claw 8 EX).
+        /// Zero disables the floor. Passing the wrong value here does not damage anything, but it
+        /// does produce a curve the firmware silently ignores at the bottom.
+        /// </param>
         public static void Resolve(
             Ipc.FanPreset preset,
             int[] modelTemps,
             int[] modelDuties,
             out int[] temps,
-            out int[] duties)
+            out int[] duties,
+            int dutyFloor = 0)
         {
             var baseTemps = Sanitize(modelTemps, FallbackTemps());
             var baseDuties = Sanitize(modelDuties, FallbackDuties());
@@ -119,7 +126,43 @@ namespace McenterLite.Shared.Fan
             }
 
             temps = ClampTemps(temps);
-            duties = ClampDuties(duties);
+            duties = EnforceDutyFloor(ClampDuties(duties), dutyFloor);
+        }
+
+        /// <summary>
+        /// Raises every duty to <paramref name="floor"/>, then re-separates the points so the curve
+        /// still rises.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Below the floor the firmware overrides the curve at idle regardless of what we write, so
+        /// a lower point does not make the device quieter - it only inverts the loudness, leaving
+        /// idle louder than light load. Raising to the floor is what makes the written curve
+        /// describe what the fan will actually do.
+        /// </para>
+        /// <para>
+        /// The second pass forces STRICTLY increasing, not merely non-decreasing as
+        /// <see cref="ClampDuties"/> does: flooring collapses several points onto the same value,
+        /// and a flat run reads as a dead zone to the EC. Points that collide with
+        /// <see cref="DutyCap"/> stay flat - the cap wins over separation.
+        /// </para>
+        /// </remarks>
+        public static int[] EnforceDutyFloor(int[] duties, int floor)
+        {
+            if (duties == null || duties.Length != Points)
+                throw new ArgumentException($"Expected {Points} duty points.", nameof(duties));
+            if (floor <= 0) return (int[])duties.Clone();
+
+            int clampedFloor = Math.Min(floor, DutyCap);
+            var result = new int[Points];
+            for (int i = 0; i < Points; i++)
+                result[i] = Math.Max(clampedFloor, duties[i]);
+
+            for (int i = 1; i < Points; i++)
+                if (result[i] <= result[i - 1])
+                    result[i] = Math.Min(DutyCap, result[i - 1] + 1);
+
+            return result;
         }
 
         private static int[] Sanitize(int[] candidate, int[] fallback) =>

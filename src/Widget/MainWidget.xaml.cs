@@ -317,12 +317,10 @@ namespace McenterLite.Widget
 
             // Surfaced rather than swallowed: the controller can accept a write and keep running
             // the old curve, and reporting that as success is the failure this app must not have.
-            var expectedPreset = (FanPreset)Clamp(_connection.GetInt(Function.FanPreset, 0), 0, 2);
-            Shared.Fan.FanProfiles.Resolve(expectedPreset, null, null, out _, out var duties);
-
-            bool matches = state.Table == null || Shared.Fan.FanProfiles.Matches(state.Table, duties);
-            FanMismatchText.Visibility = Visible(state.ControlEnabled && !matches);
-            if (state.ControlEnabled && !matches)
+            // The helper decides this - only it knows the factory curve and the model duty floor
+            // that the preset resolves against.
+            FanMismatchText.Visibility = Visible(state.ControlEnabled && !state.Matches);
+            if (state.ControlEnabled && !state.Matches)
                 FanMismatchText.Text = "The controller is not running the selected profile.";
         }
 

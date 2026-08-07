@@ -105,14 +105,16 @@
                                       OnContent="On" OffContent="Off"
                                       Toggled="FanEnabledToggle_Toggled" />
 
+                        <!-- The three shipping presets, named as ClawTweaks names them. It also
+                             offers Custom and a debug entry; neither is in scope here. -->
                         <ComboBox x:Name="FanPresetCombo"
                                   Header="Profile"
                                   HorizontalAlignment="Stretch"
                                   Margin="0,8,0,0"
                                   SelectionChanged="FanPresetCombo_SelectionChanged">
-                            <ComboBoxItem Content="Default" />
-                            <ComboBoxItem Content="Quiet idle" />
-                            <ComboBoxItem Content="Cooling" />
+                            <ComboBoxItem Content="MSI Default" />
+                            <ComboBoxItem Content="Quiet Idle" />
+                            <ComboBoxItem Content="Cooling · Early Ramp" />
                         </ComboBox>
 
                         <TextBlock x:Name="FanStateText"

@@ -221,5 +221,66 @@ namespace McenterLite.Shared.Tests
             var table = new byte[] { 7, 0, 40, 49, 58, 67, 75, 94 };
             Assert.Equal("0,40,49,58,67,75", FanProfiles.DescribeWriteWindow(table));
         }
+
+        [Fact]
+        public void EnforceDutyFloor_IsANoOpWithoutAFloor()
+        {
+            var duties = new[] { 20, 30, 45, 67, 75 };
+            Assert.Equal(duties, FanProfiles.EnforceDutyFloor(duties, 0));
+        }
+
+        [Fact]
+        public void EnforceDutyFloor_RaisesToTheFloorAndKeepsTheCurveRising()
+        {
+            // Quiet Idle on a Claw 8 EX: the bottom three points are all under the floor of 58.
+            // Flooring alone would flatten them to 58,58,58 - a dead zone - so they are re-separated.
+            var result = FanProfiles.EnforceDutyFloor(FanProfiles.QuietIdleDuties(), 58);
+
+            Assert.Equal(new[] { 58, 59, 60, 67, 75 }, result);
+        }
+
+        [Fact]
+        public void EnforceDutyFloor_LetsTheCapWinOverSeparation()
+        {
+            // Separation must never push a duty past MSI's own ceiling, even if that leaves a
+            // flat run at the top.
+            var result = FanProfiles.EnforceDutyFloor(new[] { 70, 75, 75, 75, 75 }, 75);
+
+            Assert.All(result, d => Assert.Equal(FanProfiles.DutyCap, d));
+        }
+
+        [Fact]
+        public void EnforceDutyFloor_IgnoresAFloorAboveTheCap()
+        {
+            var result = FanProfiles.EnforceDutyFloor(new[] { 10, 20, 30, 40, 50 }, 200);
+            Assert.All(result, d => Assert.InRange(d, 0, FanProfiles.DutyCap));
+        }
+
+        [Fact]
+        public void Resolve_AppliesTheModelDutyFloor()
+        {
+            FanProfiles.Resolve(FanPreset.QuietIdle, null, null, out _, out var floored, dutyFloor: 58);
+            Assert.All(floored, d => Assert.True(d >= 58));
+
+            // Without a floor the raw preset survives, so the floor is doing the work - not a clamp.
+            FanProfiles.Resolve(FanPreset.QuietIdle, null, null, out _, out var raw);
+            Assert.Equal(FanProfiles.QuietIdleDuties(), raw);
+        }
+
+        [Theory]
+        [InlineData(FanPreset.Default)]
+        [InlineData(FanPreset.QuietIdle)]
+        [InlineData(FanPreset.Cooling)]
+        public void EveryPreset_StaysSafeUnderTheExDutyFloor(FanPreset preset)
+        {
+            FanProfiles.Resolve(preset, null, null, out var temps, out var duties, dutyFloor: 58);
+
+            Assert.All(duties, d => Assert.InRange(d, 58, FanProfiles.DutyCap));
+            for (int i = 1; i < temps.Length; i++) Assert.True(temps[i] > temps[i - 1]);
+            for (int i = 1; i < duties.Length; i++) Assert.True(duties[i] >= duties[i - 1]);
+
+            var table = FanProfiles.BuildTable(duties);
+            Assert.True(FanProfiles.Matches(table, duties));
+        }
     }
 }

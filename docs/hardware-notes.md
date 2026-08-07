@@ -280,12 +280,32 @@ device before a single write.
 > "Corroborated" means someone else measured it and wrote it down — mostly on an **A2VM**, not this
 > device. It lowers the odds of a wrong byte; it does not license skipping the read-back.
 
-**Answer this before anything else in G2:** does ClawTweaks show a Fan tab on this EX? The
-reference project's per-model capability flag may still have fan control disabled on Panther Lake
-(see the desk-research section). If its author declined to ship EC fan writes here, find out why
-before we ship them.
+**Answered 2026-08-07: fan control works on this EX.** ClawTweaks shows the Fan tab, presets can be
+selected, and they apply. The "off on the Claw 8 EX for now" comments in the reference repo are
+stale — as suspected, they predate the commit that added EX tach data. M3 proceeds as planned.
 
-- [ ] ClawTweaks Fan tab visible on this device (yes/no — decides whether M3 proceeds as planned)
+**Presets: exactly the three ClawTweaks ships.** Its dropdown also carries "Custom" and
+"EC Sport default (debug)"; neither is in scope.
+
+| # | Our label | Temps | Duties |
+|---|---|---|---|
+| 0 | MSI Default | device axis | device factory curve |
+| 1 | Quiet Idle | device axis | `{20, 30, 45, 67, 75}` before the floor |
+| 2 | Cooling · Early Ramp | device axis −10 °C | `{40, 49, 58, 67, 75}` before the floor |
+
+**The duty floor is part of preset resolution, not a UI nicety.** The reference implementation runs
+its equivalent of `EnforceDutyFloor` after loading every preset: raise everything below the model
+floor (58 here) to it, then re-separate collided points so the curve still rises. On this device
+Quiet Idle therefore reaches the EC as roughly `{58, 59, 60, 67, 75}`, not what the table says.
+
+That changes the old "Quiet Idle may be pointless on the EX" note into a sharper question. Both
+Default and Quiet Idle get floored, so whether they differ depends **entirely on the EX's own
+factory curve**, which we have not read. If the factory curve sits well above 58 — plausible, since
+the EX ships table index 7 = 94 — Quiet Idle is genuinely quieter. If it sits at 58, the two
+presets converge and Quiet Idle should be relabelled or dropped.
+
+- [x] ClawTweaks Fan tab visible and presets apply on this device
+- [ ] **Factory duty curve read from the EC** — decides whether Quiet Idle is distinguishable
 - [ ] Fan WMI class and method identified
 - [ ] Read-back verified to reflect a write
 - [ ] Factory table captured (needed for uninstall restore)
@@ -302,14 +322,14 @@ before we ship them.
 | Factory temperature axis | | |
 
 **Preset measurements** — record real RPM under sustained load. If Quiet Idle proves
-indistinguishable from Default (likely, since its low points sit under the duty floor), say so
-here and change the UI rather than shipping a preset that does nothing.
+indistinguishable from Default once both are floored, say so here and change the UI rather than
+shipping a preset that does nothing.
 
-| Preset | Idle RPM | Load RPM | Distinguishable? |
-|---|---|---|---|
-| Default | | | — |
-| Quiet Idle | | | |
-| Cooling | | | |
+| Preset | Resolved duties after floor | Idle RPM | Load RPM | Distinguishable? |
+|---|---|---|---|---|
+| MSI Default | | | | — |
+| Quiet Idle | | | | |
+| Cooling · Early Ramp | | | | |
 
 **Result:** _not yet determined_
 

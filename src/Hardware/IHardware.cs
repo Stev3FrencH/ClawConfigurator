@@ -78,6 +78,17 @@ namespace McenterLite.Hardware
         /// <summary>Lowest duty the firmware honours at idle. Below this the curve is overridden.</summary>
         int DutyFloor { get; }
 
+        /// <summary>The preset last applied, used to judge whether the EC still holds it.</summary>
+        FanPreset CurrentPreset { get; }
+
+        /// <summary>
+        /// Reads the EC, including <see cref="FanState.Matches"/>.
+        /// </summary>
+        /// <remarks>
+        /// The implementation must set <c>Matches</c> itself - it is the only party that knows both
+        /// the factory curve and the duty floor the preset resolves against, so it is the only one
+        /// that can compare the read-back against what was actually written.
+        /// </remarks>
         bool TryReadState(out FanState state);
 
         /// <summary>Writes a preset, then re-reads and verifies the bytes it wrote.</summary>

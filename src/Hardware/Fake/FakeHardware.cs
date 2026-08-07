@@ -107,6 +107,7 @@ namespace McenterLite.Hardware.Fake
         private byte[] _table = { 3, 0, 40, 49, 58, 67, 75, 94 };
         private bool _enabled;
         private bool _fullSpeed;
+        private FanPreset _preset = FanPreset.Default;
         private readonly byte[] _factoryTable;
         private readonly Random _rng = new Random(20260807);
 
@@ -121,9 +122,12 @@ namespace McenterLite.Hardware.Fake
         public int[] FactoryTemps => new[] { 44, 54, 64, 74, 82 };
         public int[] FactoryDuties => new[] { 40, 49, 58, 67, 75 };
         public int DutyFloor => 58;
+        public FanPreset CurrentPreset => _preset;
 
         public bool TryReadState(out FanState state)
         {
+            FanProfiles.Resolve(_preset, FactoryTemps, FactoryDuties, out _, out var expected, DutyFloor);
+
             state = new FanState
             {
                 Table = (byte[])_table.Clone(),
@@ -132,6 +136,7 @@ namespace McenterLite.Hardware.Fake
                 FullSpeed = _fullSpeed,
                 Rpm = Available ? EstimateRpm() : -1,
                 Temps = FactoryTemps,
+                Matches = FanProfiles.Matches(_table, expected),
             };
             return Available;
         }
@@ -140,7 +145,8 @@ namespace McenterLite.Hardware.Fake
         {
             if (!Available) return OpResult.Unavailable(UnavailableReason);
 
-            FanProfiles.Resolve(preset, FactoryTemps, FactoryDuties, out _, out var duties);
+            FanProfiles.Resolve(preset, FactoryTemps, FactoryDuties, out _, out var duties, DutyFloor);
+            _preset = preset;
 
             // Exercise the real write path: patch only our window, preserving EC state bytes.
             _table = FanProfiles.ApplyToTable(_table, duties);

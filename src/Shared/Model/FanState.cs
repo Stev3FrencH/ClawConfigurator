@@ -14,7 +14,7 @@ namespace McenterLite.Shared.Model
     /// hardware quietly ignored the write is worse than one that reports nothing.
     /// </para>
     ///
-    /// <para>Encoding: <c>b0,..,b7|control|readOk|fullSpeed|rpm|t0,..,tN</c></para>
+    /// <para>Encoding: <c>b0,..,b7|control|readOk|fullSpeed|rpm|t0,..,tN|matches</c></para>
     /// </summary>
     public sealed class FanState
     {
@@ -36,9 +36,21 @@ namespace McenterLite.Shared.Model
         /// <summary>The EC's temperature axis, as read back.</summary>
         public int[] Temps { get; set; }
 
+        /// <summary>
+        /// Whether <see cref="Table"/> matches the curve the selected preset resolves to.
+        /// </summary>
+        /// <remarks>
+        /// Decided by the HELPER, not the widget, and this is not a style preference. Resolving a
+        /// preset to duties needs the device's factory curve and its model duty floor, both of
+        /// which only the helper has. A widget that recomputes it from the preset index alone
+        /// disagrees with what was actually written and cries mismatch on every push.
+        /// Defaults true so a helper that cannot determine it stays quiet rather than alarming.
+        /// </remarks>
+        public bool Matches { get; set; } = true;
+
         public string Serialize()
         {
-            var sb = new StringBuilder(72);
+            var sb = new StringBuilder(80);
 
             AppendBytes(sb, Table);
             sb.Append('|').Append(ControlEnabled ? '1' : '0');
@@ -47,6 +59,7 @@ namespace McenterLite.Shared.Model
             sb.Append('|').Append(Rpm.ToString(CultureInfo.InvariantCulture));
             sb.Append('|');
             AppendInts(sb, Temps);
+            sb.Append('|').Append(Matches ? '1' : '0');
 
             return sb.ToString();
         }
@@ -63,6 +76,8 @@ namespace McenterLite.Shared.Model
             if (parts.Length > 3) state.FullSpeed = parts[3] == "1";
             if (parts.Length > 4) state.Rpm = ToInt(parts[4], -1);
             if (parts.Length > 5) state.Temps = ParseInts(parts[5]);
+            // Absent on an older helper: stay quiet rather than reporting a mismatch we cannot judge.
+            if (parts.Length > 6) state.Matches = parts[6] == "1";
 
             return state;
         }
