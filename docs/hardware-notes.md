@@ -36,6 +36,47 @@ Fill in from `Diagnostics\Get-DeviceReport.ps1`.
 
 ---
 
+## Relationship to MSI Center M
+
+**Decided 2026-08-07: MSI Center M stays installed and running. This app is a simplified
+front-end that sits alongside it, not a replacement for it.**
+
+That is the same arrangement the reference project uses, and the reference project works on this
+device — which is the whole argument for it. The name `msi-mcenter-lite` now means "a lighter way
+to reach the settings M Center owns", not "a lightweight M Center".
+
+What follows from it:
+
+| Feature | Path | Needs MSI Center running? |
+|---|---|---|
+| TDP (PL1/PL2) | MSI Center's registry model; its service applies to the EC | **Yes** — hard dependency |
+| Fan presets | ACPI-WMI to the EC | No, but contention is possible (see below) |
+| Charge limit | ACPI-WMI / ACPI | No |
+| RGB LED | Vendor HID | No, but MSI may hold the device |
+| Desktop/gamepad mode | Vendor HID firmware command | No |
+| CPU boost, OS power mode | Windows APIs | No |
+| Intel GPU | IGCL / Intel driver | No |
+
+The reference project gates only **controller emulation and gyro** on MSI Center being active —
+both outside our scope — and explicitly ungated TDP once the registry mirror existed. Fan, LED and
+charge limit are not gated there at all, which suggests they coexist, though "not gated" is weaker
+evidence than "verified to coexist".
+
+**The contention that remains.** MSI Center owns the same hardware and will not know about us:
+
+- Its own thermal/fan profiles may overwrite a fan table we wrote. Re-read state periodically
+  rather than assuming our last write still holds.
+- It may hold the vendor HID collection, which is why the LED path opens **non-exclusive**. If
+  that fails while MSI Center runs, LED may simply be unavailable in this configuration.
+- Changing a setting in MSI Center's own UI will diverge from what our widget shows.
+
+**The new dependency risk.** TDP now rides on an undocumented, MSI-owned registry schema. An MSI
+Center update can change it and break power limits with no error — the write still succeeds. Record
+the MSI Center version every fact here was established against, and treat a silent no-op as the
+expected failure mode.
+
+---
+
 ## Desk research: ClawTweaks public repo (2026-08-07)
 
 Read from `github.com/enterTheVoidCode/ClawTweaks` at `e86e56c` (branch `release/v0.3.98.0`,
@@ -143,18 +184,21 @@ M needed as a base"*. Its TDP path is explicitly a mirror into MSI Center M's ow
 > which MSI watches and applies to the EC itself — so setting TDP works AND stays MSI-conform
 > while MSI Center M runs."* — `GamingWidget.MsiCenterGating.cs:67-71`
 
-This is Risk 2 in the plan, now confirmed from the reference project's own documentation, and it
-is pointed at the premise of this one: a *replacement* for M Center cannot lean on M Center to
-apply its power limits. The same comment carries the encouraging half — *"The old lock only
-existed because the direct EC/WMI write was refused **while MSI held the ACPI WMI**"* — which
-implies a direct WMI path exists and works when MSI Center is not holding it. **G1 is now
-specifically: does the direct ACPI-WMI TDP write work on the EX with the MSI Center service
-stopped?** That single question decides whether this project can stand alone.
+**Resolved 2026-08-07 by accepting the dependency** — see
+[Relationship to MSI Center M](#relationship-to-msi-center-m). Keeping MSI Center installed and
+running turns this from the project's largest risk into its cheapest path: the registry mirror
+needs no kernel driver, no WMI reverse-engineering, and no decompilation, and it is the route the
+reference project already proves works on this device.
+
+For the record, the same comment carries the road not taken — *"The old lock only existed because
+the direct EC/WMI write was refused **while MSI held the ACPI WMI**"* — implying a direct WMI path
+exists when MSI Center is not holding it. That is what a future standalone mode would need.
 
 `TdpMethod` (`Shared/Enums/TdpMethod.cs`) has exactly three values — `ManufacturerWMI` (Legion),
 `PawnIO` (RyzenSMU, AMD), `IntelKxExe` (MCHBAR via ring-0, and its comment names **Lunar Lake /
 A2VM only**). The registry mirror is not one of them; it is an always-on side-channel. So nothing
-in the enum tells us what the EX uses, and the ring-0 path is not documented as covering it.
+in the enum tells us what the EX uses, and the ring-0 path is not documented as covering it —
+another reason the mirror is the sensible target.
 
 **2. Fan control may be disabled on the Claw 8 EX upstream.** Three places say so, and the README
 scopes the feature to Lunar Lake:
@@ -178,21 +222,24 @@ about M3's risk and worth understanding before writing a single byte.
 
 ## Gate G1 — TDP
 
-**The hard gate. M2 does not start until this is green.**
+**No longer a hard gate** (scope decision, 2026-08-07: MSI Center M stays installed and running —
+see [Relationship to MSI Center M](#relationship-to-msi-center-m)). The registry mirror is a known,
+documented, driver-free path, so the question is no longer *whether* TDP is reachable but *what the
+key layout is*. That is a `reg export` diff, not a decompilation.
 
-The question is whether power limits can be set *without a ring-0 shim*. The reference project
-lists an `IntelKxExe` method — MCHBAR MMIO through a kernel extension — which is out of scope
-here. If that is the only path this model supports, the registry mirror is the sole option.
+The direct ACPI-WMI path is explicitly **not** being pursued. It only matters for running without
+MSI Center M, which is no longer a goal.
 
-**Sharpened by desk research** (see above): the reference project's registry mirror requires MSI
-Center M to be **running**, because MSI's own service is what reads `ManualPL*` and applies it to
-the EC. A mirror is therefore not an acceptable answer for a project that replaces M Center. The
-decisive experiment is narrower than "does TDP work":
+- [ ] Registry key path identified
+- [ ] Value names for PL1 and PL2 identified
+- [ ] Value type identified (`REG_DWORD` vs `REG_SZ`)
+- [ ] **Units confirmed at two different values** (17 W vs 25 W) — watts or milliwatts
+- [ ] Latency measured: how long after the write does the EC actually change?
+- [ ] Confirmed the value survives, or is overwritten, when MSI Center's own UI is opened
 
-> **Stop the MSI Center service, then attempt a direct ACPI-WMI power-limit write and read it
-> back.** If that succeeds, this project stands alone. If it only works with the service running,
-> msi-mcenter-lite is a front-end for M Center, not a replacement — and that is a scope decision
-> to make consciously, not to discover at M5.
+Method: `reg export HKLM\SOFTWARE\MSI` before and after a known change made **in MSI Center M
+itself**, diff the two. Procmon filtered to `RegSetValue` + `User Scenario` names which process
+writes, confirming the service is the applier. No decompilation needed for any of this.
 
 - [ ] Decompiled helper's TDP backend identified
 - [ ] Direct ACPI-WMI method found (class, method, parameter encoding)
@@ -202,12 +249,12 @@ decisive experiment is narrower than "does TDP work":
 
 | Fact | Value | Source |
 |---|---|---|
-| WMI class | | |
-| WMI method | | |
-| Registry key | | |
-| Value names | | |
+| Registry key | | expected under `HKLM\SOFTWARE\MSI\...\User Scenario` |
+| Value names | | expected `ManualPL1` / `ManualPL2` or similar |
+| Value type | | `REG_DWORD` / `REG_SZ` |
 | Units | | watts / milliwatts / raw |
-| Works without MSI Center | | **decides whether this project can replace MSI Center** |
+| Apply latency | | how long until the EC reflects it |
+| Overwritten by MSI Center's own UI? | | decides whether we re-assert periodically |
 | PL1 range accepted | | plan assumes 8–35 W |
 | PL2 range accepted | | plan assumes ≥ PL1+2, ≤ 45 W |
 

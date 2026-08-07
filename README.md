@@ -1,7 +1,12 @@
 # msi-mcenter-lite
 
-A lightweight replacement for MSI's M Center, targeting **only** the MSI Claw 8 EX AI+
-(Panther Lake, `CG3EM` / board `1T91`), delivered as an Xbox Game Bar widget.
+A lightweight front-end for the settings MSI's M Center owns, targeting **only** the MSI Claw 8 EX
+AI+ (Panther Lake, `CG3EM` / board `1T91`), delivered as an Xbox Game Bar widget.
+
+> **MSI Center M must stay installed and running.** This is not a replacement for it — power
+> limits are applied *through* it, by writing the model its own service reads. That is the same
+> arrangement ClawTweaks uses, and the reason it works on this device. See
+> [docs/hardware-notes.md](docs/hardware-notes.md#relationship-to-msi-center-m).
 
 > **Status: early. Milestone M0 in progress.**
 > The hardware layer is not implemented yet — that is gated on Phase 0 discovery (M1).
@@ -13,7 +18,7 @@ Eight features, deliberately few:
 
 | # | Feature | Status |
 |---|---|---|
-| 1 | TDP (PL1 / PL2) | blocked on gate G1 |
+| 1 | TDP (PL1 / PL2) — via MSI Center's registry model | needs gate G1 (key layout) |
 | 2 | Fan presets — 3 fixed profiles, no custom curve | blocked on gate G2 |
 | 3 | Battery charge limit | blocked on gate G3 |
 | 4 | RGB LED | blocked on gate G4 |
@@ -27,8 +32,12 @@ Live metrics and per-game profiles are out of scope.
 ## Design constraints
 
 - **No kernel driver.** Only MSI ACPI-WMI, user-mode vendor HID, Intel IGCL, and documented
-  Windows APIs. No WinRing0, inpoutx64, PawnIO, kx.exe, MSR or MCHBAR access. This rules out one
-  known TDP method, which is why gate G1 is a hard gate.
+  Windows APIs. No WinRing0, inpoutx64, PawnIO, kx.exe, MSR or MCHBAR access. This rules out the
+  `kx.exe` MCHBAR route to TDP — which costs nothing, because power limits go through MSI Center's
+  registry model instead.
+- **Runs alongside MSI Center M, not instead of it.** Accepting that dependency is what makes the
+  no-driver constraint affordable. The trade is a real one: TDP rides on an undocumented,
+  MSI-owned registry schema that an MSI Center update can change without warning.
 - **The helper is authoritative.** Every write is read back and the actual value returned; the
   widget renders that, never its own optimistic value.
 - **Every value is clamped server-side.** The pipe is ACL'd to all app packages, so the widget's

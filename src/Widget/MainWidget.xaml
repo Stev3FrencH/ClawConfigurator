@@ -263,7 +263,11 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Coexistence warning -->
+                <!-- Dependency warning.
+                     This warns when MSI Center M is NOT running, which reads backwards until you
+                     know the TDP path: we write MSI Center's own registry model and its service is
+                     what pushes the values to the EC. With the service stopped the write succeeds
+                     and nothing happens - the worst kind of failure, so it gets a banner. -->
                 <Border x:Name="MsiCenterWarning"
                         Background="#332C1A"
                         BorderBrush="{StaticResource WarningBrush}"
@@ -274,7 +278,7 @@
                         Visibility="Collapsed">
                     <TextBlock FontSize="11"
                                TextWrapping="Wrap"
-                               Text="MSI Center M is running. It controls the same hardware, so settings here may be overridden." />
+                               Text="MSI Center M is not running. Power limits are applied through it, so they will not take effect until it is started." />
                 </Border>
 
             </StackPanel>
