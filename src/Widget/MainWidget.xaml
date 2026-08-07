@@ -147,6 +147,9 @@
                             <TextBlock x:Name="ChargeLimitValueText" Grid.Column="1" FontSize="12"
                                        Foreground="{StaticResource AccentBrush}" />
                         </Grid>
+                        <!-- The controller accepts 20-100. 60 is our floor by choice, not a hardware
+                             limit: below it the limiter stops being a longevity setting and starts
+                             being a way to strand yourself on a handheld. -->
                         <Slider x:Name="ChargeLimitSlider"
                                 Minimum="60" Maximum="100" StepFrequency="5"
                                 TickFrequency="5"

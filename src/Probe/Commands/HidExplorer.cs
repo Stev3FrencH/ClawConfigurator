@@ -56,6 +56,12 @@ namespace McenterLite.Probe.Commands
             Console.WriteLine("The LED / firmware-mouse endpoint is the VENDOR collection (usage page >= 0xFF00),");
             Console.WriteLine("not the gamepad or keyboard ones. Record its DevicePath and feature-report length");
             Console.WriteLine("in docs/hardware-notes.md.");
+            Console.WriteLine();
+            Console.WriteLine("Expect TWO vendor collections, not one:");
+            Console.WriteLine("  PID 0x1901 (XInput)      usage page 0xFFA0 / usage 0x0001");
+            Console.WriteLine("  PID 0x1902 (DirectInput) usage page 0xFFF0 / usage 0x0040");
+            Console.WriteLine("Do not stop at the first match - report 0x0F (LED / mode switch, 64 bytes) is");
+            Console.WriteLine("documented on one specific interface, and picking the other one silently fails.");
 
             return 0;
         }
