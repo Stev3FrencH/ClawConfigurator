@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+  MSIX manifest for the Game Bar widget.
+
+  Capability policy: this declares the MINIMUM that makes the widget work. Three capabilities the
+  reference project carries are deliberately absent, because each is both an attack surface and an
+  AV heuristic signal that has to be justified:
+
+    internetClient          - nothing here talks to the network. There is no update checker and
+                              no telemetry, so the app never needs to reach outside the machine.
+    broadFileSystemAccess   - nothing here reads the user's files.
+    windows.activatableClass.proxyStub - ~25 lines of Game Bar PRIVATE interface IIDs, needed only
+                              for programmatic widget-bar navigation, which is out of scope.
+
+  If a future feature needs one of these, add it deliberately and say why here.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap3 desktop rescap">
+
+  <Identity
+    Name="McenterLite"
+    Publisher="CN=msi-mcenter-lite"
+    Version="0.1.0.0" />
+
+  <Properties>
+    <DisplayName>M Center Lite</DisplayName>
+    <PublisherDisplayName>msi-mcenter-lite</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <!--
+      Windows 11 only. The reference project supports back to 18362 for older handhelds; this
+      targets exactly one device that ships with Windows 11, so there is nothing to gain from a
+      lower floor and there are APIs to lose.
+    -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22000.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-US" />
+  </Resources>
+
+  <Applications>
+    <Application Id="App"
+      Executable="$targetnametoken$.exe"
+      EntryPoint="McenterLite.Widget.App">
+
+      <uap:VisualElements
+        DisplayName="M Center Lite"
+        Description="Power, fan and lighting controls for the MSI Claw 8 EX AI+"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+        <uap:SplashScreen Image="Assets\SplashScreen.png" />
+
+        <!--
+          The widget is only ever launched by the Game Bar, so it does not belong in the Start
+          menu or in app search.
+        -->
+        <uap:AppListEntry>none</uap:AppListEntry>
+      </uap:VisualElements>
+
+      <Extensions>
+
+        <!--
+          The Game Bar widget registration.
+        -->
+        <uap3:Extension Category="windows.appExtension">
+          <uap3:AppExtension
+            Name="microsoft.gameBarUIExtension"
+            Id="McenterLiteWidget"
+            PublicFolder="Public"
+            DisplayName="M Center Lite">
+            <uap3:Properties>
+              <GameBarWidget Type="Standard">
+                <HomeMenuVisible>true</HomeMenuVisible>
+                <PinningSupported>true</PinningSupported>
+                <ActivateAfterInstall>true</ActivateAfterInstall>
+                <FavoriteAfterInstall>true</FavoriteAfterInstall>
+
+                <!--
+                  Marks this as a device-control widget, which is what gets it a prominent slot in
+                  the Game Bar home menu instead of being buried in the widget list.
+
+                  NOTE: MSI's own Quick Settings widget also declares this. Two device widgets
+                  competing for that slot is undocumented behaviour - verify on the device which
+                  one wins, and whether it is stable.
+                -->
+                <IsDeviceWidget>true</IsDeviceWidget>
+
+                <Window>
+                  <Size>
+                    <Height>760</Height>
+                    <Width>420</Width>
+                    <MinHeight>420</MinHeight>
+                    <MinWidth>380</MinWidth>
+                    <MaxHeight>1080</MaxHeight>
+                    <MaxWidth>640</MaxWidth>
+                  </Size>
+                  <ResizeSupported>
+                    <Horizontal>true</Horizontal>
+                    <Vertical>true</Vertical>
+                  </ResizeSupported>
+                </Window>
+              </GameBarWidget>
+            </uap3:Properties>
+          </uap3:AppExtension>
+        </uap3:Extension>
+
+        <!--
+          The elevated helper.
+
+          The widget is a UWP AppContainer and cannot touch WMI, the EC or vendor HID at all, so
+          every hardware operation is proxied to this process over a named pipe. The widget
+          launches it via FullTrustProcessLauncher; the helper then deploys itself out of this
+          read-only package directory and registers a scheduled task, because the package folder
+          is replaced wholesale on update.
+        -->
+        <desktop:Extension
+          Category="windows.fullTrustProcess"
+          Executable="Helper\McenterLite.Helper.exe" />
+
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- Required to launch the full-trust helper at all. -->
+    <rescap:Capability Name="runFullTrust" />
+
+    <!-- Required for the helper's one-time elevation prompt during setup. -->
+    <rescap:Capability Name="allowElevation" />
+  </Capabilities>
+
+</Package>

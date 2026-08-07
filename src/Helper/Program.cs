@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using McenterLite.Hardware;
 using McenterLite.Hardware.Fake;
+using McenterLite.Helper.Deployment;
 using McenterLite.Helper.Ipc;
 using McenterLite.Helper.Settings;
 using McenterLite.Shared.Ipc;
@@ -13,6 +14,19 @@ namespace McenterLite.Helper
     /// <summary>
     /// The elevated helper. Owns all hardware access; the widget is a sandboxed view that talks
     /// to it over a named pipe.
+    ///
+    /// <para>
+    /// The same executable plays three roles, distinguished by where it was started from and with
+    /// which arguments:
+    /// </para>
+    /// <list type="number">
+    ///   <item><b>Bootstrap</b> - launched from the MSIX package by the widget. Ensures a current
+    ///   copy is deployed and the task is registered, then exits. Serves nothing.</item>
+    ///   <item><b>Setup</b> (<c>--setup</c>) - the elevated instance that performs the copy and
+    ///   registration. This is the one UAC prompt in the product.</item>
+    ///   <item><b>Service</b> - launched from the deployed location by the scheduled task.
+    ///   Elevated, no package identity, and the only role that touches hardware.</item>
+    /// </list>
     /// </summary>
     internal static class Program
     {
@@ -30,8 +44,108 @@ namespace McenterLite.Helper
 
             var dataDirectory = AppPaths.ResolveDataDirectory();
             Log.Initialize(dataDirectory);
-            Log.Info($"Starting. fakeHardware={options.FakeHardware} dataDir={dataDirectory}");
+            Log.Info($"Starting. role={DescribeRole(options)} version={HelperDeployment.CurrentVersion} " +
+                     $"elevated={Elevation.IsElevated()} dataDir={dataDirectory}");
 
+            try
+            {
+                if (options.Setup) return RunSetupRole();
+                if (options.Uninstall) return RunUninstallRole();
+
+                // Dev and test runs skip deployment entirely and serve in place, so the whole
+                // IPC and UI stack can be exercised without touching persistence or elevation.
+                if (options.FakeHardware || options.NoDeploy) return RunServiceRole(options, dataDirectory);
+
+                if (!HelperDeployment.IsRunningFromDeployedLocation()) return RunBootstrapRole();
+
+                return RunServiceRole(options, dataDirectory);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Fatal error", ex);
+                return 1;
+            }
+        }
+
+        private static string DescribeRole(CommandLineOptions options)
+        {
+            if (options.Setup) return "setup";
+            if (options.Uninstall) return "uninstall";
+            if (options.FakeHardware || options.NoDeploy) return "service(dev)";
+            return HelperDeployment.IsRunningFromDeployedLocation() ? "service" : "bootstrap";
+        }
+
+        // ── Bootstrap ───────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Runs from inside the MSIX package, started by the widget. Makes sure a current copy is
+        /// deployed and the task points at it, then exits without serving.
+        /// </summary>
+        /// <remarks>
+        /// Serving from here would be wrong twice over: the package directory is read-only and is
+        /// replaced wholesale on update, and this instance is not elevated, so every hardware
+        /// write would fail with an opaque access-denied.
+        /// </remarks>
+        private static int RunBootstrapRole()
+        {
+            var state = HelperDeployment.Evaluate();
+            Log.Info($"Deployment state: {state}");
+
+            if (state == HelperDeployment.State.UpToDate)
+            {
+                // Already deployed and registered; just make sure it is actually running. The
+                // widget reconnects on its own once the pipe appears.
+                ScheduledTaskRegistrar.Start();
+                return 0;
+            }
+
+            if (Elevation.IsElevated())
+            {
+                // Already elevated (a developer running it directly) - no prompt needed.
+                return HelperDeployment.RunSetup() ? 0 : 1;
+            }
+
+            var exitCode = Elevation.RelaunchElevated("--setup");
+            if (exitCode == null)
+            {
+                // The user declined. Not an error worth retrying: re-prompting in a loop is how
+                // an app teaches people to click yes without reading.
+                Log.Warn("Setup was declined. The helper will not start until it is allowed.");
+                return 3;
+            }
+
+            return exitCode.Value;
+        }
+
+        // ── Setup / uninstall ───────────────────────────────────────────────────
+
+        private static int RunSetupRole()
+        {
+            if (!Elevation.IsElevated())
+            {
+                // Reachable if --setup is invoked by hand. Ask rather than fail obscurely.
+                var exitCode = Elevation.RelaunchElevated("--setup");
+                return exitCode ?? 3;
+            }
+
+            return HelperDeployment.RunSetup() ? 0 : 1;
+        }
+
+        private static int RunUninstallRole()
+        {
+            if (!Elevation.IsElevated())
+            {
+                var exitCode = Elevation.RelaunchElevated("--uninstall");
+                return exitCode ?? 3;
+            }
+
+            return HelperDeployment.RunTeardown() ? 0 : 1;
+        }
+
+        // ── Service ─────────────────────────────────────────────────────────────
+
+        private static int RunServiceRole(CommandLineOptions options, string dataDirectory)
+        {
             using var mutex = new Mutex(initiallyOwned: true, SingleInstanceMutex, out bool isOnlyInstance);
             if (!isOnlyInstance)
             {
@@ -42,11 +156,6 @@ namespace McenterLite.Helper
             try
             {
                 return RunAsync(options, dataDirectory).GetAwaiter().GetResult();
-            }
-            catch (Exception ex)
-            {
-                Log.Error("Fatal error", ex);
-                return 1;
             }
             finally
             {
@@ -65,8 +174,8 @@ namespace McenterLite.Helper
 
             if (!hardware.Caps.Supported)
             {
-                // Not a fatal error: the widget still connects and explains why every control is
-                // disabled. Silently exiting would look like the helper had crashed.
+                // Not fatal: the widget still connects and explains why the controls are
+                // disabled. Exiting silently would look like a crash.
                 Log.Warn("Unsupported device. Hardware features are disabled.");
             }
 
@@ -81,11 +190,12 @@ namespace McenterLite.Helper
             Console.CancelKeyPress += (_, e) => { e.Cancel = true; Shutdown.Cancel(); };
             AppDomain.CurrentDomain.ProcessExit += (_, _) => Shutdown.Cancel();
 
+            var heartbeat = RunHeartbeatLoopAsync(dataDirectory, Shutdown.Token);
             var telemetry = RunTelemetryLoopAsync(server, dispatcher, hardware, Shutdown.Token);
             var serving = server.RunAsync();
 
-            await Task.WhenAny(serving, telemetry, Task.Delay(Timeout.Infinite, Shutdown.Token))
-                      .ConfigureAwait(false);
+            await Task.WhenAny(serving, telemetry, heartbeat,
+                               Task.Delay(Timeout.Infinite, Shutdown.Token)).ConfigureAwait(false);
 
             Log.Info("Shutting down.");
             return 0;
@@ -112,6 +222,35 @@ namespace McenterLite.Helper
             // developable, and reports Supported=false so nothing pretends to work.
             Log.Warn("Real hardware providers are not implemented yet (pending Phase 0 discovery).");
             return new FakeHardware(simulateClaw8Ex: false);
+        }
+
+        /// <summary>
+        /// Touches a heartbeat file so the widget can tell "still starting" from "died".
+        /// </summary>
+        /// <remarks>
+        /// The widget cannot see processes or scheduled tasks from inside its AppContainer, and a
+        /// pipe that refuses to open looks identical whether the helper is mid-UAC or crashed.
+        /// A file timestamp is the cheapest signal that crosses the sandbox boundary.
+        /// </remarks>
+        private static async Task RunHeartbeatLoopAsync(string dataDirectory, CancellationToken token)
+        {
+            var path = Path.Combine(dataDirectory, "heartbeat.txt");
+
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    File.WriteAllText(path,
+                        $"{Environment.ProcessId}\n{DateTimeOffset.UtcNow:O}\n{HelperDeployment.CurrentVersion}\n");
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn($"Could not write the heartbeat: {ex.Message}");
+                }
+
+                try { await Task.Delay(TimeSpan.FromSeconds(5), token).ConfigureAwait(false); }
+                catch (OperationCanceledException) { return; }
+            }
         }
 
         /// <summary>
@@ -160,8 +299,14 @@ namespace McenterLite.Helper
         /// <summary>Use simulated hardware, so the app can be developed without the device.</summary>
         public bool FakeHardware { get; private set; }
 
-        /// <summary>Deploy the helper and register its scheduled task, then exit. Implemented in M0.</summary>
+        /// <summary>Perform the elevated deployment and task registration, then exit.</summary>
         public bool Setup { get; private set; }
+
+        /// <summary>Remove the scheduled task and the deployed copy, then exit.</summary>
+        public bool Uninstall { get; private set; }
+
+        /// <summary>Serve in place without deploying. For debugging against real hardware.</summary>
+        public bool NoDeploy { get; private set; }
 
         public static CommandLineOptions Parse(string[] args)
         {
@@ -174,6 +319,8 @@ namespace McenterLite.Helper
                 {
                     case "--fake-hardware": options.FakeHardware = true; break;
                     case "--setup": options.Setup = true; break;
+                    case "--uninstall": options.Uninstall = true; break;
+                    case "--no-deploy": options.NoDeploy = true; break;
                 }
             }
 
@@ -181,7 +328,7 @@ namespace McenterLite.Helper
         }
     }
 
-    /// <summary>Where the helper keeps its settings and log.</summary>
+    /// <summary>Where the helper keeps its settings, log and heartbeat.</summary>
     internal static class AppPaths
     {
         /// <summary>
@@ -207,6 +354,17 @@ namespace McenterLite.Helper
                 {
                     var localCache = exeDir.Substring(0, index + marker.Length);
                     return Path.Combine(localCache, "McenterLite");
+                }
+
+                // Running from inside the package: resolve the package's own LocalCache, so the
+                // bootstrap and service roles agree on where settings live.
+                var familyName = PackageInterop.GetPackageFamilyName();
+                if (!string.IsNullOrEmpty(familyName))
+                {
+                    var packages = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "Packages", familyName, "LocalCache", "McenterLite");
+                    return packages;
                 }
 
                 var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);

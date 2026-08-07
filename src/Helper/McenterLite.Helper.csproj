@@ -40,6 +40,16 @@
 
   <ItemGroup>
     <PackageReference Include="System.IO.Pipes.AccessControl" Version="5.0.0" />
+
+    <!--
+      Registers the logon task through the Task Scheduler COM API.
+
+      Deliberately NOT schtasks.exe or powershell.exe: an elevated, self-signed binary spawning
+      PowerShell to create a HIGHEST-privilege ONLOGON task is a textbook persistence pattern and
+      is exactly what gets flagged by behavioural AV heuristics. This registers the task with zero
+      child processes.
+    -->
+    <PackageReference Include="TaskScheduler" Version="2.11.0" />
   </ItemGroup>
 
   <ItemGroup>
