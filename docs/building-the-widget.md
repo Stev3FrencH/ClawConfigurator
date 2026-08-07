@@ -35,6 +35,30 @@ Known places to verify first:
    will not build:
    `Assets\StoreLogo.png`, `Square150x150Logo.png`, `Square44x44Logo.png`,
    `Wide310x150Logo.png`, `SplashScreen.png`.
+5. **The visual styling**, which is also unverified. Specifics below.
+
+### Styling — what to check first
+
+The palette and card styles in `App.xaml` are **deliberately self-contained** rather than built on
+WinUI's theme-resource keys (`CardBackgroundFillColorDefaultBrush` and friends). Those would be
+idiomatic, but a `StaticResource` that does not resolve is a **runtime crash**, and none of this
+can be compiled here to find out. Every key `MainWidget.xaml` references is defined in `App.xaml`
+— that much has been cross-checked mechanically. Watch for:
+
+- **`ToggleSwitch` with blank `OnContent`/`OffContent` and `MinWidth="0"`.** This is what makes the
+  label-left / switch-right rows work instead of the stock stacked header. If the switches come out
+  mis-sized or the captions reappear, that style is why.
+- **Icon glyphs.** Every glyph used here (`E945` lightning, `E72C` refresh, `E83F` battery, `E790`
+  colour, `E7FC` game, `E713` settings) is one the reference widget already ships on this device,
+  except **`E7F4`** on the Graphics card, which is a guess. A wrong glyph renders as a box — check
+  it, but it cannot crash.
+- **`FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"`.** The comma fallback is used by the
+  reference widget on this device, so it is known to work in this host.
+- **`ConnectionDot`.** Its brush is looked up **by name** in `SetConnectionDot`
+  (`SuccessBrush` / `TextSecondaryBrush`). Renaming either key in `App.xaml` breaks it at runtime
+  with no compile error.
+- **`TextBlock.FontFeatures` does not exist in UWP.** Value alignment uses `MinWidth` +
+  `TextAlignment` instead of tabular figures. If you reach for font features later, it is not there.
 
 ## Creating the packaging project
 

@@ -8,6 +8,7 @@ using Windows.ApplicationModel.FullTrustProcess;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
 
 namespace McenterLite.Widget
@@ -469,9 +470,22 @@ namespace McenterLite.Widget
             StatusText.Text = message;
             StatusActionButton.Visibility = Visible(showRetry);
             StatusBanner.Visibility = Visibility.Visible;
+            SetConnectionDot(false);
         }
 
-        private void HideStatus() => StatusBanner.Visibility = Visibility.Collapsed;
+        private void HideStatus()
+        {
+            StatusBanner.Visibility = Visibility.Collapsed;
+            SetConnectionDot(true);
+        }
+
+        /// <summary>
+        /// Colours the header dot. Driven from the same two calls that raise and clear the banner
+        /// so the dot and the banner cannot disagree about whether the helper is up.
+        /// </summary>
+        private void SetConnectionDot(bool connected) =>
+            ConnectionDot.Fill = (Brush)Application.Current.Resources[
+                connected ? "SuccessBrush" : "TextSecondaryBrush"];
 
         private async Task RunOnUiAsync(Action action)
         {

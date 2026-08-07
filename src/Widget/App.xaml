@@ -11,36 +11,144 @@
             </ResourceDictionary.MergedDictionaries>
 
             <!--
-                The Game Bar hosts widgets over live gameplay, so the palette is deliberately
-                dark and low-contrast against its own chrome rather than a standard app surface.
+                PALETTE
+
+                Deliberately self-contained rather than built on WinUI's theme-resource keys
+                (CardBackgroundFillColorDefaultBrush and friends). Those would be the idiomatic
+                choice, but a StaticResource that does not resolve is a RUNTIME CRASH, and this
+                project cannot compile the widget on the authoring machine to find out. Local
+                brushes cost a few lines and cannot fail that way.
+
+                Strokes and fills are alpha over white rather than opaque greys. The Game Bar
+                composites this over live gameplay, so translucent edges keep their definition
+                against whatever is behind them; fixed greys look correct on a dark menu and
+                muddy over a bright scene.
             -->
-            <SolidColorBrush x:Key="CardBackgroundBrush" Color="#1A1F26" />
-            <SolidColorBrush x:Key="CardBorderBrush" Color="#2C3540" />
-            <SolidColorBrush x:Key="AccentBrush" Color="#4DA3FF" />
-            <SolidColorBrush x:Key="WarningBrush" Color="#E8A33D" />
-            <SolidColorBrush x:Key="ErrorBrush" Color="#E8624D" />
-            <SolidColorBrush x:Key="MutedTextBrush" Color="#8B97A6" />
+
+            <!-- Surfaces -->
+            <SolidColorBrush x:Key="SurfaceBrush" Color="#D91B2129" />
+            <SolidColorBrush x:Key="SurfaceStrokeBrush" Color="#17FFFFFF" />
+            <SolidColorBrush x:Key="SurfaceSubtleBrush" Color="#0AFFFFFF" />
+
+            <!-- Text -->
+            <SolidColorBrush x:Key="TextPrimaryBrush" Color="#F2F5F9" />
+            <SolidColorBrush x:Key="TextSecondaryBrush" Color="#96A2B2" />
+
+            <!-- Accent. #4CC2FF is the Windows 11 dark-theme accent, so the widget reads as part
+                 of the shell rather than as a third-party panel sitting on top of it. -->
+            <SolidColorBrush x:Key="AccentBrush" Color="#4CC2FF" />
+
+            <!-- Status. SuccessBrush and TextSecondaryBrush are resolved BY NAME from
+                 MainWidget.SetConnectionDot, so they have no XAML reference - do not delete either
+                 on the grounds that nothing appears to use it. -->
+            <SolidColorBrush x:Key="WarningBrush" Color="#FFC46B" />
+            <SolidColorBrush x:Key="ErrorBrush" Color="#FF7A6B" />
+            <SolidColorBrush x:Key="SuccessBrush" Color="#6BD98A" />
+
+            <!-- ── Cards ───────────────────────────────────────────────────────────────── -->
 
             <Style x:Key="CardStyle" TargetType="Border">
-                <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
-                <Setter Property="BorderBrush" Value="{StaticResource CardBorderBrush}" />
+                <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource SurfaceStrokeBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="CornerRadius" Value="6" />
-                <Setter Property="Padding" Value="12" />
-                <Setter Property="Margin" Value="0,0,0,8" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Padding" Value="14,12,14,14" />
+                <Setter Property="Margin" Value="0,0,0,10" />
             </Style>
 
-            <Style x:Key="CardHeaderStyle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="14" />
+            <!-- Card header icon. Segoe Fluent Icons is the Windows 11 face; the comma fallback
+                 picks up Segoe MDL2 Assets where it is missing. Every glyph used in this app is
+                 one the reference widget already ships on this device. -->
+            <Style x:Key="CardIconStyle" TargetType="FontIcon">
+                <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
+                <Setter Property="FontSize" Value="15" />
+                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Margin" Value="0,0,9,0" />
+            </Style>
+
+            <Style x:Key="CardTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="13" />
                 <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="Margin" Value="0,0,0,8" />
+                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
+
+            <!--
+                The live number for a card, right-aligned in the header row.
+
+                MinWidth plus right alignment, rather than tabular figures: UWP's TextBlock has no
+                FontFeatures property, so proportional digits are unavoidable. Reserving the width
+                of the widest value instead means the text re-flows inside a fixed box and the
+                label to its left never shifts as a slider is dragged.
+            -->
+            <Style x:Key="ValueStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="TextAlignment" Value="Right" />
+                <Setter Property="MinWidth" Value="44" />
+            </Style>
+
+            <Style x:Key="RowLabelStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="TextWrapping" Value="Wrap" />
             </Style>
 
             <Style x:Key="HintStyle" TargetType="TextBlock">
                 <Setter Property="FontSize" Value="11" />
-                <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}" />
+                <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
                 <Setter Property="TextWrapping" Value="Wrap" />
-                <Setter Property="Margin" Value="0,4,0,0" />
+                <Setter Property="Margin" Value="0,8,0,0" />
+                <Setter Property="LineHeight" Value="15" />
+            </Style>
+
+            <!-- ── Controls ────────────────────────────────────────────────────────────── -->
+
+            <!--
+                Label-left / switch-right, the Windows 11 Settings pattern, instead of the stock
+                ToggleSwitch header stacked above a switch captioned "On"/"Off". Blanking the
+                content and dropping MinWidth is what makes that layout possible - the default
+                154px MinWidth exists to reserve room for the caption text.
+            -->
+            <Style x:Key="CompactToggleStyle" TargetType="ToggleSwitch">
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="OnContent" Value="" />
+                <Setter Property="OffContent" Value="" />
+                <Setter Property="HorizontalAlignment" Value="Right" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
+
+            <!-- Sliders get a taller hit area than the desktop default. This runs on a handheld:
+                 every interaction is a thumb or a stick, never a mouse. -->
+            <Style x:Key="CardSliderStyle" TargetType="Slider">
+                <Setter Property="Margin" Value="0,2,0,0" />
+                <Setter Property="MinHeight" Value="32" />
+                <Setter Property="IsThumbToolTipEnabled" Value="False" />
+            </Style>
+
+            <Style x:Key="CardComboStyle" TargetType="ComboBox">
+                <Setter Property="HorizontalAlignment" Value="Stretch" />
+                <Setter Property="MinHeight" Value="34" />
+                <Setter Property="Margin" Value="0,2,0,0" />
+            </Style>
+
+            <!-- Inline notice used for both the connection banner and the MSI Center notice. -->
+            <Style x:Key="NoticeStyle" TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource SurfaceSubtleBrush}" />
+                <Setter Property="BorderThickness" Value="1,1,1,1" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="Padding" Value="11,9" />
+            </Style>
+
+            <Style x:Key="NoticeTextStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                <Setter Property="LineHeight" Value="15" />
             </Style>
         </ResourceDictionary>
     </Application.Resources>
