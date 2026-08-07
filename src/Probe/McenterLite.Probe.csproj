@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    A plain console app, on purpose. It runs on the Claw with no MSIX, no Game Bar and no
+    scheduled task - just "run as administrator". That turns the hardware-layer edit/test cycle
+    from a package rebuild into a file copy, which is the difference between iterating in seconds
+    and in minutes.
+
+    It is also the permanent regression harness: every fact recorded in docs/hardware-notes.md
+    should be re-checkable with one command here.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Platforms>x64</Platforms>
+    <OutputType>Exe</OutputType>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>McenterLite.Probe</RootNamespace>
+    <AssemblyName>McenterLite.Probe</AssemblyName>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+
+    <RuntimeIdentifier Condition="'$(Configuration)' == 'Release'">win-x64</RuntimeIdentifier>
+    <SelfContained Condition="'$(Configuration)' == 'Release'">true</SelfContained>
+    <PublishSingleFile Condition="'$(Configuration)' == 'Release'">true</PublishSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="HidSharp" Version="2.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Shared/McenterLite.Shared.csproj" />
+    <ProjectReference Include="../Hardware/McenterLite.Hardware.csproj" />
+  </ItemGroup>
+
+</Project>

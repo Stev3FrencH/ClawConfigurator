@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    TFM is plain net8.0-windows with NO SDK-version suffix (not net8.0-windows10.0.26100.0).
+    That is deliberate: the unversioned form needs no Windows targeting pack, so this project
+    RESTORES AND COMPILES ON macOS. Everything Windows-specific here is P/Invoke or WMI, which
+    compiles anywhere and only fails at runtime off-Windows - and the runtime path is guarded
+    by OperatingSystem.IsWindows().
+
+    Adding a version suffix, UseWPF, or UseWindowsForms would break the macOS build and with it
+    the whole author-on-Mac workflow. Don't.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Platforms>x64</Platforms>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>McenterLite.Hardware</RootNamespace>
+    <AssemblyName>McenterLite.Hardware</AssemblyName>
+
+    <!--
+      CA1416 flags every call into a Windows-only API. We are a Windows-only application whose
+      library happens to compile on macOS for authoring convenience; the guard is
+      OperatingSystem.IsWindows() at the composition root, not per-call attributes.
+    -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Management" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Shared/McenterLite.Shared.csproj" />
+  </ItemGroup>
+
+</Project>
