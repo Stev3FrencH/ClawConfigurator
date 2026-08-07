@@ -1,2 +1,138 @@
 # msi-mcenter-lite
-A lite version of M Center (for MSI Claw 8 EX AI+)
+
+A lightweight replacement for MSI's M Center, targeting **only** the MSI Claw 8 EX AI+
+(Panther Lake, `CG3EM` / board `1T91`), delivered as an Xbox Game Bar widget.
+
+> **Status: early. Milestone M0 in progress.**
+> The hardware layer is not implemented yet — that is gated on Phase 0 discovery (M1).
+> CPU boost and OS power mode work today; everything else runs against simulated hardware.
+
+## Scope
+
+Eight features, deliberately few:
+
+| # | Feature | Status |
+|---|---|---|
+| 1 | TDP (PL1 / PL2) | blocked on gate G1 |
+| 2 | Fan presets — 3 fixed profiles, no custom curve | blocked on gate G2 |
+| 3 | Battery charge limit | blocked on gate G3 |
+| 4 | RGB LED | blocked on gate G4 |
+| 5 | Desktop / gamepad mode (firmware) | blocked on gate G5 |
+| 6 | CPU Boost | ✅ implemented |
+| 7 | OS Power Mode | ✅ implemented |
+| 8 | Intel GPU controls (IGCL) | blocked on gate G6 |
+
+Live metrics and per-game profiles are out of scope.
+
+## Design constraints
+
+- **No kernel driver.** Only MSI ACPI-WMI, user-mode vendor HID, Intel IGCL, and documented
+  Windows APIs. No WinRing0, inpoutx64, PawnIO, kx.exe, MSR or MCHBAR access. This rules out one
+  known TDP method, which is why gate G1 is a hard gate.
+- **The helper is authoritative.** Every write is read back and the actual value returned; the
+  widget renders that, never its own optimistic value.
+- **Every value is clamped server-side.** The pipe is ACL'd to all app packages, so the widget's
+  slider bounds are a convenience, not enforcement.
+- **One writer for settings.** The helper owns `settings.json`; the widget persists nothing
+  functional. This removes the whole family of "my setting reset itself" bugs.
+- **Single device.** Another Claw generation is treated as unsupported, not as close enough — the
+  EC layout, duty floor and power ceilings differ.
+
+## Layout
+
+```
+src/Shared/      netstandard2.0   IPC contract, fan model, payload encodings. No dependencies.
+src/Hardware/    net8.0-windows   Provider interfaces, fakes, Windows power, device detection.
+src/Helper/      net8.0-windows   Elevated pipe server. Owns all hardware access.
+src/Probe/       net8.0-windows   Phase-0 discovery tool and regression harness.
+src/Widget/      UAP              Game Bar widget.            (not yet written)
+src/Package/     wapproj          MSIX packaging.             (not yet written)
+tests/           net8.0           Unit tests for Shared.
+Diagnostics/     PowerShell       Phase-0 scripts. Read-only.
+docs/            hardware-notes.md — the most important file in the repo.
+```
+
+## Building
+
+The .NET projects build **on macOS, Linux or Windows**:
+
+```bash
+dotnet build McenterLite.sln
+dotnet test  McenterLite.sln
+```
+
+This is deliberate. Every project uses plain `net8.0-windows` with no SDK-version suffix, so no
+Windows targeting pack is needed and the code can be authored anywhere.
+
+The widget and MSIX package are the exception: UAP `.csproj` and `.wapproj` **cannot** be built by
+`dotnet build`. They need **Visual Studio 2022 with the UWP workload and Windows 11 SDK 10.0.26100**.
+A Windows VM is a hard dependency for producing a package.
+
+If you have no .NET SDK, install one without admin rights:
+
+```bash
+curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 8.0 --install-dir "$HOME/.dotnet"
+export PATH="$HOME/.dotnet:$PATH"
+```
+
+## Running
+
+Against simulated hardware, on any Windows machine:
+
+```
+McenterLite.Helper.exe --fake-hardware
+```
+
+Discovery and verification, on the Claw, elevated:
+
+```
+McenterLite.Probe.exe --device        # confirm the model gate
+McenterLite.Probe.exe --power         # CPU boost + power mode (real, works anywhere)
+McenterLite.Probe.exe --dump-acpi C:\acpi
+McenterLite.Probe.exe --wmi-classes MSI
+McenterLite.Probe.exe --hid-list
+```
+
+Read commands are safe; only `set-*` changes anything.
+
+## Phase 0 — the hard gate
+
+The hardware protocol is not documented anywhere public. Discovery runs before implementation, and
+its output is [`docs/hardware-notes.md`](docs/hardware-notes.md).
+
+The shortcut: **ClawTweaks is installed and working on the target device**, and its helper is a
+.NET assembly. Its source repository does not contain the hardware layer, but the compiled binary
+on the device does. `Diagnostics\Find-ClawTweaksHelper.ps1` locates it.
+
+Extract **facts** — WMI class and method names, register offsets, byte layouts, HID report formats.
+Do not copy code: ClawTweaks is AGPLv3, and copying it would force the same licence here. See
+[`LICENSE-NOTES.md`](LICENSE-NOTES.md).
+
+```powershell
+.\Diagnostics\Get-DeviceReport.ps1 -Transcript .\device-report.txt
+.\Diagnostics\Find-ClawTweaksHelper.ps1
+.\Diagnostics\Watch-MsiCenter.ps1 -Label pl1-17 -TraceWmi
+```
+
+## Safety
+
+Fan control writes to an embedded controller. The mitigations are structural, not advisory:
+
+- Only three fixed presets; no user-authored duty value ever reaches the EC.
+- Every duty is clamped to ≤ 75, MSI's own ceiling.
+- Only table indices 1..6 are written; the EC's own boundary bytes are preserved.
+- Curves are forced monotonic — a duty that falls as temperature rises is the one shape that can
+  actually cook the device.
+- Every write is read back and compared before being reported as successful.
+- The factory table is captured before the first write and restored on uninstall.
+- The Intel IPF escape hatch ships before any EC write.
+
+The table builder lives in `Shared` with no platform dependencies specifically so it is unit-tested
+without the device.
+
+**Do not run this and ClawTweaks at the same time.** Both write the same EC.
+
+## Licence
+
+Not yet chosen — see [`LICENSE-NOTES.md`](LICENSE-NOTES.md). All code here is written from scratch
+so that both permissive and copyleft options remain open.
