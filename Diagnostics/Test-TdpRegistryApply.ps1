@@ -51,7 +51,10 @@ $BackupPath      = Join-Path $PSScriptRoot 'tdp-test-backup.json'
 
 # Measured 2026-08-07: watts, one-to-one. MSI Center's own UI offers exactly this range.
 $MinPl1 = 8;  $MinPl2 = 10
-$MaxPl1 = 35; $MaxPl2 = 45
+# High point is 25 W, not the 35 W ceiling. The test only has to tell the two levels apart, and
+# 8 -> 25 W is still a threefold change in sustained power - no reason to run the device at its
+# limit for longer than a benchmark would. PL2 tracks PL1 + 2, the pairing MSI's own UI produced.
+$MaxPl1 = 25; $MaxPl2 = 27
 
 # Mode 4 = User Scenario. See docs/hardware-notes.md. Manual power limits are only expected to be
 # honoured in this mode; in AI Engine (5) and Endurance (3) MSI drives the limits itself.
