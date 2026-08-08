@@ -266,12 +266,21 @@ namespace McenterLite.Helper
         }
 
         /// <summary>
-        /// Pushes fan telemetry while the widget is on screen.
+        /// Pushes fan telemetry and the OS power mode while the widget is on screen.
         /// </summary>
         /// <remarks>
         /// Gated on visibility because the widget is a UWP app that Windows suspends whenever the
         /// Game Bar is dismissed. Polling the EC for a suspended reader would be pure cost on a
         /// battery-powered device.
+        ///
+        /// <para>
+        /// The power mode is a first-class Windows control - the taskbar battery flyout and
+        /// Settings can both change it without this app being involved at all. Without polling it
+        /// here the widget only ever learns the mode at connect time, and shows a stale choice
+        /// indefinitely once something else changes it. Pushed the same way as fan telemetry: an
+        /// unconditional read-and-send every tick, relying on the widget's own dedup (it only
+        /// re-renders a value that actually changed) rather than tracking "did this change" twice.
+        /// </para>
         /// </remarks>
         private static async Task RunTelemetryLoopAsync(
             PipeServer server,
@@ -291,16 +300,35 @@ namespace McenterLite.Helper
                 }
 
                 if (!server.IsConnected || !dispatcher.WidgetVisible) continue;
-                if (!hardware.Fan.Available) continue;
 
-                try
+                if (hardware.Fan.Available)
                 {
-                    if (hardware.Fan.TryReadState(out var state))
-                        server.Send(PipeEnvelope.Event(Function.FanState, state.Serialize()));
+                    try
+                    {
+                        if (hardware.Fan.TryReadState(out var state))
+                            server.Send(PipeEnvelope.Event(Function.FanState, state.Serialize()));
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warn($"Telemetry read failed: {ex.Message}");
+                    }
                 }
-                catch (Exception ex)
+
+                if (hardware.Power.Available)
                 {
-                    Log.Warn($"Telemetry read failed: {ex.Message}");
+                    try
+                    {
+                        if (hardware.Power.TryReadPowerMode(out var mode))
+                        {
+                            server.Send(PipeEnvelope.Event(
+                                Function.OsPowerMode,
+                                ((int)mode).ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warn($"Power-mode telemetry read failed: {ex.Message}");
+                    }
                 }
             }
         }
