@@ -309,13 +309,8 @@
                                           Toggled="CpuBoostToggle_Toggled" />
                         </Grid>
 
-                        <Button x:Name="PowerModeButton"
-                                Style="{StaticResource CycleButtonStyle}"
-                                Margin="0,12,0,0"
-                                Click="PowerModeButton_Click" />
-
-                        <TextBlock Style="{StaticResource HintStyle}"
-                                   Text="These are Windows settings and apply system-wide." />
+                        <TextBlock Text="Power mode" Style="{StaticResource RowLabelStyle}" Margin="0,12,0,0" />
+                        <Grid x:Name="PowerModeSegments" Margin="0,6,0,0" />
                     </StackPanel>
                 </Border>
 

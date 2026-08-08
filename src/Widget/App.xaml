@@ -206,6 +206,43 @@
                 </Setter>
             </Style>
 
+            <!--
+                A fixed row of individually-clickable options, the active one highlighted. Used
+                where CycleButtonStyle's single button read as a dropdown despite being clickable -
+                right for a short, always-visible option set like the three power modes, where
+                showing every choice at once is clearer than requiring a press to discover them.
+            -->
+            <Style x:Key="SegmentButtonStyle" TargetType="Button">
+                <Setter Property="HorizontalAlignment" Value="Stretch" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="MinHeight" Value="{StaticResource ControlHeight}" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="Padding" Value="4,6" />
+                <Setter Property="Margin" Value="2,0,2,0" />
+                <Setter Property="FontSize" Value="{StaticResource BodySize}" />
+                <Setter Property="Background" Value="{StaticResource SurfaceSubtleBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource SurfaceStrokeBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                <Setter Property="ContentTemplate">
+                    <Setter.Value>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}"
+                                       HorizontalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" />
+                        </DataTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- The active segment. Dark-on-accent rather than white-on-accent - #4CC2FF is light
+                 enough that white text loses contrast. -->
+            <Style x:Key="SegmentButtonSelectedStyle" TargetType="Button" BasedOn="{StaticResource SegmentButtonStyle}">
+                <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                <Setter Property="Foreground" Value="#1B2129" />
+            </Style>
+
             <!-- Inline notice used for both the connection banner and the MSI Center notice. -->
             <Style x:Key="NoticeStyle" TargetType="Border">
                 <Setter Property="Background" Value="{StaticResource SurfaceSubtleBrush}" />

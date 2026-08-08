@@ -110,10 +110,78 @@ namespace McenterLite.Widget
             }
         }
 
+        /// <summary>
+        /// A fixed row of individually-clickable options, the active one highlighted.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <see cref="OptionCycler"/>'s single button read as a dropdown despite being clickable -
+        /// right for the longer option lists elsewhere in this widget, wrong for a short, always-
+        /// relevant set like the three power modes, where showing every choice up front removes any
+        /// doubt about what pressing it does.
+        /// </para>
+        /// <para>
+        /// Same index-is-the-wire-value contract as <see cref="OptionCycler"/>, and the same
+        /// "Show never counts as user input" split between display and the <see cref="Selected"/>
+        /// event, which only fires from a genuine click.
+        /// </para>
+        /// </remarks>
+        private sealed class SegmentedControl
+        {
+            private readonly Button[] _segments;
+
+            public SegmentedControl(Grid container, params string[] options)
+            {
+                _segments = new Button[options.Length];
+
+                for (int i = 0; i < options.Length; i++)
+                {
+                    container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                    int index = i; // capture per-iteration, not the loop variable
+                    var button = new Button
+                    {
+                        Content = options[i],
+                        Style = (Style)Application.Current.Resources["SegmentButtonStyle"],
+                    };
+                    button.Click += (_, __) => Selected?.Invoke(index);
+
+                    Grid.SetColumn(button, i);
+                    container.Children.Add(button);
+                    _segments[i] = button;
+                }
+
+                Show(0);
+            }
+
+            public int Index { get; private set; }
+
+            /// <summary>Fires only when a segment is actually clicked, never from <see cref="Show"/>.</summary>
+            public event Action<int> Selected;
+
+            /// <summary>Displays an option WITHOUT treating it as user input.</summary>
+            public void Show(int index)
+            {
+                if (index < 0 || index >= _segments.Length) return;
+                Index = index;
+
+                for (int i = 0; i < _segments.Length; i++)
+                {
+                    _segments[i].Style = (Style)Application.Current.Resources[
+                        i == index ? "SegmentButtonSelectedStyle" : "SegmentButtonStyle"];
+                }
+            }
+
+            public bool IsEnabled
+            {
+                set { foreach (var segment in _segments) segment.IsEnabled = value; }
+            }
+        }
+
         private OptionCycler _perfMode;
         private OptionCycler _fanPreset;
         private OptionCycler _ledMode;
-        private OptionCycler _powerMode;
+        private SegmentedControl _powerMode;
         private OptionCycler _intelFpsTier;
         private OptionCycler _intelLowLatency;
 
@@ -141,8 +209,9 @@ namespace McenterLite.Widget
                 _ledMode = new OptionCycler(LedModeButton,
                     "Off", "Static", "Breathing", "Colour cycle", "Wave");
 
-                _powerMode = new OptionCycler(PowerModeButton,
-                    "Best power efficiency", "Balanced", "Best performance");
+                _powerMode = new SegmentedControl(PowerModeSegments,
+                    "Efficiency", "Balanced", "Performance");
+                _powerMode.Selected += OnPowerModeSelected;
 
                 _intelFpsTier = new OptionCycler(IntelFpsTierButton,
                     "Off", "Performance (60 fps)", "Balanced (40 fps)", "Efficiency (30 fps)");
@@ -842,10 +911,11 @@ namespace McenterLite.Widget
             await SendAsync(Function.CpuBoost, CpuBoostToggle.IsOn);
         }
 
-        private async void PowerModeButton_Click(object sender, RoutedEventArgs e)
+        private async void OnPowerModeSelected(int index)
         {
             if (_applyingFromHelper) return;
-            await SendAsync(Function.OsPowerMode, _powerMode.Advance());
+            _powerMode.Show(index);
+            await SendAsync(Function.OsPowerMode, index);
         }
 
         private async void IntelFpsTierButton_Click(object sender, RoutedEventArgs e)
