@@ -542,6 +542,45 @@ foreach ($selector in 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0xEF, 0xD7) {
 }
 
 Write-Host ''
+Write-Host '[3c] Control: repeated reads with NOTHING changed' -ForegroundColor Yellow
+Write-Host '     Sub-function 0x03 moved by +/-1 across the 100/80/60 runs. That is only evidence' -ForegroundColor DarkGray
+Write-Host '     of anything if it holds STILL when the setting does not change - otherwise the' -ForegroundColor DarkGray
+Write-Host '     drift is measurement noise. Same selector, five reads, no setting touched.' -ForegroundColor DarkGray
+
+$controlRows = @()
+foreach ($iteration in 1..5) {
+    $bytes = Invoke-Package -MethodName $ReadMethod -Payload @([byte]0x03)
+    if ($bytes) {
+        $controlRows += , $bytes
+        Write-Host ("     read {0} -> {1}" -f $iteration, (Format-BytesInline -Bytes $bytes -Count 8))
+    }
+    else {
+        Write-Host ("     read {0} -> (rejected)" -f $iteration)
+    }
+    Start-Sleep -Milliseconds 1500
+}
+
+if ($controlRows.Count -ge 2) {
+    $varying = @()
+    for ($index = 0; $index -lt 8; $index++) {
+        $distinct = @($controlRows | ForEach-Object { $_[$index] } | Sort-Object -Unique)
+        if ($distinct.Count -gt 1) {
+            $varying += ("byte {0} ({1})" -f $index, (($distinct | ForEach-Object { '{0:X2}' -f $_ }) -join '/'))
+        }
+    }
+
+    Write-Host ''
+    if ($varying.Count -eq 0) {
+        Write-Host '     STABLE with nothing changed. The earlier drift therefore tracked something' -ForegroundColor Green
+        Write-Host '     real - worth investigating as a candidate field.' -ForegroundColor Green
+    }
+    else {
+        Write-Host ("     DRIFTS with nothing changed: {0}" -f ($varying -join ', ')) -ForegroundColor Yellow
+        Write-Host '     So the same movement across the 100/80/60 runs is noise, not the limit.' -ForegroundColor Yellow
+    }
+}
+
+Write-Host ''
 Write-Host '[4] Get_EC block reads (read-only, address in input byte 0)' -ForegroundColor Yellow
 Write-Host '    Tests the msi-ec hypothesis directly: the charge threshold is reported to live at' -ForegroundColor DarkGray
 Write-Host '    EC 0xD7 (gen 2) or 0xEF (gen 1), holding percent|0x80. The input convention here is' -ForegroundColor DarkGray

@@ -686,6 +686,46 @@ registers on real firmware. The purpose-built method lets the firmware validate 
 in code, not merely documented: `Probe`'s `--acpi-get` refuses any method not named `Get_*`, and
 `--set-charge-limit` calls `Set_MasterBattery` and nothing else.
 
+#### The ACPI-WMI interface, decoded (measured 2026-08-08)
+
+| Fact | Value |
+|---|---|
+| `Get_MasterBattery` / `Set_MasterBattery` | take one `[EmbeddedInstance, in, out]` parameter, `Data` |
+| Embedded class | `Package_32`, one property `Bytes : UInt8Array` |
+| Accepted payload | 32 bytes |
+| Return | `Boolean` |
+| `MSI_Master_Battery` (the plain class) | **"Not supported"** — the property read is unavailable, so the method call is the only route |
+
+**Input byte 0 is a sub-function selector, not a value.** `Get_MasterBattery` returns different
+data for `0x00`–`0x03`, which is what establishes this. It also means a payload of
+`percent | 0x80` in byte 0 would be read as *sub-function `0xBC`*, not as a threshold — so the
+obvious write is malformed, and the write shape is still unknown.
+
+#### `Get_MasterBattery` does NOT carry the charge limit (measured 2026-08-08)
+
+Three read-only runs, with MSI Center's own limit set to 100%, 80% and 60% between them
+(`Diagnostics/battery-limit-results.zip`). Sub-functions `0x00`–`0x05` were byte-identical across
+all three, with one exception that does not survive scrutiny:
+
+| Selector | Behaviour across 100 / 80 / 60 |
+|---|---|
+| `0x00` | identical — `01 09 00 …` |
+| `0x01` | identical — `01 88 13 C8 3C F4 01 E0` |
+| `0x02` | identical — `01 00 00 64 00 E2 13`; the `0x64` is a constant 100, i.e. design capacity, not the limit |
+| `0x03` | `…9E 45 1B…` / `…A0 45 1B…` / `…9F 45 1C…` |
+| `0x04`, `0x05`, `0xEF`, `0xD7` | all zeroes |
+
+`0x03` moves, but **not with the setting**. Read as little-endian pairs it is live telemetry:
+bytes 3–4 give 17822 / 17824 / 17823 mV, a plausible 4S pack voltage drifting by ±2 mV between
+reads, and bytes 5–6 give 3099 / 3099 / 3100. A threshold field would also be monotonic in the
+limit, and this is not — 100% → `9E`, 80% → `A0`, 60% → `9F`.
+
+> **The `Get_EC` rows in that capture are void.** They all reported "rejected", but that was a bug
+> in the harness, not a property of the device: it built every payload from the class taken off
+> `Get_MasterBattery` and reused it for all methods, so any method wanting a different package was
+> handed the wrong one. The EC hypothesis is **untested**, not refuted. Fixed by resolving the
+> package class per method.
+
 ---
 
 ## Gate G4 — RGB LED
