@@ -1,0 +1,25 @@
+
+=== MSI battery charge limit over ACPI-WMI ===
+
+[1] MSI_Master_Battery (property read, no method call)
+WARNING: Could not read MSI_Master_Battery: Not supported
+
+[2] MSI_ACPI declared method shapes (nothing called)
+    Get_MasterBattery  (returns Boolean)
+      Data : Instance   [EmbeddedInstance,in,id,out]
+    Set_MasterBattery  (returns Boolean)
+      Data : Instance   [EmbeddedInstance,in,id,out]
+
+[3] MSI_ACPI.Get_MasterBattery
+    note: skipping parameter(s) of type Instance/Reference: Data
+    [no arguments] Invalid parameter
+WARNING: Every argument shape tried for Get_MasterBattery failed. The declared shape is in [2] above.
+
+Expected if the percent|0x80 encoding holds:
+  100% -> 0xE4 (228)
+   80% -> 0xD0 (208)
+   60% -> 0xBC (188)
+
+Read-only run. Set MSI Center's own limit to 100/80/60 and re-run each time;
+whichever value tracks those three is the threshold.
+When that is established:  .\Test-BatteryWmi.ps1 -SetLimit 60
