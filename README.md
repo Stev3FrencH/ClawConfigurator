@@ -8,9 +8,14 @@ AI+ (Panther Lake, `CG3EM` / board `1T91`), delivered as an Xbox Game Bar widget
 > arrangement ClawTweaks uses, and the reason it works on this device. See
 > [docs/hardware-notes.md](docs/hardware-notes.md#relationship-to-msi-center-m).
 
-> **Status: early. Milestone M0 in progress.**
-> The hardware layer is not implemented yet — that is gated on Phase 0 discovery (M1).
-> CPU boost and OS power mode work today; everything else runs against simulated hardware.
+> **Status: the widget builds, packages, installs, and runs.** CPU Boost and OS Power Mode are
+> verified working end-to-end through the real widget, including reflecting changes made outside
+> it (Windows Settings, the taskbar flyout, the physical mode button). Everything else is
+> implemented but unverified against the real Claw hardware — the only device this has run on so
+> far is a different, correctly-gated-off-as-unsupported machine. Fan (gate G2) and RGB LED
+> (gate G4) also need Phase 0 discovery finished before they can be turned on at all; desktop/
+> gamepad mode (G5) and Intel GPU controls (G6) are unimplemented stubs regardless of their gate
+> status. See [docs/hardware-notes.md](docs/hardware-notes.md) for the full gate-by-gate picture.
 
 ## Scope
 
@@ -54,8 +59,8 @@ src/Shared/      netstandard2.0   IPC contract, fan model, payload encodings. No
 src/Hardware/    net8.0-windows   Provider interfaces, fakes, Windows power, device detection.
 src/Helper/      net8.0-windows   Elevated pipe server. Owns all hardware access.
 src/Probe/       net8.0-windows   Phase-0 discovery tool and regression harness.
-src/Widget/      UAP              Game Bar widget.            (not yet written)
-src/Package/     wapproj          MSIX packaging.             (not yet written)
+src/Widget/      UAP              Game Bar widget.
+src/Package/     wapproj          MSIX packaging.
 tests/           net8.0           Unit tests for Shared.
 Diagnostics/     PowerShell       Phase-0 scripts. Read-only.
 docs/            hardware-notes.md — the most important file in the repo.
@@ -75,7 +80,8 @@ Windows targeting pack is needed and the code can be authored anywhere.
 
 The widget and MSIX package are the exception: UAP `.csproj` and `.wapproj` **cannot** be built by
 `dotnet build`. They need **Visual Studio 2022 with the UWP workload and Windows 11 SDK 10.0.26100**.
-A Windows VM is a hard dependency for producing a package.
+A real Windows machine or VM is a hard dependency for producing a package — see
+[`docs/building-the-widget.md`](docs/building-the-widget.md) for the full setup and build walkthrough.
 
 If you have no .NET SDK, install one without admin rights:
 
@@ -143,5 +149,6 @@ without the device.
 
 ## Licence
 
-Not yet chosen — see [`LICENSE-NOTES.md`](LICENSE-NOTES.md). All code here is written from scratch
-so that both permissive and copyleft options remain open.
+MIT — see [`LICENSE`](LICENSE). All code here is written from scratch; see
+[`LICENSE-NOTES.md`](LICENSE-NOTES.md) for why that was the deliberate line held throughout, not
+an accident of how the choice turned out.

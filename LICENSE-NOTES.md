@@ -1,7 +1,7 @@
 # Licensing notes
 
-**Status: the project licence is not yet chosen.** This file records the constraints
-so the decision can be made deliberately rather than by accident.
+**Status: MIT.** See [`LICENSE`](LICENSE). Chosen deliberately, for the reasons below - this file
+stays as the record of why a copyleft licence was never forced.
 
 ## Why this matters
 
@@ -38,8 +38,8 @@ would have been easy and was actively considered:
 - The IPC envelope, `Function` enum, feature dispatcher, settings store and all UI —
   original designs, deliberately different in shape from ClawTweaks'.
 
-This keeps the licence choice **open**: AGPLv3 remains available if wanted, but is not
-forced.
+This kept the licence choice **open**: AGPLv3 remained available if wanted, but was never
+forced - MIT was chosen instead, precisely because nothing here required the alternative.
 
 ## Decompilation
 
@@ -65,6 +65,8 @@ treat its contents as third-party material regardless of the source licence.
 
 ## To do
 
-- [ ] Choose the project licence (AGPLv3, or a permissive option such as MIT/Apache-2.0)
-      and add a `LICENSE` file.
-- [ ] If a permissive licence is chosen, keep enforcing the "facts not code" line above.
+- [x] Choose the project licence (AGPLv3, or a permissive option such as MIT/Apache-2.0)
+      and add a `LICENSE` file. → MIT.
+- [ ] Keep enforcing the "facts not code" line above - MIT does not change it. Anything
+      copied from ClawTweaks would still make this a derivative work bound by AGPLv3,
+      regardless of what licence this repo declares for its own original code.
