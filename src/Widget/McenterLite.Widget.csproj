@@ -88,6 +88,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="Assets\StoreLogo.png" />
+    <Content Include="Assets\Square44x44Logo.png" />
+    <Content Include="Assets\Square150x150Logo.png" />
+    <Content Include="Assets\Wide310x150Logo.png" />
+    <Content Include="Assets\SplashScreen.png" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!--
       No <Project> GUID element: McenterLite.Shared is an SDK-style project and has none.
       Supplying a made-up GUID here is a common way to get a confusing load failure in VS.

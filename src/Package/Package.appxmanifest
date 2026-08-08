@@ -52,20 +52,19 @@
       Executable="$targetnametoken$.exe"
       EntryPoint="McenterLite.Widget.App">
 
+      <!--
+        AppListEntry="none": the widget is only ever launched by the Game Bar, so it does not
+        belong in the Start menu or in app search.
+      -->
       <uap:VisualElements
         DisplayName="M Center Lite"
         Description="Power, fan and lighting controls for the MSI Claw 8 EX AI+"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
-        Square44x44Logo="Assets\Square44x44Logo.png">
+        Square44x44Logo="Assets\Square44x44Logo.png"
+        AppListEntry="none">
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
-
-        <!--
-          The widget is only ever launched by the Game Bar, so it does not belong in the Start
-          menu or in app search.
-        -->
-        <uap:AppListEntry>none</uap:AppListEntry>
       </uap:VisualElements>
 
       <Extensions>

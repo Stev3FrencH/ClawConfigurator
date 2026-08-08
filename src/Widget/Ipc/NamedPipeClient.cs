@@ -157,22 +157,23 @@ namespace McenterLite.Widget.Ipc
         {
             try
             {
-                using var reader = new StreamReader(stream, new UTF8Encoding(false));
-
-                while (!token.IsCancellationRequested)
+                using (var reader = new StreamReader(stream, new UTF8Encoding(false)))
                 {
-                    var line = reader.ReadLine();
-                    if (line == null) break; // helper closed or exited
-
-                    if (line.Length == 0) continue;
-
-                    if (!PipeEnvelope.TryParse(line, out var envelope))
+                    while (!token.IsCancellationRequested)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[pipe] dropped an unparseable line ({line.Length} bytes)");
-                        continue;
-                    }
+                        var line = reader.ReadLine();
+                        if (line == null) break; // helper closed or exited
 
-                    Dispatch(envelope);
+                        if (line.Length == 0) continue;
+
+                        if (!PipeEnvelope.TryParse(line, out var envelope))
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[pipe] dropped an unparseable line ({line.Length} bytes)");
+                            continue;
+                        }
+
+                        Dispatch(envelope);
+                    }
                 }
             }
             catch (Exception ex)
@@ -232,7 +233,7 @@ namespace McenterLite.Widget.Ipc
                 return null;
             }
 
-            using var timeout = new CancellationTokenSource(timeoutMs);
+            using (var timeout = new CancellationTokenSource(timeoutMs))
             using (timeout.Token.Register(() => completion.TrySetResult(null)))
             {
                 var reply = await completion.Task.ConfigureAwait(false);

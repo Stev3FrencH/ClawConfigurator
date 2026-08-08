@@ -4,11 +4,12 @@ using McenterLite.Shared.Ipc;
 using McenterLite.Shared.Model;
 using McenterLite.Widget.Ipc;
 using Microsoft.Gaming.XboxGameBar;
-using Windows.ApplicationModel.FullTrustProcess;
+using Windows.ApplicationModel;
 using Windows.Foundation;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
 
