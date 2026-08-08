@@ -480,7 +480,6 @@ namespace McenterLite.Widget
             {
                 Pl1Slider,
                 FanEnabledToggle,
-                ChargeLimitSlider,
                 LedToggle,
                 HwMouseToggle,
                 CpuBoostToggle,
@@ -555,7 +554,6 @@ namespace McenterLite.Widget
             // by any app on the machine and the helper is the only real gate.
             TdpCard.Visibility = Visible(_connection.IsAvailable(Function.Pl1));
             FanCard.Visibility = Visible(caps.HasFan && _connection.IsAvailable(Function.FanPreset));
-            ChargeCard.Visibility = Visible(caps.HasChargeLimit);
             LedCard.Visibility = Visible(caps.HasLed);
             HwMouseCard.Visibility = Visible(caps.HasHwMouse);
             IntelCard.Visibility = Visible(caps.HasIgcl && _connection.IsAvailable(Function.IntelFpsTier));
@@ -586,7 +584,6 @@ namespace McenterLite.Widget
             ApplyValue(Function.FanEnabled);
             ApplyValue(Function.FanPreset);
             ApplyValue(Function.FanState);
-            ApplyValue(Function.ChargeLimitPercent);
             ApplyValue(Function.LedEnabled);
             ApplyValue(Function.HwMouseMode);
             ApplyValue(Function.CpuBoost);
@@ -630,15 +627,6 @@ namespace McenterLite.Widget
                 case Function.FanState:
                     ApplyFanState(_connection.Get(Function.FanState));
                     break;
-
-                case Function.ChargeLimitPercent:
-                {
-                    int percent = ChargeLevels.Snap(
-                        _connection.GetInt(Function.ChargeLimitPercent, ChargeLevels.Default));
-                    ChargeLimitSlider.Value = percent;
-                    ChargeLimitValueText.Text = $"{percent}%";
-                    break;
-                }
 
                 case Function.LedEnabled:
                     LedToggle.IsOn = _connection.GetBool(Function.LedEnabled);
@@ -817,18 +805,6 @@ namespace McenterLite.Widget
         {
             if (_applyingFromHelper) return;
             await SendAsync(Function.FanPreset, _fanPreset.Advance());
-        }
-
-        private async void ChargeLimitSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
-        {
-            if (_applyingFromHelper) return;
-
-            // Snapped again even though StepFrequency should already guarantee it. The slider's
-            // step is a UI affordance; this is the value that goes on the wire, and the helper is
-            // entitled to assume it is one the hardware can hold.
-            int percent = ChargeLevels.Snap((int)e.NewValue);
-            ChargeLimitValueText.Text = $"{percent}%";
-            await SendAsync(Function.ChargeLimitPercent, percent);
         }
 
         private async void LedToggle_Toggled(object sender, RoutedEventArgs e)

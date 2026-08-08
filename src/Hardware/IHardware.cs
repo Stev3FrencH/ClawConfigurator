@@ -118,18 +118,6 @@ namespace McenterLite.Hardware
         OpResult RestoreFactory();
     }
 
-    public interface IChargeLimitProvider : IFeatureProvider
-    {
-        bool TryRead(out bool enabled, out int percent);
-
-        /// <summary>
-        /// Applies a charge limit. <paramref name="percent"/> is snapped to one of
-        /// <see cref="Model.ChargeLevels"/> - the device stores a three-state selector, not a
-        /// percentage, so arbitrary values cannot be honoured.
-        /// </summary>
-        OpResult Apply(bool enabled, int percent);
-    }
-
     /// <summary>
     /// Lighting, reduced to on/off.
     /// </summary>
@@ -196,7 +184,6 @@ namespace McenterLite.Hardware
 
         ITdpProvider Tdp { get; }
         IFanProvider Fan { get; }
-        IChargeLimitProvider ChargeLimit { get; }
         ILedProvider Led { get; }
         IHwMouseProvider HwMouse { get; }
         IPowerProvider Power { get; }

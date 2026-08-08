@@ -450,15 +450,6 @@ namespace McenterLite.Helper
                     : $"Could not re-apply the fan preset: {result.Error}");
             }
 
-            if (hardware.ChargeLimit.Available && settings.GetBool(SettingsKeys.ChargeLimitEnabled, false))
-            {
-                int percent = settings.GetInt(SettingsKeys.ChargeLimitPercent, 80);
-                var result = hardware.ChargeLimit.Apply(true, percent);
-                Log.Info(result.Ok
-                    ? $"Re-applied the {percent}% charge limit."
-                    : $"Could not re-apply the charge limit: {result.Error}");
-            }
-
             // Lighting is deliberately NOT re-applied here, for the same reason as the power-mode
             // overlay below: MSI's own performance-mode selector writes this same registry value
             // (Endurance turns it off), so it is shared state, not ours alone, and reasserting our

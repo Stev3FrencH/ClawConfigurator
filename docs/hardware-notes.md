@@ -587,6 +587,16 @@ needs revisiting against this finding, not carried forward unquestioned.
 
 ## Gate G3 — Battery charge limit
 
+> **FEATURE REMOVED 2026-08-08.** The charge limit is no longer part of this app: it is set in MSI
+> Center, changes rarely, and the registry path was measured not to enforce it. The code is gone
+> from the widget, helper, IPC contract and hardware layer, and `Function` ordinals 30/31 are
+> retired.
+>
+> **Everything below is kept as a device record, not as live work.** It cost several rounds of
+> on-device measurement and correctly identifies the working mechanism, so it stays for anyone who
+> revisits this. The short version: the limit lives at `MSI_ACPI.Get_AP` / `Set_AP`, sub-function
+> 0, byte 5, encoded `percent | 0x80`. The write was never exercised.
+
 There is no fallback for this one. Without a driver-free method it is cut, not worked around.
 
 - [ ] WMI/ACPI method identified

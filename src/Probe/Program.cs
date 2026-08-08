@@ -49,8 +49,6 @@ namespace McenterLite.Probe
                 case "wmi-instances": return Commands.WmiExplorer.DumpInstances(rest);
                 case "wmi-method": return Commands.WmiExplorer.DescribeMethod(rest);
                 case "acpi-get": return Commands.WmiExplorer.AcpiGet(rest);
-                case "battery": return Commands.BatteryInfo.Read();
-                case "set-charge-limit": return Commands.BatteryInfo.SetLimit(rest);
                 case "dump-acpi": return Commands.AcpiDump.Run(rest);
                 case "hid-list": return Commands.HidExplorer.List(rest);
 
@@ -84,8 +82,6 @@ READ
                             writes are not reachable from here.
                             e.g.  --acpi-get Get_MasterBattery
                                   --acpi-get Get_EC 0xD7
-  --battery                 Read the charge limit via MSI_ACPI.Get_MasterBattery and print
-                            the byte each of 100/80/60 is expected to produce.
   --dump-acpi <dir>         Write DSDT and all SSDT tables as .aml for offline disassembly.
                             Then, on any machine:  iasl -d DSDT.aml
   --hid-list [vid]          Enumerate HID interfaces (default VID 0x0DB0) with report
@@ -95,10 +91,6 @@ READ
 WRITE (these change system state)
   --set-power-mode <0|1|2>  0 = best efficiency, 1 = balanced, 2 = best performance.
   --set-cpu-boost <on|off>
-  --set-charge-limit <60|80|100>
-                            Set the battery charge limit via MSI_ACPI.Set_MasterBattery, and
-                            ONLY that method. Prints the byte it will send and reads back
-                            before and after. Confirm the encoding with --battery first.
 
 SUGGESTED PHASE-0 ORDER
   1. --device                     confirm the model gate matches

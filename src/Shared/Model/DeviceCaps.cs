@@ -59,7 +59,6 @@ namespace McenterLite.Shared.Model
 
         // ── Feature availability ─────────────────────────────────────────────────
         public bool HasFan { get; set; }
-        public bool HasChargeLimit { get; set; }
         public bool HasLed { get; set; }
         public bool HasHwMouse { get; set; }
         public bool HasIgcl { get; set; }
@@ -83,7 +82,6 @@ namespace McenterLite.Shared.Model
             Append(sb, "pl2Off", Pl2MinOffset);
             Append(sb, "tdpBackend", (int)TdpBackend);
             Append(sb, "fan", HasFan ? "1" : "0");
-            Append(sb, "charge", HasChargeLimit ? "1" : "0");
             Append(sb, "led", HasLed ? "1" : "0");
             Append(sb, "hwMouse", HasHwMouse ? "1" : "0");
             Append(sb, "igcl", HasIgcl ? "1" : "0");
@@ -122,7 +120,8 @@ namespace McenterLite.Shared.Model
                             : Ipc.TdpBackendKind.Unavailable;
                         break;
                     case "fan": caps.HasFan = value == "1"; break;
-                    case "charge": caps.HasChargeLimit = value == "1"; break;
+                    // "charge" retired with the charge-limit feature; an older helper may still
+                    // send it, and the default branch below drops it harmlessly.
                     case "led": caps.HasLed = value == "1"; break;
                     case "hwMouse": caps.HasHwMouse = value == "1"; break;
                     case "igcl": caps.HasIgcl = value == "1"; break;

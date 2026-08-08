@@ -107,13 +107,6 @@ namespace McenterLite.Helper
                         ? PipeEnvelope.FromBool(fullSpeedState.FullSpeed)
                         : null;
 
-                case Function.ChargeLimitEnabled:
-                case Function.ChargeLimitPercent:
-                    if (!_hw.ChargeLimit.TryRead(out bool chargeOn, out int chargePct)) return null;
-                    return fn == Function.ChargeLimitEnabled
-                        ? PipeEnvelope.FromBool(chargeOn)
-                        : PipeEnvelope.FromInt(chargePct);
-
                 case Function.LedEnabled:
                     return _hw.Led.TryRead(out bool ledOn) ? PipeEnvelope.FromBool(ledOn) : null;
 
@@ -187,10 +180,6 @@ namespace McenterLite.Helper
                 case Function.FanFullSpeed:
                     return Apply(request, _hw.Fan.SetFullSpeed(request.AsBool()),
                         () => ReadValue(Function.FanFullSpeed));
-
-                case Function.ChargeLimitEnabled:
-                case Function.ChargeLimitPercent:
-                    return SetChargeLimit(request);
 
                 case Function.LedEnabled:
                     return SetLed(request);
@@ -277,58 +266,6 @@ namespace McenterLite.Helper
             Log.Info($"Applied the {preset} fan preset.");
 
             return Ok(request, PipeEnvelope.FromEnum(preset));
-        }
-
-        private PipeEnvelope SetChargeLimit(PipeEnvelope request)
-        {
-            if (!_hw.ChargeLimit.Available)
-                return PipeEnvelope.Failure(request.Id, request.Fn, _hw.ChargeLimit.UnavailableReason);
-
-            if (!_hw.ChargeLimit.TryRead(out bool enabled, out int percent))
-                return PipeEnvelope.Failure(request.Id, request.Fn, "Could not read the charge limit.");
-
-            _settings.CaptureOriginal(SettingsKeys.ChargeLimitEnabled, PipeEnvelope.FromBool(enabled));
-            _settings.CaptureOriginal(SettingsKeys.ChargeLimitPercent, PipeEnvelope.FromInt(percent));
-
-            if (request.Fn == Function.ChargeLimitEnabled)
-            {
-                enabled = request.AsBool(enabled);
-
-                // Re-enabling restores the user's last choice. The device stores only three
-                // states and "100%" IS the off state, so it cannot remember what limit was in
-                // force before it was switched off - without this, turning the limiter back on
-                // silently lands on the default instead of the 60% someone deliberately picked.
-                if (enabled)
-                {
-                    int remembered = _settings.GetInt(SettingsKeys.ChargeLimitPercent, percent);
-                    percent = ChargeLevels.Snap(remembered);
-                }
-            }
-            else
-            {
-                // Snapped, not clamped: the device holds one of three levels, and a value between
-                // them is not a smaller mistake than one outside the range.
-                percent = ChargeLevels.Snap(request.AsInt(percent));
-
-                // The widget has no separate enable/disable control - picking a percent IS the
-                // whole interface, and 100% already means "off" at the hardware level (see
-                // Apply() below). Without this, a percent sent while the device happened to be at
-                // 100% from a PREVIOUS disable would be silently ignored: Apply(enabled=false, _)
-                // maps to Full regardless of percent, and enabled here is still whatever TryRead
-                // just reported.
-                enabled = true;
-            }
-
-            var result = _hw.ChargeLimit.Apply(enabled, percent);
-            if (!result.Ok) return PipeEnvelope.Failure(request.Id, request.Fn, result.Error);
-
-            _settings.SetBool(SettingsKeys.ChargeLimitEnabled, enabled);
-            _settings.SetInt(SettingsKeys.ChargeLimitPercent, percent);
-
-            _hw.ChargeLimit.TryRead(out bool actualEnabled, out int actualPercent);
-            return Ok(request, request.Fn == Function.ChargeLimitEnabled
-                ? PipeEnvelope.FromBool(actualEnabled)
-                : PipeEnvelope.FromInt(actualPercent));
         }
 
         private PipeEnvelope SetLed(PipeEnvelope request)
@@ -431,16 +368,8 @@ namespace McenterLite.Helper
                 if (!r.Ok) problems.Add($"power limits: {r.Error}");
             }
 
-            // Charge limit. The one most worth restoring: it is invisible day to day, so a
-            // forgotten 60% limit is discovered weeks later as "my battery stopped charging".
-            var originalChargeOn = _settings.GetOriginal(SettingsKeys.ChargeLimitEnabled);
-            var originalChargePct = _settings.GetOriginal(SettingsKeys.ChargeLimitPercent);
-            if (originalChargeOn != null && _hw.ChargeLimit.Available)
-            {
-                int percent = int.TryParse(originalChargePct, out int p) ? p : ChargeLevels.Default;
-                var r = _hw.ChargeLimit.Apply(originalChargeOn == "1", percent);
-                if (!r.Ok) problems.Add($"charge limit: {r.Error}");
-            }
+            // Nothing to restore for the charge limit: the feature was removed, and this app never
+            // wrote a value the user did not set in MSI Center themselves.
 
             var originalBoost = _settings.GetOriginal(SettingsKeys.CpuBoost);
             if (originalBoost != null)
@@ -520,8 +449,6 @@ namespace McenterLite.Helper
             Function.FanPreset,
             Function.FanState,
             Function.FanFullSpeed,
-            Function.ChargeLimitEnabled,
-            Function.ChargeLimitPercent,
             Function.LedEnabled,
             Function.HwMouseMode,
             Function.CpuBoost,

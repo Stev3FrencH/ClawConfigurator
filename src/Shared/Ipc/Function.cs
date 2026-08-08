@@ -73,11 +73,15 @@ namespace McenterLite.Shared.Ipc
         /// <summary>Full-speed override. A separate EC control from the curve, not a preset.</summary>
         FanFullSpeed = 23,
 
-        // ── 3. Battery charge limit ──────────────────────────────────────────────
-        ChargeLimitEnabled = 30,
-
-        /// <summary>Charge ceiling percent. Clamped server-side to [60, 100].</summary>
-        ChargeLimitPercent = 31,
+        // ── 3. Battery charge limit — REMOVED ────────────────────────────────────
+        //
+        // Ordinals 30 (ChargeLimitEnabled) and 31 (ChargeLimitPercent) are RETIRED. Per the rule
+        // at the top of this enum they must never be reused: an old widget meeting a new helper
+        // would otherwise route a stale charge-limit message onto whatever took the number.
+        //
+        // Descoped 2026-08-08. The limit is set in MSI Center, changes rarely, and the registry
+        // path this app could reach did not enforce it. The hardware findings are kept in
+        // docs/hardware-notes.md Gate G3 rather than thrown away.
 
         // ── 4. Lighting ──────────────────────────────────────────────────────────
         /// <summary>

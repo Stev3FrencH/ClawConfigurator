@@ -34,7 +34,7 @@ namespace McenterLite.Shared.Tests
         [Fact]
         public void RoundTrips_ErrorMessage()
         {
-            var parsed = RoundTrip(PipeEnvelope.Failure(7, Function.ChargeLimitEnabled, "not present"));
+            var parsed = RoundTrip(PipeEnvelope.Failure(7, Function.LedEnabled, "not present"));
 
             Assert.Equal(Command.Error, parsed.Cmd);
             Assert.Equal("not present", parsed.Error);

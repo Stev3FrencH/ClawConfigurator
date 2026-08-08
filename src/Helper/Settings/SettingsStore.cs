@@ -158,8 +158,6 @@ namespace McenterLite.Helper.Settings
         public const string FanEnabled = "FanEnabled";
         public const string FanPreset = "FanPreset";
 
-        public const string ChargeLimitEnabled = "ChargeLimitEnabled";
-        public const string ChargeLimitPercent = "ChargeLimitPercent";
 
         public const string LedEnabled = "LedEnabled";
 

@@ -50,7 +50,6 @@ namespace McenterLite.Hardware.Windows
 
                 // Not implemented yet. Reported as absent rather than broken.
                 HasFan = false,
-                HasChargeLimit = false,   // set below, once the provider has probed
                 HasLed = false,           // set below, once the provider has probed
                 HasHwMouse = false,
                 HasIgcl = false,
@@ -63,9 +62,6 @@ namespace McenterLite.Hardware.Windows
                 ? tdp.Backend
                 : TdpBackendKind.Unavailable;
 
-            var chargeLimit = new RegistryChargeLimitProvider();
-            Caps.HasChargeLimit = identity.IsClaw8Ex && chargeLimit.Available;
-
             var led = new RegistryLedProvider();
             Caps.HasLed = identity.IsClaw8Ex && led.Available;
 
@@ -77,9 +73,6 @@ namespace McenterLite.Hardware.Windows
                 : new UnavailableTdp("This device is not an MSI Claw 8 EX AI+.");
 
             Fan = new UnavailableFan("Fan control is not implemented yet.", ExDutyFloor);
-            ChargeLimit = identity.IsClaw8Ex
-                ? (IChargeLimitProvider)chargeLimit
-                : new UnavailableChargeLimit("This device is not an MSI Claw 8 EX AI+.");
             Led = identity.IsClaw8Ex
                 ? (ILedProvider)led
                 : new UnavailableLed("This device is not an MSI Claw 8 EX AI+.");
@@ -92,7 +85,6 @@ namespace McenterLite.Hardware.Windows
         public DeviceCaps Caps { get; }
         public ITdpProvider Tdp { get; }
         public IFanProvider Fan { get; }
-        public IChargeLimitProvider ChargeLimit { get; }
         public ILedProvider Led { get; }
         public IHwMouseProvider HwMouse { get; }
         public IPowerProvider Power { get; }
@@ -160,23 +152,6 @@ namespace McenterLite.Hardware.Windows
         public OpResult SetEnabled(bool enabled) => OpResult.Unavailable(UnavailableReason);
         public OpResult SetFullSpeed(bool on) => OpResult.Unavailable(UnavailableReason);
         public OpResult RestoreFactory() => OpResult.Unavailable(UnavailableReason);
-    }
-
-    internal sealed class UnavailableChargeLimit : IChargeLimitProvider
-    {
-        public UnavailableChargeLimit(string reason) => UnavailableReason = reason;
-
-        public bool Available => false;
-        public string UnavailableReason { get; }
-
-        public bool TryRead(out bool enabled, out int percent)
-        {
-            enabled = false;
-            percent = ChargeLevels.Default;
-            return false;
-        }
-
-        public OpResult Apply(bool enabled, int percent) => OpResult.Unavailable(UnavailableReason);
     }
 
     internal sealed class UnavailableLed : ILedProvider

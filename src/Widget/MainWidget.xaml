@@ -172,49 +172,9 @@
                     </StackPanel>
                 </Border>
 
-                <!-- 3. Battery -->
-                <Border x:Name="ChargeCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
-                    <StackPanel>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <FontIcon Grid.Column="0" Glyph="&#xE83F;" Style="{StaticResource CardIconStyle}" />
-                            <TextBlock Grid.Column="1" Text="Battery" Style="{StaticResource CardTitleStyle}" />
-                        </Grid>
-
-                        <Grid Margin="0,12,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Stop charging at" Style="{StaticResource RowLabelStyle}" />
-                            <TextBlock x:Name="ChargeLimitValueText" Grid.Column="1" Style="{StaticResource ValueStyle}" />
-                        </Grid>
-
-                        <!-- A three-position slider, not a continuous one.
-                             MSI stores a three-state selector (BatteryLevel "0"/"1"/"2"), not a
-                             percentage - measured 2026-08-07. StepFrequency 20 over 60..100 makes
-                             the only reachable values 60, 80 and 100, so the control cannot offer
-                             a limit the device has no way to represent. SnapsTo is what enforces
-                             that on a drag; without it the thumb moves continuously and only the
-                             committed value snaps, which reads as the control fighting back.
-
-                             Always enabled - no separate toggle. 100% already IS "off" at the
-                             hardware level (a three-state selector, not a percentage; see
-                             RegistryChargeLimitProvider.Apply), so there is nothing a toggle would
-                             mean that moving the slider to 100 does not already mean. -->
-                        <Slider x:Name="ChargeLimitSlider"
-                                Style="{StaticResource CardSliderStyle}"
-                                Minimum="60" Maximum="100"
-                                StepFrequency="20"
-                                SnapsTo="StepValues"
-                                TickFrequency="20"
-                                TickPlacement="Outside"
-                                ValueChanged="ChargeLimitSlider_ValueChanged" />
-                    </StackPanel>
-                </Border>
+                <!-- 3. Battery charge limit was here. Removed 2026-08-08: it is set in MSI
+                     Center, changes rarely, and the registry path this app could reach did not
+                     enforce it. See docs/hardware-notes.md Gate G3. -->
 
                 <!-- 4. Lighting -->
                 <!-- On/off only. The vendor HID report that would carry mode/colour/effect is

@@ -38,7 +38,6 @@ namespace McenterLite.Hardware.Fake
                 MaxPl2Dc = 30,
                 TdpBackend = simulateClaw8Ex ? TdpBackendKind.Wmi : TdpBackendKind.Unavailable,
                 HasFan = simulateClaw8Ex,
-                HasChargeLimit = simulateClaw8Ex,
                 HasLed = simulateClaw8Ex,
                 HasHwMouse = simulateClaw8Ex,
                 HasIgcl = simulateClaw8Ex,
@@ -47,7 +46,6 @@ namespace McenterLite.Hardware.Fake
 
             Tdp = new FakeTdp(Caps);
             Fan = new FakeFan(simulateClaw8Ex);
-            ChargeLimit = new FakeChargeLimit(simulateClaw8Ex);
             Led = new FakeLed(simulateClaw8Ex);
             HwMouse = new FakeHwMouse(simulateClaw8Ex);
             Igcl = new FakeIgcl(simulateClaw8Ex);
@@ -61,7 +59,6 @@ namespace McenterLite.Hardware.Fake
         public DeviceCaps Caps { get; }
         public ITdpProvider Tdp { get; }
         public IFanProvider Fan { get; }
-        public IChargeLimitProvider ChargeLimit { get; }
         public ILedProvider Led { get; }
         public IHwMouseProvider HwMouse { get; }
         public IPowerProvider Power { get; }
@@ -231,33 +228,6 @@ namespace McenterLite.Hardware.Fake
             }
 
             return rpm + _rng.Next(-40, 41);
-        }
-    }
-
-    internal sealed class FakeChargeLimit : IChargeLimitProvider
-    {
-        private bool _enabled;
-        private int _percent = ChargeLevels.Default;
-
-        public FakeChargeLimit(bool available) => Available = available;
-
-        public bool Available { get; }
-        public string UnavailableReason => Available ? null : "Charge limiting is not available on this device.";
-
-        public bool TryRead(out bool enabled, out int percent)
-        {
-            enabled = _enabled;
-            percent = _percent;
-            return Available;
-        }
-
-        public OpResult Apply(bool enabled, int percent)
-        {
-            if (!Available) return OpResult.Unavailable(UnavailableReason);
-            _enabled = enabled;
-            // Snap, do not clamp: the device holds one of three levels, not a range.
-            _percent = ChargeLevels.Snap(percent);
-            return OpResult.Success();
         }
     }
 
