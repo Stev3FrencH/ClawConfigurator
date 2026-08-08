@@ -565,6 +565,20 @@ duties reach 84 against our cap of 75. `MSI_ACPI` also exposes `Get_Fan`/`Set_Fa
 `Get_Thermal`/`Set_Thermal` directly. **`src/Shared/Fan/FanProfiles.cs` describes the A2VM, not
 this device** — do not write a fan table until the duty scales are reconciled.
 
+**Answered 2026-08-08: MSI Center M's own fan control UI on this device accepts a 0–100% range,
+not capped at 75.** Confirmed directly in MSI Center's own fan slider on the EX, not inferred from
+the reference project. This refutes the "MSI's own cap is duty 75" assumption in the table above,
+which was carried over from the A2VM reference project and had never been independently measured
+on this device.
+
+It does **not** by itself resolve the byte-layout question this gate is actually blocked on: a UI
+accepting a 0–100% input says nothing about how that value gets encoded into the EC table this app
+would have to write, or whether the UI's percentage even maps 1:1 to the raw duty byte (`Duty is
+the raw EC byte, no scaling` above is itself still only "corroborated, not measured"). Still do not
+write a fan table until the six-point curve and its byte encoding are reconciled — but when that
+work happens, the ≤75 cap this project has assumed throughout (see `README.md`'s Safety section)
+needs revisiting against this finding, not carried forward unquestioned.
+
 ---
 
 ## Gate G3 — Battery charge limit
