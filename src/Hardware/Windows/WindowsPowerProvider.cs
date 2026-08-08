@@ -118,10 +118,47 @@ namespace McenterLite.Hardware.Windows
             if (rc != PowerInterop.ErrorSuccess)
                 return OpResult.Fail($"Failed to set the power-mode overlay (error {rc}).");
 
+            // Unlike the ordinary per-scheme settings ApplyCpuBoost writes (which have a documented
+            // AC/DC-symmetric API), PowerSetActiveOverlayScheme only ever updates the preference for
+            // whichever power source is currently active - confirmed by watching
+            // HKLM\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes\ActiveOverlay{Ac,Dc}PowerScheme
+            // while calling it on AC: only the AC value moved. Left alone, that means the setting
+            // silently reverts to whatever the other source was last set to the moment the device
+            // changes power source - the exact "which mode applies when" confusion this exists to
+            // remove. Mirror the same GUID into the other source's value directly.
+            TrySyncOtherPowerSourceOverlay(overlay);
+
             if (TryReadPowerMode(out var actual) && actual != mode)
                 return OpResult.Fail("The system did not accept the power-mode change.");
 
             return OpResult.Success();
+        }
+
+        /// <summary>
+        /// Writes the overlay GUID into the *other* power source's registry value, so AC and DC
+        /// stay identical. Best-effort: the primary <see cref="PowerInterop.PowerSetActiveOverlayScheme"/>
+        /// call above already succeeded and took effect for the active source, so a failure here is a
+        /// degraded outcome (only the current source is correct), not a reason to fail the whole call.
+        /// </summary>
+        private static void TrySyncOtherPowerSourceOverlay(Guid overlay)
+        {
+            try
+            {
+                if (!PowerInterop.GetSystemPowerStatus(out var status)) return;
+
+                string otherValueName;
+                if (status.ACLineStatus == 1) otherValueName = "ActiveOverlayDcPowerScheme"; // on AC; sync DC/battery
+                else if (status.ACLineStatus == 0) otherValueName = "ActiveOverlayAcPowerScheme"; // on battery; sync AC
+                else return; // Unknown power source - do not guess which side to overwrite.
+
+                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    @"SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes", writable: true);
+                key?.SetValue(otherValueName, overlay.ToString(), Microsoft.Win32.RegistryValueKind.String);
+            }
+            catch (Exception)
+            {
+                // Best-effort, as documented above.
+            }
         }
 
         // ── Helpers ─────────────────────────────────────────────────────────────

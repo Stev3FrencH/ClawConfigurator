@@ -78,6 +78,24 @@ namespace McenterLite.Hardware.Windows
 
         [DllImport("kernel32.dll", ExactSpelling = true)]
         internal static extern IntPtr LocalFree(IntPtr hMem);
+
+        /// <summary>Documented, in the public SDK headers (winbase.h) - unlike the overlay pair above.</summary>
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool GetSystemPowerStatus(out SystemPowerStatus status);
+    }
+
+    /// <summary>Subset of the fields in Win32's SYSTEM_POWER_STATUS. Only ACLineStatus is used here.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct SystemPowerStatus
+    {
+        /// <summary>0 = offline (running on battery), 1 = online (AC/plugged in), 255 = unknown.</summary>
+        public byte ACLineStatus;
+        public byte BatteryFlag;
+        public byte BatteryLifePercent;
+        public byte SystemStatusFlag;
+        public uint BatteryLifeTime;
+        public uint BatteryFullLifeTime;
     }
 
     /// <summary>
