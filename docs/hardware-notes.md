@@ -640,6 +640,52 @@ switched back on; the device cannot, because turning it off overwrites the only 
 > declared in/out parameters without calling it) to find that out before writing any code that
 > calls it.
 
+#### No Windows API exists for this (established 2026-08-08)
+
+Worth recording so it is not re-investigated. **Microsoft has never shipped a battery
+charge-threshold API.** ACPI's `_BTP` is a *notification* trip point, not a charge limiter; the
+WinRT `Windows.Devices.Power` / `Windows.System.Power` surfaces are read-only. Charge thresholds are
+vendor EC/BIOS features, which is why Lenovo Vantage, Dell Power Manager, MyASUS and Acer Care
+Center all ship their own utilities to do it. So MSI's own ACPI-WMI interface is not merely the
+preferred route — it is the only driver-free one.
+
+#### ClawTweaks cannot answer this (checked 2026-08-08)
+
+Re-verified against the live GitHub tree, not just the 2026-08-07 note above: the public repo
+contains only `ClawTweaksSetup/Core/HelperControl.cs` and `HelperPipeClient.cs` — the *client* side
+that talks to a helper over a pipe. **No battery, EC, ACPI or hardware-layer source exists in any
+ref.** Their implementation ships only as a compiled binary, so answering "how does ClawTweaks do
+it" would require decompiling the installed helper. Permitted under `LICENSE-NOTES.md`, but a much
+bigger lift than the route below, and unnecessary given it.
+
+#### Threshold byte encoding — hypothesis, source: `msi-ec` (2026-08-08)
+
+From the **`msi-ec` Linux driver** (`BeardOverflow/msi-ec`, GPL), which documents MSI firmware's EC
+layout. Recorded here as a hardware fact under rule 1 of this document — it describes the embedded
+controller, which does not know or care what OS is running, and **no Linux code is used, ported or
+shipped**. It is also cleaner provenance than ClawTweaks for an MIT project, carrying no
+AGPL-derivative risk.
+
+| Fact | Value |
+|---|---|
+| Threshold encoding | **`percent \| 0x80`** — bit 7 is an enable/commit flag, bits 0-6 the percent |
+| Write | `ec_write(addr, value \| BIT(7))` |
+| Read | masks `~BIT(7)` to recover the percent |
+| Charge-control EC address | `0xEF` on gen-1 MSI configs, `0xD7` on gen-2 |
+
+Expected bytes if the encoding holds: 60% → `0xBC`, 80% → `0xD0`, 100% → `0xE4`.
+
+> **Unverified on this device.** Those addresses are laptop configurations and the Claw is a
+> handheld, so **the address is not assumed** — only the encoding is carried forward, and only as a
+> hypothesis to confirm by reading. Per rule 3 of this document, this does not go into a write
+> until it has been read back on the EX.
+
+**Decision: writes go through `Set_MasterBattery` only.** `MSI_ACPI` also exposes `Set_EC`, which
+writes a raw byte to an arbitrary controller address — a wrong address reaches fan or thermal
+registers on real firmware. The purpose-built method lets the firmware validate instead. Enforced
+in code, not merely documented: `Probe`'s `--acpi-get` refuses any method not named `Get_*`, and
+`--set-charge-limit` calls `Set_MasterBattery` and nothing else.
+
 ---
 
 ## Gate G4 — RGB LED

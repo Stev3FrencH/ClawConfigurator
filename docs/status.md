@@ -44,19 +44,77 @@ sufficient. MSI Center's own UI is doing something extra, most likely calling
 `MSI_ACPI.Set_MasterBattery` directly (the ACPI-WMI path the original desk research always expected
 this feature to need). Full writeup: [`hardware-notes.md` Gate G3](hardware-notes.md#gate-g3--battery-charge-limit).
 
-**Next step — needs to run on the Claw:**
+**No Windows API exists for this.** Microsoft has never shipped one — charge thresholds are vendor
+EC/BIOS features, which is why every OEM ships its own utility. MSI's `MSI_ACPI` ACPI-WMI class is
+the only driver-free route, and it is confirmed present on the device
+(`Diagnostics/device-report.txt:489`). ClawTweaks cannot be consulted: its public repo contains
+only the pipe-client side, never the hardware layer, which ships as a compiled binary only.
 
-1. Copy over the freshly published Probe: `src/Probe/bin/Release/net8.0-windows/win-x64/publish/McenterLite.Probe.exe`
-2. Elevated PowerShell:
-   ```powershell
-   .\McenterLite.Probe.exe --wmi-method MSI_ACPI Set_MasterBattery
-   .\McenterLite.Probe.exe --wmi-method MSI_ACPI Get_MasterBattery
-   ```
-   This is read-only — it dumps the method's declared parameters without calling it.
-3. If either errors with "no method named", first run `--wmi-classes MSI_ACPI` to confirm the
-   exact class is present and get the real method list, and report that instead.
-4. Paste back whatever it prints. That parameter shape is what's needed to write
-   `Set_MasterBattery` support with confidence instead of guessing at an EC write.
+**Working hypothesis for the encoding:** the threshold byte is `percent | 0x80` — bit 7 an
+enable/commit flag, bits 0–6 the percentage. Sourced from the `msi-ec` Linux driver, which
+documents MSI firmware's EC layout; that is a property of the embedded controller and independent
+of the OS, so nothing Linux is used or ported. **Unverified on the Claw** (a handheld, not one of
+the laptops that driver covers) — confirm by reading before writing. Expected: 60% → `0xBC`,
+80% → `0xD0`, 100% → `0xE4`.
+
+**Decision: writes go through `Set_MasterBattery` only.** No raw `MSI_ACPI.Set_EC` — a wrong
+address there puts a raw byte into real firmware that could land on fan or thermal registers.
+This is enforced in code, not just documented: `--acpi-get` refuses any method not named `Get_*`.
+
+### Step 0 — costs nothing, needs no new build
+
+The Probe already on the Claw can do this. `MSI_Master_Battery` is a WMI class with a readable
+`Master_Battery` property (`device-report.txt:1444-1447`) that may expose the threshold directly:
+
+```powershell
+.\McenterLite.Probe.exe --wmi-instances MSI_Master_Battery
+```
+
+Run it three times, setting **MSI Center's own** charge limit to 100 / 80 / 60 in between. If
+`Master_Battery` tracks those as 228/208/188 (or plain 100/80/60), the encoding is decoded
+read-only, with no method call at all.
+
+### Step 1 — with the rebuilt Probe
+
+Copy over `src/Probe/bin/Release/net8.0-windows/win-x64/publish/McenterLite.Probe.exe`, then in an
+**elevated** PowerShell:
+
+```powershell
+# Read-only: declared parameter shapes, without calling anything
+.\McenterLite.Probe.exe --wmi-method MSI_ACPI Get_MasterBattery
+.\McenterLite.Probe.exe --wmi-method MSI_ACPI Set_MasterBattery
+
+# Read-only: actually call the getter and dump the buffer as indexed hex
+.\McenterLite.Probe.exe --battery
+```
+
+Re-run `--battery` at each of MSI Center's three settings. Whichever byte index tracks 100/80/60 is
+the threshold — that is the fact the fix depends on.
+
+### Step 2 — the write, once the read makes sense
+
+```powershell
+.\McenterLite.Probe.exe --set-charge-limit 60
+```
+
+Prints the byte it will send, and reads back before and after. Then the test that actually matters,
+since a changed read-back only proves the value landed:
+
+```powershell
+.\Watch-Battery.ps1 -Limit 60      # plug in, below 60%; reports ENFORCED / NOT ENFORCED
+```
+
+Then `--set-charge-limit 100` and confirm charging *resumes* — that is the case that failed via the
+registry, so it is the sharpest signal the WMI path is genuinely different. Finally reboot and
+re-read to confirm it persists in the controller.
+
+If any of this errors with "no method named", run `--wmi-classes MSI` first and report the real
+method list instead.
+
+**Then:** implement `WmiChargeLimitProvider` against the measured facts and swap it into
+`WindowsHardware.cs:66`. Likely shape is registry for read/display (it already round-trips and
+keeps MSI Center's UI in sync) plus WMI for apply — but that is a decision to make against
+measurements, not in advance.
 
 ### 2. Lighting card does not appear at all
 

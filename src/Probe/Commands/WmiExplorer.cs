@@ -155,6 +155,81 @@ namespace McenterLite.Probe.Commands
             return 0;
         }
 
+        /// <summary>
+        /// Calls a READ-ONLY <c>MSI_ACPI</c> method and dumps its output buffer.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The <c>Get_</c> prefix check below is a real safety boundary, not a naming nicety.
+        /// <c>MSI_ACPI</c> exposes <c>Set_EC</c>, which writes a raw byte to an arbitrary embedded
+        /// controller address - a wrong address there lands on fan or thermal registers of real
+        /// firmware. Writes are deliberately confined to one purpose-built method, in
+        /// <see cref="BatteryInfo"/>, where the firmware validates the value. Nothing reachable
+        /// from this command can write.
+        /// </para>
+        /// <para>
+        /// Reading is unrestricted because it is safe and because finding which address or index
+        /// carries a value is the whole job.
+        /// </para>
+        /// </remarks>
+        public static int AcpiGet(string[] args)
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                Console.Error.WriteLine("This command needs Windows.");
+                return 1;
+            }
+
+            if (args.Length < 1)
+            {
+                Console.Error.WriteLine(
+                    "Usage: --acpi-get <Get_Method> [bytes...]\n" +
+                    "  e.g. --acpi-get Get_MasterBattery\n" +
+                    "       --acpi-get Get_EC 0xD7");
+                return 64;
+            }
+
+            var methodName = args[0];
+
+            if (!methodName.StartsWith("Get_", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.Error.WriteLine(
+                    $"Refusing to call '{methodName}': this command only calls Get_* methods.\n" +
+                    "Writes are restricted to --set-charge-limit, which calls Set_MasterBattery\n" +
+                    "and nothing else. Raw Set_EC writes are deliberately not reachable from here.");
+                return 64;
+            }
+
+            if (!MsiAcpi.TryParseBytes(args.Skip(1).ToArray(), out var payload, out var parseError))
+            {
+                Console.Error.WriteLine(parseError);
+                return 64;
+            }
+
+            var instance = MsiAcpi.TryGetInstance(out var error);
+            if (instance == null)
+            {
+                Console.Error.WriteLine(error);
+                return 1;
+            }
+
+            using (instance)
+            {
+                Console.WriteLine($"{MsiAcpi.ClassName}.{methodName}");
+
+                var result = MsiAcpi.Invoke(instance, methodName, payload, out error);
+                if (result == null)
+                {
+                    Console.Error.WriteLine(error);
+                    return 1;
+                }
+
+                MsiAcpi.DumpResult(result);
+            }
+
+            return 0;
+        }
+
         private static void DumpParameters(string label, ManagementBaseObject parameters)
         {
             if (parameters == null)
