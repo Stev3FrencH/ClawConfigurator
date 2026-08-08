@@ -110,6 +110,12 @@ function Show-CimResult {
             Write-Host "$Indent$($prop.Name) = byte[$($prop.Value.Count)]"
             Show-Bytes -Bytes $prop.Value -Indent "$Indent  "
         }
+        elseif ($prop.Value -is [Microsoft.Management.Infrastructure.CimInstance]) {
+            # The payload of an EmbeddedInstance method rides in here, so this recursion is
+            # where the answer actually shows up - not at the top level.
+            Write-Host "$Indent$($prop.Name) = [$($prop.Value.CimSystemProperties.ClassName)]"
+            Show-CimResult -Result $prop.Value -Indent "$Indent  "
+        }
         elseif ($null -ne $prop.Value -and $prop.Value.GetType().IsValueType) {
             Write-Host ("{0}{1} = 0x{2:X} ({2})" -f $Indent, $prop.Name, $prop.Value)
         }
@@ -189,10 +195,44 @@ foreach ($name in @($ReadMethod, $WriteMethod)) {
     foreach ($p in $method.Parameters) {
         $quals = ($p.Qualifiers | ForEach-Object { $_.Name }) -join ','
         Write-Host "      $($p.Name) : $($p.CimType)   [$quals]"
+
+        # An EmbeddedInstance parameter names the class it expects. Without that value there is
+        # nothing to construct, which is why every plain byte/scalar shape was rejected.
+        $embedded = $p.Qualifiers['EmbeddedInstance']
+        if ($embedded) {
+            Write-Host "        EmbeddedInstance -> $($embedded.Value)" -ForegroundColor Green
+        }
     }
 }
 
 Write-Host ''
+
+# ── 2b. The embedded payload class ──────────────────────────────────────────
+
+$EmbeddedClassName = $null
+$readMethodDecl = $class.CimClassMethods[$ReadMethod]
+if ($readMethodDecl) {
+    foreach ($p in $readMethodDecl.Parameters) {
+        $embedded = $p.Qualifiers['EmbeddedInstance']
+        if ($embedded) { $EmbeddedClassName = $embedded.Value; break }
+    }
+}
+
+$EmbeddedClass = $null
+if ($EmbeddedClassName) {
+    Write-Host "[2b] Embedded payload class: $EmbeddedClassName" -ForegroundColor Yellow
+    try {
+        $EmbeddedClass = Get-CimClass -Namespace $Namespace -ClassName $EmbeddedClassName -ErrorAction Stop
+        foreach ($prop in $EmbeddedClass.CimClassProperties) {
+            $quals = ($prop.Qualifiers | ForEach-Object { $_.Name }) -join ','
+            Write-Host "      $($prop.Name) : $($prop.CimType)   [$quals]"
+        }
+    }
+    catch {
+        Write-Warning "Could not read $EmbeddedClassName in ${Namespace}: $($_.Exception.Message)"
+    }
+    Write-Host ''
+}
 
 # ── 3. Call the READ method, trying each plausible argument shape ───────────
 
@@ -235,11 +275,43 @@ function Get-InputParameters {
     return @($Method.Parameters | Where-Object { $_.Qualifiers['In'] })
 }
 
+function New-EmbeddedPayload {
+    <#
+        Builds the [EmbeddedInstance] object a method expects, filling its properties from the
+        byte payload. Array properties get a buffer of the given size; scalars get the first
+        byte. -ClientOnly because this object is an argument, not something WMI already holds.
+    #>
+    param([string]$ClassName, $ClassDecl, [byte[]]$Payload, [int]$BufferSize)
+
+    $properties = @{}
+
+    if ($ClassDecl) {
+        foreach ($prop in $ClassDecl.CimClassProperties) {
+            # Key/system properties are not ours to populate.
+            if ($prop.Qualifiers['key']) { continue }
+
+            if ($prop.CimType -match 'Array') {
+                $buffer = New-Object byte[] $BufferSize
+                for ($i = 0; $i -lt $Payload.Count -and $i -lt $BufferSize; $i++) {
+                    $buffer[$i] = $Payload[$i]
+                }
+                $properties[$prop.Name] = $buffer
+            }
+            elseif ($prop.CimType -match 'UInt8|SInt8|UInt16|SInt16|UInt32|SInt32|UInt64|SInt64') {
+                $properties[$prop.Name] = if ($Payload.Count -gt 0) { [uint32]$Payload[0] } else { [uint32]0 }
+            }
+        }
+    }
+
+    return New-CimInstance -Namespace $Namespace -ClassName $ClassName `
+                           -Property $properties -ClientOnly -ErrorAction Stop
+}
+
 function Get-ArgumentShapes {
     <#
-        Candidate argument sets for a method whose shape is not yet known, most likely first.
-        Instance/Reference parameters are skipped rather than synthesised - they cannot be
-        conjured from a byte payload, and guessing produced the original failure.
+        Candidate argument sets for a method whose shape is not yet fully known, most likely
+        first. EmbeddedInstance parameters are CONSTRUCTED from the class the qualifier names -
+        skipping them, as an earlier version did, left the method with nothing to act on.
     #>
     param($Method, [byte[]]$Payload)
 
@@ -250,33 +322,49 @@ function Get-ArgumentShapes {
         return @(, @{ Label = 'no arguments'; Arguments = $null })
     }
 
-    $unsupported = @($inputs | Where-Object { $_.CimType -match 'Instance|Reference' })
-    if ($unsupported.Count -gt 0) {
-        Write-Host ("    note: skipping parameter(s) of type Instance/Reference: {0}" -f
-            (($unsupported | ForEach-Object { $_.Name }) -join ', ')) -ForegroundColor DarkGray
-    }
-
-    $usable = @($inputs | Where-Object { $_.CimType -notmatch 'Instance|Reference' })
-
-    foreach ($size in 32, 8, 4) {
+    foreach ($size in 32, 256, 8, 4) {
         # NOT $args - that is an automatic variable in PowerShell functions.
         $argSet = @{}
-        $applies = $false
+        $varies = $false
+        $ok = $true
 
-        foreach ($p in $usable) {
-            if ($p.CimType -match 'Array') {
+        foreach ($p in $inputs) {
+            $embedded = $p.Qualifiers['EmbeddedInstance']
+
+            if ($embedded) {
+                try {
+                    $decl = $null
+                    try { $decl = Get-CimClass -Namespace $Namespace -ClassName $embedded.Value -ErrorAction Stop }
+                    catch { $decl = $null }
+
+                    $argSet[$p.Name] = New-EmbeddedPayload -ClassName $embedded.Value `
+                        -ClassDecl $decl -Payload $Payload -BufferSize $size
+                    $varies = $true
+                }
+                catch {
+                    Write-Host "    could not build $($embedded.Value): $($_.Exception.Message)" -ForegroundColor DarkYellow
+                    $ok = $false
+                }
+            }
+            elseif ($p.CimType -match 'Array') {
                 $buffer = New-Object byte[] $size
                 for ($i = 0; $i -lt $Payload.Count -and $i -lt $size; $i++) { $buffer[$i] = $Payload[$i] }
                 $argSet[$p.Name] = $buffer
-                $applies = $true
+                $varies = $true
+            }
+            elseif ($p.CimType -match 'Instance|Reference') {
+                $ok = $false   # an instance parameter with no class named - nothing to build
             }
             else {
                 $argSet[$p.Name] = if ($Payload.Count -gt 0) { [uint32]$Payload[0] } else { [uint32]0 }
             }
         }
 
-        if ($argSet.Count -gt 0) { $shapes += @{ Label = "buffer $size"; Arguments = $argSet } }
-        if (-not $applies) { break }   # no array parameter, so buffer size is irrelevant
+        if ($ok -and $argSet.Count -gt 0) {
+            $shapes += @{ Label = "payload $size"; Arguments = $argSet }
+        }
+
+        if (-not $varies) { break }   # nothing size-dependent, so retrying sizes is pointless
     }
 
     # Last resort: some ACPI methods accept a bare call despite declaring inputs.
