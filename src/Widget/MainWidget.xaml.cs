@@ -47,9 +47,91 @@ namespace McenterLite.Widget
         /// </remarks>
         private bool _applyingFromHelper;
 
+        /// <summary>
+        /// Drives a <see cref="Button"/> as a cycling selector over a fixed list of options.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Replaces the ComboBox everywhere in this widget. The device is a handheld driven with a
+        /// game controller: a dropdown costs a press to open, D-pad travel through a popup that
+        /// takes focus out of the card, and a second press to commit. This is one press per step.
+        /// </para>
+        /// <para>
+        /// The option strings live here rather than in XAML because the index IS the wire value -
+        /// it is cast straight to <c>PerfMode</c>, <c>FanPreset</c>, <c>LedMode</c> and friends.
+        /// Keeping the list next to the code that casts it makes that coupling visible; in XAML it
+        /// was three files apart.
+        /// </para>
+        /// </remarks>
+        private sealed class OptionCycler
+        {
+            private readonly Button _button;
+            private readonly string[] _options;
+
+            public OptionCycler(Button button, params string[] options)
+            {
+                _button = button;
+                _options = options;
+                _button.Content = options[0];
+            }
+
+            public int Index { get; private set; }
+
+            /// <summary>Displays an option WITHOUT treating it as user input.</summary>
+            public void Show(int index)
+            {
+                if (index < 0 || index >= _options.Length) return;
+                Index = index;
+                _button.Content = _options[index];
+            }
+
+            /// <summary>Advances one step, wrapping past the end. Returns the new index.</summary>
+            public int Advance()
+            {
+                Show((Index + 1) % _options.Length);
+                return Index;
+            }
+
+            public bool IsEnabled
+            {
+                set => _button.IsEnabled = value;
+            }
+        }
+
+        private OptionCycler _perfMode;
+        private OptionCycler _fanPreset;
+        private OptionCycler _chargeLimit;
+        private OptionCycler _ledMode;
+        private OptionCycler _powerMode;
+        private OptionCycler _intelFpsTier;
+        private OptionCycler _intelLowLatency;
+
         public MainWidget()
         {
             InitializeComponent();
+
+            // Order is the contract: every index below is cast directly to the enum it names.
+            _perfMode = new OptionCycler(PerfModeButton,
+                "Endurance", "User Scenario", "AI Engine");
+
+            _fanPreset = new OptionCycler(FanPresetButton,
+                "MSI Default", "Quiet Idle", "Cooling \u00B7 Early Ramp");
+
+            // Ascending, matching ChargeLevels.All().
+            _chargeLimit = new OptionCycler(ChargeLimitButton,
+                "60%  \u00B7  best for longevity", "80%  \u00B7  balanced", "100%  \u00B7  full capacity");
+
+            _ledMode = new OptionCycler(LedModeButton,
+                "Off", "Static", "Breathing", "Colour cycle", "Wave");
+
+            _powerMode = new OptionCycler(PowerModeButton,
+                "Best power efficiency", "Balanced", "Best performance");
+
+            _intelFpsTier = new OptionCycler(IntelFpsTierButton,
+                "Off", "Performance (60 fps)", "Balanced (40 fps)", "Efficiency (30 fps)");
+
+            _intelLowLatency = new OptionCycler(IntelLowLatencyButton,
+                "Off", "On", "On + boost");
 
             _connection.SnapshotApplied += OnSnapshotApplied;
             _connection.ValueChanged += OnValueChanged;
@@ -250,11 +332,11 @@ namespace McenterLite.Widget
 
                 case Function.FanEnabled:
                     FanEnabledToggle.IsOn = _connection.GetBool(Function.FanEnabled);
-                    FanPresetCombo.IsEnabled = FanEnabledToggle.IsOn;
+                    _fanPreset.IsEnabled = FanEnabledToggle.IsOn;
                     break;
 
                 case Function.FanPreset:
-                    FanPresetCombo.SelectedIndex = Clamp(_connection.GetInt(Function.FanPreset, 0), 0, 2);
+                    _fanPreset.Show(Clamp(_connection.GetInt(Function.FanPreset, 0), 0, 2));
                     break;
 
                 case Function.FanState:
@@ -263,14 +345,14 @@ namespace McenterLite.Widget
 
                 case Function.ChargeLimitEnabled:
                     ChargeLimitToggle.IsOn = _connection.GetBool(Function.ChargeLimitEnabled);
-                    ChargeLimitCombo.IsEnabled = ChargeLimitToggle.IsOn;
+                    _chargeLimit.IsEnabled = ChargeLimitToggle.IsOn;
                     break;
 
                 case Function.ChargeLimitPercent:
                 {
                     int percent = ChargeLevels.Snap(
                         _connection.GetInt(Function.ChargeLimitPercent, ChargeLevels.Default));
-                    ChargeLimitCombo.SelectedIndex = ChargeLevels.ToIndex(percent);
+                    _chargeLimit.Show(ChargeLevels.ToIndex(percent));
                     ChargeLimitValueText.Text = $"{percent}%";
                     break;
                 }
@@ -288,15 +370,15 @@ namespace McenterLite.Widget
                     break;
 
                 case Function.OsPowerMode:
-                    PowerModeCombo.SelectedIndex = Clamp(_connection.GetInt(Function.OsPowerMode, 1), 0, 2);
+                    _powerMode.Show(Clamp(_connection.GetInt(Function.OsPowerMode, 1), 0, 2));
                     break;
 
                 case Function.IntelFpsTier:
-                    IntelFpsTierCombo.SelectedIndex = Clamp(_connection.GetInt(Function.IntelFpsTier, 0), 0, 3);
+                    _intelFpsTier.Show(Clamp(_connection.GetInt(Function.IntelFpsTier, 0), 0, 3));
                     break;
 
                 case Function.IntelLowLatency:
-                    IntelLowLatencyCombo.SelectedIndex = Clamp(_connection.GetInt(Function.IntelLowLatency, 0), 0, 2);
+                    _intelLowLatency.Show(Clamp(_connection.GetInt(Function.IntelLowLatency, 0), 0, 2));
                     break;
 
                 case Function.MsiCenterRunning:
@@ -341,7 +423,7 @@ namespace McenterLite.Widget
         private void ApplyLedSpec(string payload)
         {
             var spec = LedSpec.Parse(payload ?? "");
-            LedModeCombo.SelectedIndex = Clamp((int)spec.Mode, 0, 4);
+            _ledMode.Show(Clamp((int)spec.Mode, 0, 4));
             LedBrightnessSlider.Value = spec.Brightness;
             LedBrightnessValueText.Text = $"{spec.Brightness}%";
         }
@@ -364,18 +446,18 @@ namespace McenterLite.Widget
             // Unknown is not in the dropdown: MSI reported a mode we do not model, so leave the
             // selection alone rather than misrepresenting it as one of the three we do.
             if (mode != PerfMode.Unknown)
-                PerfModeCombo.SelectedIndex = (int)mode;
+                _perfMode.Show((int)mode);
 
             Pl1Slider.IsEnabled = manual;
             Pl2Slider.IsEnabled = manual;
             PerfModeHint.Visibility = manual ? Visibility.Collapsed : Visibility.Visible;
         }
 
-        private async void PerfModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void PerfModeButton_Click(object sender, RoutedEventArgs e)
         {
             if (_applyingFromHelper) return;
 
-            var mode = (PerfMode)PerfModeCombo.SelectedIndex;
+            var mode = (PerfMode)_perfMode.Advance();
             ApplyPerfMode(mode);
             await SendAsync(Function.PerfMode, (int)mode);
 
@@ -402,34 +484,35 @@ namespace McenterLite.Widget
         private async void FanEnabledToggle_Toggled(object sender, RoutedEventArgs e)
         {
             if (_applyingFromHelper) return;
-            FanPresetCombo.IsEnabled = FanEnabledToggle.IsOn;
+            _fanPreset.IsEnabled = FanEnabledToggle.IsOn;
             await SendAsync(Function.FanEnabled, FanEnabledToggle.IsOn);
         }
 
-        private async void FanPresetCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void FanPresetButton_Click(object sender, RoutedEventArgs e)
         {
             if (_applyingFromHelper) return;
-            await SendAsync(Function.FanPreset, FanPresetCombo.SelectedIndex);
+            await SendAsync(Function.FanPreset, _fanPreset.Advance());
         }
 
         private async void ChargeLimitToggle_Toggled(object sender, RoutedEventArgs e)
         {
             if (_applyingFromHelper) return;
-            ChargeLimitCombo.IsEnabled = ChargeLimitToggle.IsOn;
+            _chargeLimit.IsEnabled = ChargeLimitToggle.IsOn;
             await SendAsync(Function.ChargeLimitEnabled, ChargeLimitToggle.IsOn);
         }
 
-        private async void ChargeLimitCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void ChargeLimitButton_Click(object sender, RoutedEventArgs e)
         {
             if (_applyingFromHelper) return;
-            int percent = ChargeLevels.FromIndex(ChargeLimitCombo.SelectedIndex);
+            int percent = ChargeLevels.FromIndex(_chargeLimit.Advance());
             ChargeLimitValueText.Text = $"{percent}%";
             await SendAsync(Function.ChargeLimitPercent, percent);
         }
 
-        private async void LedModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void LedModeButton_Click(object sender, RoutedEventArgs e)
         {
             if (_applyingFromHelper) return;
+            _ledMode.Advance();
             await SendLedAsync();
         }
 
@@ -452,7 +535,7 @@ namespace McenterLite.Widget
         private async Task SendLedAsync()
         {
             var spec = LedSpec.Parse(_connection.Get(Function.LedSpec) ?? "");
-            spec.Mode = (LedMode)Clamp(LedModeCombo.SelectedIndex, 0, 4);
+            spec.Mode = (LedMode)Clamp(_ledMode.Index, 0, 4);
             spec.Brightness = (int)LedBrightnessSlider.Value;
 
             await SendAsync(Function.LedSpec, spec.Serialize());
@@ -470,22 +553,22 @@ namespace McenterLite.Widget
             await SendAsync(Function.CpuBoost, CpuBoostToggle.IsOn);
         }
 
-        private async void PowerModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void PowerModeButton_Click(object sender, RoutedEventArgs e)
         {
             if (_applyingFromHelper) return;
-            await SendAsync(Function.OsPowerMode, PowerModeCombo.SelectedIndex);
+            await SendAsync(Function.OsPowerMode, _powerMode.Advance());
         }
 
-        private async void IntelFpsTierCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void IntelFpsTierButton_Click(object sender, RoutedEventArgs e)
         {
             if (_applyingFromHelper) return;
-            await SendAsync(Function.IntelFpsTier, IntelFpsTierCombo.SelectedIndex);
+            await SendAsync(Function.IntelFpsTier, _intelFpsTier.Advance());
         }
 
-        private async void IntelLowLatencyCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void IntelLowLatencyButton_Click(object sender, RoutedEventArgs e)
         {
             if (_applyingFromHelper) return;
-            await SendAsync(Function.IntelLowLatency, IntelLowLatencyCombo.SelectedIndex);
+            await SendAsync(Function.IntelLowLatency, _intelLowLatency.Advance());
         }
 
         private async void StatusActionButton_Click(object sender, RoutedEventArgs e) => await StartAsync();

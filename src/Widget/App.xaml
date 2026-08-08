@@ -130,10 +130,56 @@
                 <Setter Property="IsThumbToolTipEnabled" Value="False" />
             </Style>
 
-            <Style x:Key="CardComboStyle" TargetType="ComboBox">
+            <!--
+                A button that cycles through a fixed list of options, used everywhere a ComboBox
+                would otherwise be.
+
+                This is a gamepad-first decision, not a stylistic one. The Claw is driven with a
+                controller: a ComboBox costs a press to open the flyout, D-pad travel through a
+                popup that steals focus, and a second press to commit - and the popup can render
+                outside the widget's bounds in the Game Bar. A cycle button is one A press per
+                step, with focus never leaving the card.
+
+                It also deletes a bug class. A ComboBox raises SelectionChanged while XAML applies
+                its markup defaults during construction, which is why every helper-driven update
+                has to be wrapped in a guard. A Button raises Click only when something clicks it.
+
+                The trade is that reaching option 5 of 5 takes four presses. That is acceptable at
+                these list lengths - the longest here is the five LED effects - and would not be
+                if any list grew much beyond that.
+            -->
+            <Style x:Key="CycleButtonStyle" TargetType="Button">
                 <Setter Property="HorizontalAlignment" Value="Stretch" />
-                <Setter Property="MinHeight" Value="34" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="MinHeight" Value="38" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="Padding" Value="12,6" />
                 <Setter Property="Margin" Value="0,2,0,0" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="ContentTemplate">
+                    <Setter.Value>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding}"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+                                <!-- Says "there is another option this way" rather than "this
+                                     opens something", which a dropdown chevron would imply. -->
+                                <FontIcon Grid.Column="1"
+                                          Glyph="&#xE76C;"
+                                          FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                          FontSize="12"
+                                          Margin="8,0,0,0"
+                                          VerticalAlignment="Center"
+                                          Opacity="0.6" />
+                            </Grid>
+                        </DataTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
 
             <!-- Inline notice used for both the connection banner and the MSI Center notice. -->

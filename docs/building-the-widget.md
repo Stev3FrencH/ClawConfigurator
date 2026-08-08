@@ -59,6 +59,24 @@ can be compiled here to find out. Every key `MainWidget.xaml` references is defi
   with no compile error.
 - **`TextBlock.FontFeatures` does not exist in UWP.** Value alignment uses `MinWidth` +
   `TextAlignment` instead of tabular figures. If you reach for font features later, it is not there.
+- **`CycleButtonStyle`'s `ContentTemplate`.** Every selector is a `Button` whose `Content` is a
+  plain string, rendered by a `DataTemplate` that binds `{Binding}` and appends a chevron. If the
+  buttons come out blank, that binding is the first thing to check — `{Binding}` against a
+  `ContentPresenter` resolves to the content itself, which is correct but easy to break.
+- **Selector option lists live in `MainWidget.xaml.cs`, not in XAML.** `OptionCycler` is
+  constructed with them, and **the index is the wire value** — cast straight to `PerfMode`,
+  `FanPreset`, `LedMode` and so on. Reordering a list silently changes what the helper is told.
+
+### Why buttons instead of dropdowns
+
+The Claw is driven with a game controller. A `ComboBox` costs a press to open, D-pad travel
+through a popup that pulls focus out of the card, and a second press to commit — and the popup can
+render outside the widget's bounds inside the Game Bar. A cycle button is one A press per step
+with focus never leaving the card.
+
+It also removes a bug class: a `ComboBox` raises `SelectionChanged` while XAML applies its markup
+defaults during construction, which is exactly what `_applyingFromHelper` exists to suppress. A
+`Button` raises `Click` only when something clicks it.
 
 ## Creating the packaging project
 
