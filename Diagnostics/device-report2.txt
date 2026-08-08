@@ -1,0 +1,1606 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20260807204334
+Username: DESKTOP-4VQMFVD\jdurham
+RunAs User: DESKTOP-4VQMFVD\jdurham
+Configuration Name: 
+Machine: DESKTOP-4VQMFVD (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+Process ID: 7748
+PSVersion: 5.1.26100.8875
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.8875
+BuildVersion: 10.0.26100.8875
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+
+=== Identity ===
+
+
+Vendor            : Micro-Star International Co., Ltd.
+Name              : Claw 8 EX AI+ CG3EM
+Version           : REV:1.0
+IdentifyingNumber : K2606N0060207
+
+
+
+
+
+Manufacturer : Micro-Star International Co., Ltd.
+Product      : MS-1T91
+Version      : REV:1.0
+
+
+
+
+
+Manufacturer      : American Megatrends International, LLC.
+SMBIOSBIOSVersion : E1T91IMS.10A
+ReleaseDate       : 7/28/2026 5:00:00 PM
+
+
+
+
+=== Processor and graphics ===
+
+
+Name                      : Intel(R) Arc(TM) G3 Extreme
+NumberOfCores             : 14
+NumberOfLogicalProcessors : 14
+MaxClockSpeed             : 1900
+
+
+
+
+
+Name          : Intel(R) Arc(TM) B390 GPU
+DriverVersion : 32.0.101.8801
+DriverDate    : 5/11/2026 5:00:00 PM
+PNPDeviceID   : PCI\VEN_8086&DEV_B080&SUBSYS_15101462&REV_04\3&11583659&0&10
+
+
+
+
+=== Intel Graphics Control Library ===
+  present: C:\WINDOWS\System32\ControlLib.dll
+  version: 1.2.288.0
+
+=== MSI software ===
+
+ProcessName                              Id Company                            Path
+-----------                              -- -------                            ----
+mongMode                              13948 MSI                                C:\Program Files (x86)\MSI\MSI Center M\mo...
+MSI Center M                          17836 Micro-Star Int'l Co., Ltd.         C:\Program Files\WindowsApps\9426MICRO-STA...
+MSI_Center_M_Launcher                  8860 Micro-Star Int'l Co., Ltd.         C:\Program Files (x86)\MSI\MSI Center M\MS...
+MSI_Center_M_Server                    4660 Micro-Star Int'l Co., Ltd.         C:\Program Files (x86)\MSI\MSI Center M\MS...
+MSI_Center_M_Server_Battery            8364 Micro-Star Int'l Co., Ltd.         C:\Program Files (x86)\MSI\MSI Center M\MS...
+MSI_Center_M_Server_ControlMode        8852 Micro-Star Int'l Co., Ltd.         C:\Program Files (x86)\MSI\MSI Center M\MS...
+MSI_Center_M_Server_GameLibrary        8968 Micro-Star Int'l Co., Ltd.         C:\Program Files (x86)\MSI\MSI Center M\MS...
+MSI_Center_M_Server_LiveUpdate         8660 Micro-Star Int'l Co., Ltd.         C:\Program Files (x86)\MSI\MSI Center M\MS...
+MSI_Center_M_Server_MediaGallery       8480 Micro-Star Int'l Co., Ltd.         C:\Program Files (x86)\MSI\MSI Center M\MS...
+MSI_Center_M_Server_MysticLight        7980 Micro-Star Int'l Co., Ltd.         C:\Program Files (x86)\MSI\MSI Center M\MS...
+MSI_Center_M_Server_Nahimic            8396 Micro-Star Int'l Co., Ltd.         C:\Program Files (x86)\MSI\MSI Center M\MS...
+MSI_Center_M_Server_NoiseCancellation  8416 Micro-Star Int'l Co., Ltd.         C:\Program Files (x86)\MSI\MSI Center M\MS...
+MSI_Center_M_Server_Service            8948 Micro-Star Int'l Co., Ltd.         C:\Program Files (x86)\MSI\MSI Center M\MS...
+MSI_Center_M_Server_Storage            8624 Micro-Star Int'l Co., Ltd.         C:\Program Files (x86)\MSI\MSI Center M\MS...
+MSI_Center_M_Server_UserScenario       7820 Micro-Star Int'l Co., Ltd.         C:\Program Files (x86)\MSI\MSI Center M\MS...
+MSIAPService                           4960 Micro-Star International Co., Ltd. C:\Program Files (x86)\MSI\MSI Center M\MS...
+Noise Cancellation M                  10160 Micro-Star INT'L CO., LTD.         C:\Program Files (x86)\MSI\MSI Center M\No...
+
+
+
+Name                   DisplayName                        Status StartType
+----                   -----------                        ------ ---------
+MSI Foundation Service MSI Foundation Service            Running Automatic
+MSiSCSI                Microsoft iSCSI Initiator Service Stopped    Manual
+msiserver              Windows Installer                 Stopped    Manual
+
+
+
+=== Intel thermal stack (IPF / DTT) ===
+
+Name    DisplayName                                           Status StartType
+----    -----------                                           ------ ---------
+dptftcs Intel(R) Dynamic Tuning Technology Telemetry Service Running Automatic
+ipfsvc  Intel(R) Innovation Platform Framework Service       Running Automatic
+
+
+
+
+Status       : OK
+Class        : System
+FriendlyName : Intel(R) Innovation Platform Framework Fan Participant
+InstanceId   : ACPI\INTC10D6\TFN1
+
+
+
+
+=== MSI HID interfaces (VID_0DB0) ===
+
+
+Status       : OK
+Class        : Keyboard
+FriendlyName : HID Keyboard Device
+InstanceId   : HID\VID_0DB0&PID_1901&MI_02&COL01\7&338A39EB&0&0000
+
+Status       : OK
+Class        : HIDClass
+FriendlyName : USB Input Device
+InstanceId   : USB\VID_0DB0&PID_1901&IG_00\7&4032161&0&00
+
+Status       : OK
+Class        : XnaComposite
+FriendlyName : Xbox 360 Controller for Windows
+InstanceId   : USB\VID_0DB0&PID_1901&MI_00\6&2B02AE9F&0&0000
+
+Status       : OK
+Class        : USB
+FriendlyName : USB Composite Device
+InstanceId   : USB\VID_0DB0&PID_1901\00006F64096B22E7
+
+Status       : OK
+Class        : Mouse
+FriendlyName : HID-compliant mouse
+InstanceId   : HID\VID_0DB0&PID_1901&MI_02&COL02\7&338A39EB&0&0001
+
+Status       : OK
+Class        : HIDClass
+FriendlyName : USB Input Device
+InstanceId   : USB\VID_0DB0&PID_1901&MI_01\6&2B02AE9F&0&0001
+
+Status       : OK
+Class        : HIDClass
+FriendlyName : HID-compliant vendor-defined device
+InstanceId   : HID\VID_0DB0&PID_1901&MI_01\7&1BC6ADA6&0&0000
+
+Status       : OK
+Class        : HIDClass
+FriendlyName : HID-compliant consumer control device
+InstanceId   : HID\VID_0DB0&PID_1901&MI_02&COL03\7&338A39EB&0&0002
+
+Status       : OK
+Class        : HIDClass
+FriendlyName : USB Input Device
+InstanceId   : USB\VID_0DB0&PID_1901&MI_02\6&2B02AE9F&0&0002
+
+Status       : OK
+Class        : HIDClass
+FriendlyName : HID-compliant game controller
+InstanceId   : HID\VID_0DB0&PID_1901&IG_00\8&1717EFAA&0&0000
+
+
+
+
+=== root\WMI classes with an ACPI GUID qualifier ===
+
+Class                                              Guid                                   Methods
+-----                                              ----                                   -------
+AcpiControlStatus                                  {3CACB2F3-A6AB-4DCB-8CA7-3BF4D75BEDA8}
+AcpiGenAddr                                        {313e88df-a4fd-11d8-b301-505054503030}
+AcpiPct                                            {313e88e0-a4fd-11d8-b301-505054503030}
+AcpiPss                                            {313e88dd-a4fd-11d8-b301-505054503030}
+AcpiPssState                                       {313e88dc-a4fd-11d8-b301-505054503030}
+ACPITrace                                          {dab01d4d-2d48-477d-b1c3-daad0ce6f06b}
+ALPC                                               {45d8cccd-539f-4b72-a8b7-5c683142609a}
+AMLIEvalData1                                      {f2e0e060-bf32-4b88-b8e4-5cad15af6ae9}
+AtaportGuid                                        {d08bd885-501e-489a-bac6-b7d24bfe6bbf}
+AUTHFWCFG                                          {935F4AE6-845D-41C6-97FA-380DAD429B72}
+BatteryCycleCount                                  {ef98db24-0014-4c25-a50b-c724ae5cd371}
+BatteryFullChargedCapacity                         {40b40565-96f7-4435-8694-97e0e4395905}
+BatteryRuntime                                     {535a3767-1ac2-49bc-a077-3f7a02e40aec}
+BatteryStaticData                                  {05e1e463-e4e2-4ea9-80cb-9bd4b3ca0655}
+BatteryStatus                                      {fc4670d1-ebbf-416e-87ce-374a4ebc111a}
+BatteryStatusChange                                {cddfa0c3-7c5b-4e43-a034-059fa5b84364}
+BatteryTagChange                                   {5e1f6e19-8786-4d23-94fc-9e746bd5d888}
+BatteryTemperature                                 {1a52a14d-adce-4a44-9a3e-c8d8f15ff2c2}
+BfeTraceProvider                                   {106b464a-8043-46b1-8cb8-e92a0cd7a560}
+Bid2Etw_ADODB_1                                    {04C8A86F-3369-12F8-4769-24E484A9E725}
+Bid2Etw_ADODB_1_Trace                              {04C8A870-3369-12F8-4769-24E484A9E725}
+Bid2Etw_ADOMD_1                                    {7EA56435-3F2F-3F63-A829-F0B35B5CAD41}
+Bid2Etw_ADOMD_1_Trace                              {7EA56436-3F2F-3F63-A829-F0B35B5CAD41}
+Bid2Etw_BCP_1                                      {24722B88-DF97-4FF6-E395-DB533AC42A1E}
+Bid2Etw_BCP_1_Trace                                {24722B89-DF97-4FF6-E395-DB533AC42A1E}
+Bid2Etw_DBNETLIB_1                                 {BD568F20-FCCD-B948-054E-DB3421115D61}
+Bid2Etw_DBNETLIB_1_Trace                           {BD568F21-FCCD-B948-054E-DB3421115D61}
+Bid2Etw_MSADCE_1                                   {76DBA919-5A36-FC80-2CAD-3185532B7CB1}
+Bid2Etw_MSADCE_1_Trace                             {76DBA91A-5A36-FC80-2CAD-3185532B7CB1}
+Bid2Etw_MSADCF_1                                   {101C0E21-EBBA-A60A-EC3D-58797788928A}
+Bid2Etw_MSADCF_1_Trace                             {101C0E22-EBBA-A60A-EC3D-58797788928A}
+Bid2Etw_MSADCO_1                                   {5C6CE734-1B3E-705E-C2AB-B272D99AAF8F}
+Bid2Etw_MSADCO_1_Trace                             {5C6CE735-1B3E-705E-C2AB-B272D99AAF8F}
+Bid2Etw_MSADDS_1                                   {13CD7F92-5BAA-8C7C-3D72-B69FAC139A46}
+Bid2Etw_MSADDS_1_Trace                             {13CD7F93-5BAA-8C7C-3D72-B69FAC139A46}
+Bid2Etw_MSADOX_1                                   {6C770D53-0441-AFD4-DCAB-1D89155FECFC}
+Bid2Etw_MSADOX_1_Trace                             {6C770D54-0441-AFD4-DCAB-1D89155FECFC}
+Bid2Etw_MSDADIAG_ETW                               {8B98D3F2-3CC6-0B9C-6651-9649CCE5C752}
+Bid2Etw_MSDADIAG_ETW_Trace                         {8B98D3F3-3CC6-0B9C-6651-9649CCE5C752}
+Bid2Etw_MSDAPRST_1                                 {64A552E0-6C60-B907-E59C-10F1DFF76B0D}
+Bid2Etw_MSDAPRST_1_Trace                           {64A552E1-6C60-B907-E59C-10F1DFF76B0D}
+Bid2Etw_MSDAREM_1                                  {564F1E24-FC86-28E1-74F8-5CA0D950BEE0}
+Bid2Etw_MSDAREM_1_Trace                            {564F1E25-FC86-28E1-74F8-5CA0D950BEE0}
+Bid2Etw_MSDART_1                                   {ceb7253c-bb96-9dfe-51d1-53d966d0cf8b}
+Bid2Etw_MSDART_1_Trace                             {ceb7253D-bb96-9dfe-51d1-53d966d0cf8b}
+Bid2Etw_MSDASQL_1                                  {B6501BA0-C61A-C4E6-6FA2-A4E7F8C8E7A0}
+Bid2Etw_MSDASQL_1_Trace                            {B6501BA1-C61A-C4E6-6FA2-A4E7F8C8E7A0}
+Bid2Etw_MSDATL3_1                                  {87B93A44-1F73-EC83-7261-2DFC972D9B1E}
+Bid2Etw_MSDATL3_1_Trace                            {87B93A45-1F73-EC83-7261-2DFC972D9B1E}
+Bid2Etw_ODBC_1                                     {F34765F6-A1BE-4B9D-1400-B8A12921F704}
+Bid2Etw_ODBC_1_Trace                               {F34765F7-A1BE-4B9D-1400-B8A12921F704}
+Bid2Etw_ODBCBCP_1                                  {932B59F1-90C2-D8BA-0956-3975C344AE2B}
+Bid2Etw_ODBCBCP_1_Trace                            {932B59F2-90C2-D8BA-0956-3975C344AE2B}
+Bid2Etw_OLEDB_1                                    {0DD082C4-66F2-271F-74BA-2BF1F9F65C66}
+Bid2Etw_OLEDB_1_Trace                              {0DD082C5-66F2-271F-74BA-2BF1F9F65C66}
+Bid2Etw_RowsetHelper_1                             {74a75b02-36d8-ede6-d10e-95b691503408}
+Bid2Etw_RowsetHelper_1_Trace                       {74a75b03-36d8-ede6-d10e-95b691503408}
+Bid2Etw_SQLOLEDB_1                                 {C5BFFE2E-9D87-D568-A09E-08FC83D0C7C2}
+Bid2Etw_SQLOLEDB_1_Trace                           {C5BFFE2F-9D87-D568-A09E-08FC83D0C7C2}
+Bid2Etw_SQLSRV32_1                                 {4B647745-F438-0A42-F870-5DBD29949C99}
+Bid2Etw_SQLSRV32_1_Trace                           {4B647746-F438-0A42-F870-5DBD29949C99}
+BITSServiceTrace                                   {4a8aaa94-cfc4-46a7-8e4e-17bc45608f0a}
+CertificateServicesClient                          {f01b7774-7ed7-401e-8088-b576793d7841}
+CertificateServicesClient_CredentialRoaming        {ef4109dc-68fc-45af-b329-ca2825437209}
+ClasspnpGuid                                       {FA8DE7C4-ACDE-4443-9994-C4E2359A9EDB}
+Close                                              {2306fe3b-dbf6-11d2-9244-006008269001}
+CMsftMultisessionSequential                        {0e85a5a5-4d5c-44b7-8bda-5b7ab54f7ea0}
+CounterCorruptionStatus                            {5a5183f3-9216-4b06-9707-8148206c1e3c}
+CreateTrustedDomEx                                 {2306fe2c-dbf6-11d2-9244-006008269001}
+CritSecTrace                                       {3AC66736-CC59-4cff-8115-8DF50E39816B}
+CritSecTraceProvider                               {3AC66736-CC59-4cff-8115-8DF50E39816B}
+CtlGuid                                            {b809f4ff-3023-473c-971b-ab594429ea57}
+CtlGuidAssocDB                                     {7311AD03-18D6-45ac-9B08-B020BDD6A590}
+CtlGuidBthMtpEnum                                  {4b6efb94-30ea-49a7-bb29-e9ed9dce67da}
+CtlGuidFDSSDP                                      {db1d0418-105a-4c77-9a25-8f96a19716a4}
+CtlGuidFDWSD                                       {7e2dbfc7-41e8-4987-bca7-76cadfad765f}
+CtlGuidPortableDeviceAPI                           {C3C5D8AF-2FD5-4500-A8E7-379C2D0BBE2E}
+CtlGuidPortableDeviceClassExtension                {a0a352c5-b8ec-41e9-9936-8452c1c0a6cf}
+CtlGuidPortableDeviceConnectApi                    {02FE721A-0725-469E-A26D-37B3C09FAAC1}
+CtlGuidPortableDeviceTypes                         {58E8F67D-29E9-456C-B23D-C6489E341BB0}
+CtlGuidUMB                                         {96ab095a-9519-4f5c-81ee-c510b0a45463}
+CtlGuidWMP                                         {A9C1A3B7-54F3-4724-ADCE-58BC03E3BC78}
+CtlGuidWpdBusEnum                                  {0381564e-d5cb-4e48-ab35-be24389b0f59}
+CtlGuidWPDCI                                       {45350D79-4497-42f1-BD1B-83587575B91A}
+CtlGuidWpdFs                                       {1311095b-b9ff-497a-8560-2f43ca5438e4}
+CtlGuidWpdMtp                                      {97496DDA-C211-4ffe-B1B1-68E6E98EBC38}
+CtlGuidWpdShellExtension                           {A42C7BD1-5AF3-4b32-9BC6-B85EB31D3F4A}
+CtlGuidWPDShServiceObj                             {1ab5ac29-037f-43a1-9484-78c9db61f869}
+CtlGuidWPDSP                                       {17ABF473-982C-4d0e-B502-3A59D89E71DE}
+Debugger                                           {13976d09-a327-438c-950b-7f03192815c7}
+DigestDebugTrace                                   {fb6a424f-b5d6-4329-b9d5-a975b3a93ead}
+DiskGuid                                           {945186BF-3DD6-4f3f-9C8E-9EDD3FC9D558}
+DiskIo                                             {3d6fa8d4-fe05-11d0-9dda-00c04fd7ba7c}
+DiskIo_V0                                          {3d6fa8d4-fe05-11d0-9dda-00c04fd7ba7c}
+DiskIo_V1                                          {3d6fa8d4-fe05-11d0-9dda-00c04fd7ba7c}
+DiskIo_V2                                          {3d6fa8d4-fe05-11d0-9dda-00c04fd7ba7c}
+Dll                                                {0e85a5a5-4d5c-44b7-8bda-5b7ab54f7e90}
+DriverManagerTraceGuid                             {485e7dea-0a80-11d8-ad15-505054503030}
+EA_IME_API                                         {e2a24a32-00dc-4025-9689-c108c01991c5}
+EnumTrstedDomEx                                    {2306fe2d-dbf6-11d2-9244-006008269001}
+EnumTrustedDoms                                    {2306fe37-dbf6-11d2-9244-006008269001}
+EsifDeviceInformation                              {AB27DB29-DB25-42E6-A3E7-28BD46BDB999} EsifExecutePrimitive
+EsifWmiEvent                                       {21AD9EB5-0FCD-441B-825A-8D96B20536AC}
+EventTraceEvent                                    {68fdd900-4a3e-11d1-84f4-0000f80464e3}
+EventTraceEvent_V0                                 {68fdd900-4a3e-11d1-84f4-0000f80464e3}
+EventTraceEvent_V1                                 {68fdd900-4a3e-11d1-84f4-0000f80464e3}
+FDCtlGuid                                          {480217a9-f824-4bd4-bbe8-f371caaf9a0d}
+fdpHostCtlGuid                                     {f1c521ca-da82-4d79-9ee4-d7a375723b68}
+fdResPubCtlGuid                                    {649e3596-2620-4d58-a01f-17aefe8185db}
+FDWNetCtlGuid                                      {8b20d3e4-581f-4a27-8109-df01643a7a93}
+FileIo                                             {90cbdc39-4a3e-11d1-84f4-0000f80464e3}
+FileIo_V0                                          {90cbdc39-4a3e-11d1-84f4-0000f80464e3}
+FileIo_V1                                          {90cbdc39-4a3e-11d1-84f4-0000f80464e3}
+FileIo_V2                                          {90cbdc39-4a3e-11d1-84f4-0000f80464e3}
+FileSystemImageTracing                             {F8036571-42D9-480A-BABB-DE7833CB059C}
+FileTrace                                          {F681E6CC-EC6C-4ee9-90A6-C0C4E83276C2}
+FIRE_TEST_EVENT                                    {1F13AB7F-6220-4210-8F8E-8BB5E71EE969} FireEvent
+FirewallAPI                                        {28c9f48f-d244-45a8-842f-dc9fbc9b6e92}
+FirmwareClient                                     {1094DFCB-69A9-4404-8F03-20341AC55FFA}
+FrameworkTraceGuid                                 {485e7de9-0a80-11d8-ad15-505054503030}
+FrequencyRangeDescriptor                           {F4546078-F3B2-417E-94CD-47EA306C5751}
+FWCFG                                              {28c9f48f-d244-45a8-842f-dc9fbc9b6e94}
+FwpkclntTraceProvider                              {ad33fa19-f2d2-46d1-8f4c-e3c3087e45ad}
+FwpuclntTraceProvider                              {5a1600d2-68e5-4de7-bcf4-1c2d215fe0fe}
+HBAFC3MgmtInfo                                     {5966A24F-6AA5-418E-B75C-2F214DFB4B18}
+HBAFCPBindingEntry                                 {FCEFF8B7-9D6B-4115-8422-05992451A629}
+HBAFCPBindingEntry2                                {3A1E7679-4B1F-4f31-A8AE-FE9278730924}
+HBAFCPID                                           {FF02BC96-7FB0-4bac-8F97-C71E495FA698}
+HBAFCPScsiEntry                                    {77CA1248-1505-4221-8EB6-BBB6EC771A87}
+HBAScsiID                                          {A76F5058-B1F0-4622-9E88-5CC41E34454A}
+HeapTrace                                          {222962ab-6180-4b88-a825-346b75f2a24a}
+HeapTrace_V2                                       {222962ab-6180-4b88-a825-346b75f2a24a}
+HeapTraceProvider                                  {222962ab-6180-4b88-a825-346b75f2a24a}
+HostProcessTraceGuid                               {485e7df0-0a80-11d8-ad15-505054503030}
+IdleAccounting                                     {e2a26f78-ae07-4ee0-a30f-ce354f5a94cd}
+IdleAccountingEx                                   {d67abd39-81f8-4a5e-8152-72e31ec912ee}
+IdleStateAccounting                                {5280028a-c24f-43ec-b27d-a960a70e319a}
+IdleStateAccountingEx                              {3e0d7b2c-401b-480f-8303-d0c20ea1a7d8}
+IdleStateBucketEx                                  {e53e0a7d-36f0-4a77-879e-9c6b5e4a8554}
+IHVServiceFrameworkCtlGuid                         {E2EB5B52-08B1-4391-B670-F58317376247}
+IkeextTraceProvider                                {106b464d-8043-46b1-8cb8-e92a0cd7a560}
+Image                                              {2cb15d1d-5fc1-11d2-abe1-00a0c911f518}
+Image_V0                                           {2cb15d1d-5fc1-11d2-abe1-00a0c911f518}
+Image_V1                                           {2cb15d1d-5fc1-11d2-abe1-00a0c911f518}
+Image_V2                                           {2cb15d1d-5fc1-11d2-abe1-00a0c911f518}
+ImapiV1Shim                                        {1FF10429-99AE-45bb-8A67-C9E945B9FB6C}
+IPMIDRIVER                                         {D5C6A3E9-FA9C-434e-9653-165B4FC869E4}
+IPMIPrv                                            {651d672b-e11f-41b7-add3-c2f6a4023672}
+IpsecPolicyAgent                                   {94335eb3-79ea-44d5-8ea9-306f49b3a040}
+IpsecPolStore                                      {94335eb3-79ea-44d5-8ea9-306f49b3a070}
+iScsi                                              {1babefb4-59cb-49e5-9698-fd38ac830a91}
+ISCSI_ConnectionStaticInfo                         {3CE2D6A0-7346-4826-972F-F2C19779D1D1}
+ISCSI_IP_Address                                   {9AC5D4A1-1A1A-48ec-8E79-735806E9A1FA}
+ISCSI_LoginOptions                                 {3011A7BD-0491-478e-8C79-3C76424D05E2}
+ISCSI_LUNList                                      {994FF278-3512-4d9b-A241-54CEF45F5A25}
+ISCSI_Path                                         {C8775641-5430-4220-BA25-7DA561CB64CE}
+ISCSI_PortalInfo                                   {4FB9130E-1FEF-4ae6-9E48-77839204D413}
+ISCSI_RedirectPortalInfo                           {F6004CE6-9507-4d86-AE1E-E9D64F166F2F}
+ISCSI_RedirectSessionInfo                          {ED60BC3F-3D56-42f0-B4D0-81DD16E28515}
+ISCSI_SessionStaticInfo                            {B71D2538-57E2-4228-888B-1AF9B3BD01CD}
+ISCSI_Supported_LB_Policies                        {749AFE4D-804D-4662-A68B-DC696655C79A}
+ISCSI_TargetMapping                                {21A28820-3C4C-4944-AC4F-DA7FEBA21168}
+ISCSI_TargetPortal                                 {DE5051A7-BF27-48f1-BD12-07CADE92AEFD}
+ISCSI_TargetPortalGroup                            {3081F2A5-95F5-4d2a-813D-EE59864C6FC5}
+IsseiWmiInfo                                       {7013E961-32E6-4D33-8E27-5C0A3E27853D}
+KerbAcceptSecurityContext                          {94acefe3-9e56-49e3-9895-7240a231c371}
+KerbChangePassword                                 {c55e606b-334a-488b-b907-384abaa97b04}
+KerberosDebugTrace                                 {6B510852-3583-4e2d-AFFE-A67F9F223438}
+KerbInitSecurityContext                            {52e82f1a-7cd4-47ed-b5e5-fde7bf64cea6}
+KerbLogonUser                                      {8a3b8d86-db1e-47a9-9264-146e097b3c64}
+KerbSetPassword                                    {94c79108-b23b-4418-9b7f-e6d75a3a0ab2}
+KernelIdleState                                    {46bdcf4a-e076-4550-82b2-9f32eded3e7f}
+KernelIdleStateChange                              {4838fe4f-f71c-4e51-9ecc-8430a7ac4c6c}
+KernelIdleStates                                   {ba138e10-e250-4ad7-8616-cf1a7ad410e7}
+KernelPerfState                                    {8c7980e1-f62b-419e-aa82-276c8d064a1f}
+KernelPerfStateChange                              {A5B32DDD-7F39-4abc-B892-900E43B59EBB}
+KernelPerfStateDomainChange                        {995e6b7f-d653-497a-b978-36a30c29bf01}
+KernelPerfStates                                   {5708cc20-7d40-4bf4-b4aa-2b01338d0126}
+KernelThermalConstraintChange                      {a852c2c8-1a4c-423b-8c2c-f30d82931a88}
+KernelThermalPolicyChange                          {aca5a8f7-96ca-4397-bade-43be2f577d51}
+KmdfTraceGuid                                      {544d4c9d-942c-46d5-bf50-df5cd9524a50}
+LBR_V2                                             {99134383-5248-43fc-834b-529454e75df3}
+LbrRecordEntry                                     {bed3d5aa-c723-4c2c-b456-3ae2a318c5d9}
+LLTDIO                                             {0741C7BE-DAAC-4A5b-B00A-4BD9A2D89D0E}
+LLTDSVC                                            {CCC64809-6B5F-4c1b-AB39-336904DA9B3B}
+LookupNames                                        {2306fe36-dbf6-11d2-9244-006008269001}
+LookupSids                                         {2306fe35-dbf6-11d2-9244-006008269001}
+Lost_Event                                         {6a399ae0-4bc6-4de9-870b-3657f8947e7e}
+LpcDriverTraceGuid                                 {485e7ded-0a80-11d8-ad15-505054503030}
+LpcTraceGuid                                       {485e7def-0a80-11d8-ad15-505054503030}
+MMC                                                {9C88041D-349D-4647-8BFD-2C0A167BFE58}
+MMCSSTrace                                         {f8f10121-b617-4a56-868b-9df1b27fe32c}
+MobilityCenterTrace                                {082dff20-f430-11d9-8cd6-0800200c9a66}
+MobTabPerfTraceProvider                            {8A8B5246-6EB6-4339-8B59-B0085B9F4890}
+Mountmgr                                           {467c1914-37f0-4c7d-b6db-5cd7dfe7bd5e}
+MpsDrvTrace                                        {d5e09122-d0b2-4235-adc1-c89faaaf1069}
+MpsIpsecClient                                     {94335eb3-79ea-44d5-8ea9-306f49b3a041}
+Mpssvc                                             {5EEFEBDB-E90C-423a-8ABF-0241E7C5B87D}
+MS_SM_AdapterEvent                                 {7944cf67-697b-4432-953e-1fdada884361}
+MS_SM_AdapterInformationQuery                      {bdc67efa-e5e7-4777-b13c-621459657099}
+MS_SM_EventControl                                 {d6145693-5988-457f-8581-9a0157b58690} SM_AddTarget,SM_RemoveTarget,SM_Ad
+                                                                                          dPort,SM_RemovePort,SM_AddLink,SM_
+                                                                                          RemoveLink
+MS_SM_FabricAndDomainManagementMethods             {467fea10-701b-4388-917f-730620cea328} SM_SendTEST,SM_SendECHO,SM_SendSMP
+                                                                                          PassThru,SM_SendCTPassThru,SM_GetR
+                                                                                          NIDMgmtInfo,SM_SetRNIDMgmtInfo,SM_
+                                                                                          SendRNID,SM_SendRPL,SM_SendRPS,SM_
+                                                                                          SendSRL,SM_SendLIRR,SM_SendRLS
+MS_SM_PortEvent                                    {0f760256-8fc6-47ad-9d2e-f0d69801de7c}
+MS_SM_PortInformationMethods                       {5b6a8b86-708d-4ec6-82a6-39adcf6f6433} SM_GetPortType,SM_GetAdapterPortAt
+                                                                                          tributes,SM_GetDiscoveredPortAttri
+                                                                                          butes,SM_GetPortAttributesByWWN,SM
+                                                                                          _GetProtocolStatistics,SM_GetPhySt
+                                                                                          atistics,SM_GetFCPhyAttributes,SM_
+                                                                                          GetSASPhyAttributes,SM_RefreshInfo
+                                                                                          rmation
+MS_SM_ScsiInformationMethods                       {b6661e6f-075e-4209-ae20-fe81db03d979} SM_ScsiInquiry,SM_ScsiReportLuns,S
+                                                                                          M_ScsiReadCapacity
+MS_SM_TargetEvent                                  {6e2d8b73-f928-4da9-bda1-ae54189a3825}
+MS_SM_TargetInformationMethods                     {93545055-ab4c-4e80-84ae-6a86a2dc4b84} SM_GetTargetMapping,SM_GetBindingC
+                                                                                          apability,SM_GetBindingSupport,SM_
+                                                                                          SetBindingSupport,SM_GetPersistent
+                                                                                          Binding,SM_SetPersistentBinding,SM
+                                                                                          _RemovePersistentBinding,SM_GetLUN
+                                                                                          Statistics
+MS_SMHBA_BINDINGENTRY                              {65bfb548-d00a-4d4c-a357-7daa23bc2e3d}
+MS_SMHBA_FC_PHY                                    {fb66c8fe-1da0-48a2-92db-02c341143c46}
+MS_SMHBA_FC_Port                                   {96b827a7-2b4a-49c8-9097-078200c5a5cd}
+MS_SMHBA_PORTATTRIBUTES                            {50a97b2d-99ad-4cf9-8437-b4ea0c07be4c}
+MS_SMHBA_PORTLUN                                   {0669d100-066e-4e49-a68c-e05199596132}
+MS_SMHBA_PROTOCOLSTATISTICS                        {b557bd86-4128-4d5c-b6e6-b65f9bd68722}
+MS_SMHBA_SAS_PHY                                   {dde0a090-96bc-452b-9a64-6fbb6a19c47d}
+MS_SMHBA_SAS_Port                                  {b914e34f-7b80-46b0-8034-6d9b689e1ddd}
+MS_SMHBA_SASPHYSTATISTICS                          {bd458e7d-c40a-4401-a179-11919cbcc5c6}
+MS_SMHBA_SCSIENTRY                                 {125d41bc-7643-4155-b81c-e2f128ad1fb4}
+MS_SystemInformation                               {98A2B9D7-94DD-496a-847E-67A5557A59F2}
+MSAcpi_ThermalZoneTemperature                      {A1BC18C0-A7C8-11d1-BF3C-00A0C9062910}
+MSAcpiInfo                                         {5DAF38AE-F6F8-4d90-8199-EBDE6800EC3B}
+MSAgp_Information                                  {8C27FBED-1C7B-47E4-A649-0E389D3ADA4F}
+MSChangerParameters                                {24EB52AC-7C77-438b-AB61-D024DAB0C03A}
+MSChangerProblemDeviceError                        {56B396A8-0B95-42fe-BBCE-D36FDA904F8E}
+MSChangerProblemEvent                              {45DB06A5-20D5-4de3-A36C-3AB974600A4C}
+MSDeviceUI_FirmwareRevision                        {4504B1D4-C5EE-4df6-951F-16180E3DD815}
+MSDiskDriver_Geometry                              {25007F51-57C2-11d1-A528-00A0C9062910}
+MSDiskDriver_Performance                           BDD865D1-D7C1-11d0-A501-00A0C9062910
+MSDiskDriver_PerformanceData                       BDD865D2-D7C1-11d0-A501-00A0C9062910
+MSFC_AdapterEvent                                  {E9E47403-D1D7-43F8-8EE3-53CDBFFF5646}
+MSFC_DH_Chap_Parameters                            {8c6bc95b-e363-418d-b86b-686f49c26608}
+MSFC_EventBuffer                                   {623F4588-CF01-4f0e-B197-ABBEE5E0CFF3}
+MSFC_EventControl                                  {A251CCB3-5AB0-411B-8771-5430EF53A26C} AddTarget,RemoveTarget,AddPort,Rem
+                                                                                          ovePort,AddLink,RemoveLink
+MSFC_FC4STATISTICS                                 {CA8E7FE6-B85E-497f-8858-9B5D93A66FE1}
+MSFC_FCAdapterHBAAttributes                        {F8F3EA26-AB2C-4593-8B84-C56428E6BEDB}
+MSFC_FibrePortHBAAttributes                        {61B397FD-F5AE-4950-9758-0EE598E3C6E6}
+MSFC_FibrePortHBAMethods                           {E693553E-EDF6-4D57-BF08-EFCAAE1A2E1C} ResetStatistics
+MSFC_FibrePortHBAStatistics                        {27EFABA4-362A-4F20-920B-ED66E280FCF5}
+MSFC_FibrePortNPIVAttributes                       {66902796-54f4-4e24-ad91-0ab3b1ad65af}
+MSFC_FibrePortNPIVMethods                          {8d49ef4c-c172-45d8-a303-c5fbc5601f37} CreateVirtualPort,RemoveVirtualPor
+                                                                                          t
+MSFC_FibrePortNPIVMethodsEx                        {4135419a-2ebe-472b-a8c8-8416ca2ae1d8} SetChapForPhysicalPort,RemoveChapF
+                                                                                          orPhysicalPort,CreateVirtualPortEx
+                                                                                          ,CreateVirtualPortExUsingDHCHAP,Re
+                                                                                          moveVirtualPortEx,RescanVirtualPor
+                                                                                          t
+MSFC_HBAAdapterMethods                             {DF87D4ED-4612-4D12-85FB-83574EC34B7C} GetDiscoveredPortAttributes,GetPor
+                                                                                          tAttributesByWWN,RefreshInformatio
+                                                                                          n,SendCTPassThru,SendRNID,SendRNID
+                                                                                          V2,GetFC3MgmtInfo,SetFC3MgmtInfo,S
+                                                                                          endRPL,SendRPS,SendSRL,SendLIRR,Ge
+                                                                                          tFC4Statistics,GetFCPStatistics,Sc
+                                                                                          siInquiry,ScsiReadCapacity,ScsiRep
+                                                                                          ortLuns,GetEventBuffer,SendRLS
+MSFC_HBAFCPInfo                                    {7A1FC391-5B23-4C19-B0EB-B1AEF59050C3} GetFcpTargetMapping,GetFcpPersiste
+                                                                                          ntBinding,GetBindingCapability,Get
+                                                                                          BindingSupport,SetBindingSupport,G
+                                                                                          etPersistentBinding2,SetPersistent
+                                                                                          Entry,RemovePersistentEntry
+MSFC_HBAPortAttributesResults                      {A76BD4E3-9961-4d9b-B6BE-86E698260F68}
+MSFC_HBAPortStatistics                             {3CE7904F-459F-480d-9A3C-013EDE3BDDE8}
+MSFC_LinkEvent                                     {C66015EE-014B-498A-9451-99FEAD0AB451}
+MSFC_NPIVCapabilities                              {57d6ff16-db8a-4205-bdc0-b690e9a2f862}
+MSFC_NPIVLUNMappingInformation                     {21763208-feb5-49bc-a4e6-f56fdd8ccbd4}
+MSFC_NPIVLUNMappingInformationEx                   {684c1fef-3c76-4147-b214-e9aa061a7564}
+MSFC_PortEvent                                     {095FBE97-3876-48EF-8A04-1C55935D0DF5}
+MSFC_TargetEvent                                   {CFA6EF26-8675-4E27-9A0B-B4A860DDD0F3}
+MSFC_TM                                            {8CF4C7EB-A286-409d-9EB9-29D7E0E9F4FA}
+MSFC_VirtualFibrePortAttributes                    {3574bc0b-6f5f-4baf-af67-c48cc79fe957}
+MsftDiscFormat2Data                                {0e85a5a5-4d5c-44b7-8bda-5b7ab54f7e98}
+MsftDiscFormat2Erase                               {0e85a5a5-4d5c-44b7-8bda-5b7ab54f7e97}
+MsftDiscFormat2MsfAddress                          {0e85a5a5-4d5c-44b7-8bda-5b7ab54f7e9f}
+MsftDiscFormat2RawCD                               {0e85a5a5-4d5c-44b7-8bda-5b7ab54f7e9a}
+MsftDiscFormat2RawImage                            {07e397ec-c240-4ed7-8a2a-b9ff0fe5d581}
+MsftDiscFormat2StreamConcatenate                   {0e85a5a5-4d5c-44b7-8bda-5b7ab54f7e9d}
+MsftDiscFormat2StreamInterleave                    {0e85a5a5-4d5c-44b7-8bda-5b7ab54f7e9e}
+MsftDiscFormat2StreamRandom                        {0e85a5a5-4d5c-44b7-8bda-5b7ab54f7e9c}
+MsftDiscFormat2StreamZero                          {0e85a5a5-4d5c-44b7-8bda-5b7ab54f7e9b}
+MsftDiscFormat2Tao                                 {0e85a5a5-4d5c-44b7-8bda-5b7ab54f7e99}
+MsftDiscMaster2                                    {0e85a5a5-4d5c-44b7-8bda-5b7ab54f7e91}
+MsftDiscRecorder2                                  {0e85a5a5-4d5c-44b7-8bda-5b7ab54f7e93}
+MsftEnumDiscRecorder2                              {0e85a5a5-4d5c-44b7-8bda-5b7ab54f7e92}
+MsftUtils                                          {0e85a5a5-4d5c-44b7-8bda-5b7ab54f7e94}
+MsftWriteEngine2                                   {0e85a5a5-4d5c-44b7-8bda-5b7ab54f7e96}
+MSI_ACPI                                           {ABBC0F6E-8EA1-11d1-00A0-C90629100000} GetPackage,SetPackage,Get_EC,Set_E
+                                                                                          C,Get_BIOS,Set_BIOS,Get_SMBUS,Set_
+                                                                                          SMBUS,Get_MasterBattery,Set_Master
+                                                                                          Battery,Get_SlaveBattery,Set_Slave
+                                                                                          Battery,Get_Temperature,Set_Temper
+                                                                                          ature,Get_Thermal,Set_Thermal,Get_
+                                                                                          Fan,Set_Fan,Get_Device,Set_Device,
+                                                                                          Get_Power,Set_Power,Get_Debug,Set_
+                                                                                          Debug,Get_AP,Set_AP,Get_Data,Set_D
+                                                                                          ata,Get_WMI,Get_PE,Set_PE,Get_EC2,
+                                                                                          Get_BIOS_64,Set_BIOS_64,Get_SMBUS_
+                                                                                          64,Set_SMBUS_64,Get_Thermal_64,Set
+                                                                                          _Thermal_64
+MSI_AP                                             {A1753D7C-B621-de4a-B41A-55716A0ECE7A}
+MSI_CPU                                            {BD2A216F-2FB9-a640-B807-DDDBAD656891}
+MSI_Device                                         {4AFBD56B-9F91-8f49-81F5-995BA73822AF}
+MSI_Event                                          {5B3CC38A-40D9-7245-8AE6-1145B751BE3F}
+MSI_Master_Battery                                 {40BA026D-075D-cd4a-9710-F7C57347CAC9}
+MSI_Power                                          {2D3CBA6C-1C9C-7f41-B54C-F5D5D580D482}
+MSI_Slave_Battery                                  {8DBCCF6E-9DB4-0e46-A3F2-99AFAAA77A7A}
+MSI_Software                                       {24418D6A-0A79-524C-9AB1-18B78CA68CE7}
+MSI_System                                         {A1753D7B-B621-de4a-B41A-55716A0ECE7A}
+MSI_VGA                                            {1EC3EC7A-1E9B-e74a-9026-CF122B0BBD21}
+MSIde_PortDeviceInfo                               {53f5630f-b6bf-11d0-94f2-00a0c91efb8b}
+MSiSCSI_BootConfiguration                          {53EF8D5F-36F3-4124-8B76-C6AD521A1021}
+MSiSCSI_ConnectionStatistics                       {4AE27CD9-8DFA-4c37-A42C-B88A93E3E521}
+MSiSCSI_DiscoveryConfig                            {45755098-4291-43df-9720-B58642DD63DF}
+MSiSCSI_Eventlog                                   {E6B8552B-7C62-4c6e-99EB-67CE6087894C}
+MSiSCSI_HBAInformation                             {58515BF3-2F59-4f37-B74F-85AEEC652AD6}
+MSiSCSI_HBASessionConfig                           {B35694DE-D323-49d2-ABB2-8139209AD150}
+MSiSCSI_InitiatorInstanceFailureEvent              {E67E1BDB-D130-4143-9EB2-8BEE1899FD52}
+MSiSCSI_InitiatorInstanceStatistics                {FA30C290-68DB-430a-AF76-91A2E1C49154}
+MSiSCSI_InitiatorLoginStatistics                   {F022F413-3BF5-47ec-A942-33B81CF8E7FF}
+MSiSCSI_InitiatorNodeFailureEvent                  {1221948A-6332-4ac2-AA04-268AABCECE4F}
+MSiSCSI_InitiatorSessionInfo                       {D7931411-0376-4869-A491-8D679BFC004A}
+MSiSCSI_LB_Operations                              {A7DFE761-B6BC-4490-91B0-D9CF4A24D37C} SetLoadBalancePolicy
+MSiSCSI_ManagementOperations                       {B8D765F0-2D93-4da2-8186-A187622B4302} PingIPAddress
+MSiSCSI_MMIPSECStats                               {36B58EA2-C461-4bb0-AC8E-952F59D251ED}
+MSiSCSI_NICConfig                                  {C75258E9-BE79-4a48-A23D-EEB6F8FB940C}
+MSiSCSI_NICPerformance                             {5C59FD61-E919-4687-84E2-7200ABE2209B}
+MSiSCSI_PortalInfoClass                            {84CA6FD6-B152-4e6a-8869-FDE5E37B6157}
+MSiSCSI_QMIPSECStats                               {B4D1C606-8682-4b7a-AC6B-D883D91555FB}
+MSiSCSI_QueryLBPolicy                              {E0AECAEE-B311-426f-B67A-18D5E55D0996}
+MSiSCSI_RADIUSConfig                               {8EAEF9D8-C053-49d3-9205-65C703C2ECC1}
+MSiSCSI_RedirectPortalInfoClass                    {DAF7F63A-F9EA-4869-87E1-AE8A7C2261E2}
+MSiSCSI_RequestTimeStatistics                      {E0B40AA8-544B-4d5e-BA60-A03F136DA83D}
+MSiSCSI_SecurityCapabilities                       {225B9D64-47A9-41c8-81CD-69BC02652D87}
+MSiSCSI_SessionStatistics                          {C827993C-6D1F-4194-9B5C-D7C0A5F1CFB7}
+MSiSCSI_TCPIPConfig                                {7A2C6C2B-E5A5-49ad-AD68-133089ACD74D}
+MSKerbTrace                                        {bba3add2-c229-4cdb-ae2b-57eb6966b0c4}
+MSKeyboard_ClassInformation                        {4731F899-71CB-11d1-A52C-00A0C9062910}
+MSKeyboard_ExtendedID                              {6ac4e23d-a950-4518-8b2b-aa4dcd5fe14a}
+MSKeyboard_PortInformation                         {4731F89A-71CB-11d1-A52C-00A0C9062910}
+MSLSA_LookupIsolatedNameInTrustedDomains           {2484dc26-49d3-4085-a6e4-4972115cb3c0}
+MSLSATrace                                         {cc85922f-db41-11d2-9244-006008269001}
+MSMCAEvent_BusError                                {1ee17050-0039-40f7-9ead-14ad51612cb2}
+MSMCAEvent_CPUError                                {5CE27CDE-D179-4c68-937F-A07B8CC2EA39}
+MSMCAEvent_Header                                  {6381C27F-C8FA-4da7-8953-B86833736E15}
+MSMCAEvent_InvalidError                            {477B769B-785C-48dd-A02E-57E051BE7B85}
+MSMCAEvent_MemoryError                             {433EEA38-C1A7-48f1-884F-B6875F176CC7}
+MSMCAEvent_MemoryHierarchyError                    {cede75a0-a77f-452b-8f2f-541f926db0f9}
+MSMCAEvent_MemoryPageRemoved                       {84E9DDB6-E233-4dfc-988C-7412C8754FEC}
+MSMCAEvent_PCIBusError                             {A14A5594-25DE-410e-9B92-80F0801AEC07}
+MSMCAEvent_PCIComponentError                       {805CAF4E-336C-4eb2-8C0C-02F351CBF13C}
+MSMCAEvent_PlatformSpecificError                   {2D2434AA-EF83-4200-BA24-DE366C415F7B}
+MSMCAEvent_SMBIOSError                             {4184DF1B-EDFE-406b-B172-54C91FBD9BAF}
+MSMCAEvent_SwitchToCMCPolling                      {39C14290-F036-4999-B8A1-B6F871FB329E}
+MSMCAEvent_SwitchToCPEPolling                      {D5C870CE-4ED0-4fdc-BB54-8B452C18797E}
+MSMCAEvent_SystemEventError                        {BDBA4B12-8D00-4570-B9B2-3FDECF1D5661}
+MSMCAEvent_TLBError                                {b161eeab-ac03-4c2b-ae7a-5a3768f70e85}
+MSMCAInfo_Entry                                    {9E77A308-6B82-4fc1-AB41-0A55867C35C2}
+MSMCAInfo_RawCMCEvent                              {2F1A8A9D-7988-457f-A17A-8979E82043C5}
+MSMCAInfo_RawCorrectedPlatformEvent                {6B629D5E-E63C-48a3-9EBB-974227075265}
+MSMCAInfo_RawMCAData                               {23602A8A-DADD-462f-9AE5-30FA2C37DD5B}
+MSMCAInfo_RawMCAEvent                              {2F1A8A9F-7988-457f-A17A-8979E82043C5}
+MSMouse_ClassInformation                           {4731F89B-71CB-11d1-A52C-00A0C9062910}
+MSMouse_PortInformation                            {4731F89C-71CB-11d1-A52C-00A0C9062910}
+MSNdis_80211_AddWEP                                {4307bff0-2129-11d4-97eb-00c04f79c403}
+MSNdis_80211_AuthenticationMode                    {43920a24-2129-11d4-97eb-00c04f79c403}
+MSNdis_80211_BaseServiceSetIdentifier              {2504b6c2-1fa5-11d4-97eb-00c04f79c403}
+MSNdis_80211_BssIdListScan                         {0d9e01e1-ba70-11d4-b675-002048570337}
+MSNdis_80211_BSSIList                              {69526f9a-2062-11d4-97eb-00c04f79c403}
+MSNdis_80211_Configuration                         {4a4df982-2068-11d4-97eb-00c04f79c403}
+MSNdis_80211_ConfigurationFH                       {4a800b8c-2068-11d4-97eb-00c04f79c403}
+MSNdis_80211_ConfigurationInfo                     {220c16fc-b9a8-11d4-b675-002048570337}
+MSNdis_80211_DataRates                             {49db8722-2068-11d4-97eb-00c04f79c403}
+MSNdis_80211_DesiredDataRates                      {452ee08e-2536-11d4-97eb-00c04f79c403}
+MSNdis_80211_Disassociate                          {43671f40-2129-11d4-97eb-00c04f79c403}
+MSNdis_80211_FragmentationThreshold                {69aaa7c4-2062-11d4-97eb-00c04f79c403}
+MSNdis_80211_InfrastructureMode                    {697d5a7e-2062-11d4-97eb-00c04f79c403}
+MSNdis_80211_NetworkInfrastructure                 {34e1fa48-b9b6-11d4-b675-002048570337}
+MSNdis_80211_NetworkType                           {e779ab61-b9ab-11d4-b675-002048570337}
+MSNdis_80211_NetworkTypeInUse                      {857e2326-2041-11d4-97eb-00c04f79c403}
+MSNdis_80211_NetworkTypesSupported                 {8531d6e6-2041-11d4-97eb-00c04f79c403}
+MSNdis_80211_NumberOfAntennas                      {01779336-2064-11d4-97eb-00c04f79c403}
+MSNdis_80211_PowerMode                             {85be837c-2041-11d4-97eb-00c04f79c403}
+MSNdis_80211_PrivacyFilter                         {6733c4e9-4792-11d4-97f1-00c04f79c403}
+MSNdis_80211_ReceiveAntennaSelected                {01ac07a2-2064-11d4-97eb-00c04f79c403}
+MSNdis_80211_ReceivedSignalStrength                {1507db16-2053-11d4-97eb-00c04f79c403}
+MSNdis_80211_ReceivedSignalStrengthEventTrigger    {155689b8-2053-11d4-97eb-00c04f79c403}
+MSNdis_80211_ReloadDefaults                        {748b14e8-32ee-4425-b91b-c9848c58b55a}
+MSNdis_80211_RemoveWEP                             {433c345c-2129-11d4-97eb-00c04f79c403}
+MSNdis_80211_RTSThreshold                          {0134d07e-2064-11d4-97eb-00c04f79c403}
+MSNdis_80211_ServiceSetIdentifier                  {7d2a90ea-2041-11d4-97eb-00c04f79c403}
+MSNdis_80211_Statistics                            {42bb73b0-2129-11d4-97eb-00c04f79c403}
+MSNdis_80211_TransmitAntennaSelected               {01dbb74a-2064-11d4-97eb-00c04f79c403}
+MSNdis_80211_TransmitPowerLevel                    {11e6ba76-2053-11d4-97eb-00c04f79c403}
+MSNdis_80211_WEPStatus                             {b027a21f-3cfa-4125-800b-3f7a18fddcdc}
+MSNdis_80211_WLanBssId                             {6929e718-2062-11d4-97eb-00c04f79c403}
+MSNdis_AtmHardwareCurrentAddress                   {791ad1a1-e35c-11d0-9692-00c04fc3358c}
+MSNdis_AtmMaxAal0PacketSize                        {791ad1a5-e35c-11d0-9692-00c04fc3358c}
+MSNdis_AtmMaxAal1PacketSize                        {791ad1a6-e35c-11d0-9692-00c04fc3358c}
+MSNdis_AtmMaxAal34PacketSize                       {791ad1a7-e35c-11d0-9692-00c04fc3358c}
+MSNdis_AtmMaxAal5PacketSize                        {791ad191-e35c-11d0-9692-00c04fc3358c}
+MSNdis_AtmMaxActiveVciBits                         {791ad1a3-e35c-11d0-9692-00c04fc3358c}
+MSNdis_AtmMaxActiveVcs                             {791ad1a2-e35c-11d0-9692-00c04fc3358c}
+MSNdis_AtmMaxActiveVpiBits                         {791ad1a4-e35c-11d0-9692-00c04fc3358c}
+MSNdis_AtmReceiveCellsDropped                      {0a21480c-e35f-11d0-9692-00c04fc3358c}
+MSNdis_AtmReceiveCellsOk                           {0a21480a-e35f-11d0-9692-00c04fc3358c}
+MSNdis_AtmSupportedAalTypes                        {791ad1a0-e35c-11d0-9692-00c04fc3358c}
+MSNdis_AtmSupportedServiceCategory                 {791ad19f-e35c-11d0-9692-00c04fc3358c}
+MSNdis_AtmSupportedVcRates                         {791ad19e-e35c-11d0-9692-00c04fc3358c}
+MSNdis_AtmTransmitCellsOk                          {0a21480b-e35f-11d0-9692-00c04fc3358c}
+MSNdis_CoDriverVersion                             {791ad198-e35c-11d0-9692-00c04fc3358c}
+MSNdis_CoHardwareStatus                            {791ad192-e35c-11d0-9692-00c04fc3358c}
+MSNdis_CoLinkSpeed                                 {791ad195-e35c-11d0-9692-00c04fc3358c}
+MSNdis_CoMacOptions                                {791ad19a-e35c-11d0-9692-00c04fc3358c}
+MSNdis_CoMediaConnectStatus                        {791ad19b-e35c-11d0-9692-00c04fc3358c}
+MSNdis_CoMediaInUse                                {791ad194-e35c-11d0-9692-00c04fc3358c}
+MSNdis_CoMediaSupported                            {791ad193-e35c-11d0-9692-00c04fc3358c}
+MSNdis_CoMinimumLinkSpeed                          {791ad19d-e35c-11d0-9692-00c04fc3358c}
+MSNdis_CoReceivePduErrors                          {0a214808-e35f-11d0-9692-00c04fc3358c}
+MSNdis_CoReceivePdusNoBuffer                       {0a214809-e35f-11d0-9692-00c04fc3358c}
+MSNdis_CoReceivePdusOk                             {0a214806-e35f-11d0-9692-00c04fc3358c}
+MSNdis_CoTransmitPduErrors                         {0a214807-e35f-11d0-9692-00c04fc3358c}
+MSNdis_CoTransmitPdusOk                            {0a214805-e35f-11d0-9692-00c04fc3358c}
+MSNdis_CountedString                               {146360a5-88dd-11dd-94b8-001d09162bc3}
+MSNdis_CoVendorDescription                         {791ad197-e35c-11d0-9692-00c04fc3358c}
+MSNdis_CoVendorDriverVersion                       {791ad19c-e35c-11d0-9692-00c04fc3358c}
+MSNdis_CoVendorId                                  {791ad196-e35c-11d0-9692-00c04fc3358c}
+MSNdis_CurrentLookahead                            {5ec10361-a61a-11d0-8dd4-00c04fc3358c}
+MSNdis_CurrentPacketFilter                         {5ec10360-a61a-11d0-8dd4-00c04fc3358c}
+MSNdis_DeviceWakeOnMagicPacketOnly                 {a14f1c97-8839-4f8a-9996-a28996ebbf1d}
+MSNdis_DriverVersion                               {5ec10362-a61a-11d0-8dd4-00c04fc3358c}
+MSNdis_EnumerateAdapter                            {981f2d7f-b1f3-11d0-8dd7-00c04fc3358c}
+MSNdis_EnumerateAdapterEx                          {16716917-4306-4be4-9b5a-3809ae44b125}
+MSNdis_EnumeratePorts                              {f1d6abe8-15e4-4407-81b7-6b830c777cd9} WmiEnumeratePorts
+MSNdis_EnumerateReceiveFilters                     {3f2c141d-83bc-11dd-94b8-001d09162bc3} WmiEnumReceiveFilters
+MSNdis_EnumerateReceiveQueues                      {3f2c141b-83bc-11dd-94b8-001d09162bc3} WmiEnumReceiveQueues
+MSNdis_EthernetCurrentAddress                      {44795700-a61b-11d0-8dd4-00c04fc3358c}
+MSNdis_EthernetMacOptions                          {44795703-a61b-11d0-8dd4-00c04fc3358c}
+MSNdis_EthernetMaximumMulticastListSize            {44795702-a61b-11d0-8dd4-00c04fc3358c}
+MSNdis_EthernetMoreTransmitCollisions              {44795706-a61b-11d0-8dd4-00c04fc3358c}
+MSNdis_EthernetMulticastList                       {44795701-a61b-11d0-8dd4-00c04fc3358c}
+MSNdis_EthernetOneTransmitCollision                {44795705-a61b-11d0-8dd4-00c04fc3358c}
+MSNdis_EthernetPermanentAddress                    {447956ff-a61b-11d0-8dd4-00c04fc3358c}
+MSNdis_EthernetReceiveErrorAlignment               {44795704-a61b-11d0-8dd4-00c04fc3358c}
+MSNdis_FddiAttachmentType                          {acf1403d-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_FddiDownstreamNodeLong                      {acf1403f-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_FddiFrameErrors                             {acf14040-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_FddiFramesLost                              {acf14041-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_FddiLConnectionState                        {acf14045-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_FddiLctFailures                             {acf14043-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_FddiLemRejects                              {acf14044-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_FddiLongCurrentAddress                      {acf14036-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_FddiLongMaximumListSize                     {acf14038-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_FddiLongMulticastList                       {acf14037-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_FddiLongPermanentAddress                    {acf14035-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_FddiRingManagmentState                      {acf14042-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_FddiShortCurrentAddress                     {acf1403a-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_FddiShortMaximumListSize                    {acf1403c-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_FddiShortMulticastList                      {acf1403b-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_FddiShortPermanentAddress                   {acf14039-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_FddiUpstreamNodeLong                        {acf1403e-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_GroupAffinity                               {f786fbd5-c049-11dd-b885-001d09162bc3}
+MSNdis_HardwareStatus                              {5ec10354-a61a-11d0-8dd4-00c04fc3358c}
+MSNdis_HDSplitCurrentConfig                        {81d1303c-ab00-4e49-80b1-5e6e0bf9be53} WmiQueryHDSplitCurrentConfig
+MSNdis_HDSplitParameters                           {1131c56a-0a5a-4d79-8dde-1e6f178005ee}
+MSNdis_InterruptModerationParameters               {09f58643-31fb-45b5-852b-09b4d3ff3765}
+MSNdis_LinkParameters                              {29380131-a312-4400-be0c-53877a41c465}
+MSNdis_LinkSpeed                                   {5ec10359-a61a-11d0-8dd4-00c04fc3358c}
+MSNdis_LinkState                                   {ba1f4c14-a945-4762-b916-0b5515b6f43a} WmiQueryLinkState
+MSNdis_LinkStateData                               {5b26b94f-0272-4d4c-8744-bd84be421f3b}
+MSNdis_MacOptions                                  {5ec10365-a61a-11d0-8dd4-00c04fc3358c}
+MSNdis_MaximumFrameSize                            {5ec10358-a61a-11d0-8dd4-00c04fc3358c}
+MSNdis_MaximumLookahead                            {5ec10357-a61a-11d0-8dd4-00c04fc3358c}
+MSNdis_MaximumSendPackets                          {5ec10367-a61a-11d0-8dd4-00c04fc3358c}
+MSNdis_MaximumTotalSize                            {5ec10363-a61a-11d0-8dd4-00c04fc3358c}
+MSNdis_MediaConnectStatus                          {5ec10366-a61a-11d0-8dd4-00c04fc3358c}
+MSNdis_MediaInUse                                  {5ec10356-a61a-11d0-8dd4-00c04fc3358c}
+MSNdis_MediaSupported                              {5ec10355-a61a-11d0-8dd4-00c04fc3358c}
+MSNdis_NdisEnumerateVc                             {981f2d82-b1f3-11d0-8dd7-00c04fc3358c}
+MSNdis_NetworkAddress                              {B5BD98B7-0201-11d1-A50E-00A0C9062910}
+MSNdis_NetworkDirectAdapterCapabilities            {64c71824-1bb8-47d2-b347-a8fbd95b9c07}
+MSNdis_NetworkDirectAdapterInfo                    {691a00ec-4e8e-4993-879e-960011a46cef}
+MSNdis_NetworkDirectCapabilities                   {7969ba4d-dd80-4bc7-b3e6-68043997e519}
+MSNdis_NetworkDirectState                          {530c69c9-2f51-49de-a1af-088d54ffa474}
+MSNdis_NetworkDirectVersion                        {c89b8490-350a-4a34-90b6-98b37f4ed5b2}
+MSNdis_NetworkLinkSpeed                            {60fc6b57-0f66-11d1-96a7-00c04fc3358c}
+MSNdis_NetworkShortAddress                         {B5BD98B8-0201-11d1-A50E-00A0C9062910}
+MSNdis_NicSwitchCapabilities                       {db80dd1c-59ae-48e7-b7ec-f9be2c4b8cb0}
+MSNdis_NotifyAdapterArrival                        {981f2d81-b1f3-11d0-8dd7-00c04fc3358c}
+MSNdis_NotifyAdapterRemoval                        {981f2d80-b1f3-11d0-8dd7-00c04fc3358c}
+MSNdis_NotifyFilterArrival                         {0b6d3c89-5917-43ca-b578-d01a7967c41c}
+MSNdis_NotifyFilterRemoval                         {1f177cd9-5955-4721-9f6a-78ebdfaef889}
+MSNdis_NotifyVcArrival                             {182f9e0c-b1f3-11d0-8dd7-00c04fc3358c}
+MSNdis_NotifyVcRemoval                             {981f2d79-b1f3-11d0-8dd7-00c04fc3358c}
+MSNdis_ObjectHeader                                {2b1831b2-2216-4ede-a469-9fe3dd6d5a7e}
+MSNdis_PciDeviceProperty                           {0573f70f-ded8-401c-8b56-a62bb528c0e2}
+MSNdis_PhysicalMediumType                          {418ca16d-3937-4208-940a-ec6196278085}
+MSNdis_PMAdminConfig                               {1528D111-708A-4ca4-9215-C05771161CDA}
+MSNdis_PMAdminConfigParam                          {492dc449-13d9-4bd6-89d4-96e3534e6a05}
+MSNdis_PMAdminConfigState                          {0cffd0fc-8333-4000-9a3b-200735d698f9}
+MSNdis_PMCapabilities                              {B2CF76E3-B3AE-4394-A01F-338C9870E939}
+MSNdis_PMCapabilitiesParam                         {CCCB122D-D5C4-4ee1-8001-B8AD6D3CE876}
+MSNdis_PMCapabilityState                           {C1CC6857-1A26-4f6d-AB98-291F0C3BBD4C}
+MSNdis_PortArray                                   {0fee8708-df65-456e-b4ca-fa623266a12a}
+MSNdis_PortAuthParameters                          {5c3bda24-8b64-4829-a587-8ce719152fe2}
+MSNdis_PortChar                                    {f5b7d202-e594-4aa3-be43-4976833c7840}
+MSNdis_PortStateData                               {8feae2c6-ee28-469f-8b5d-9f743bab21aa}
+MSNdis_QueryInterruptModeration                    {d9c8eea5-f16e-467c-84d5-6345a22ce213} WmiQueryInterruptModeration
+MSNdis_QueryNicSwitchCurrentCapabilities           {e76fdaf3-0be7-4d95-87e9-5aead4b590e9} WmiQueryNICSwitchCurrentCapabiliti
+                                                                                          es
+MSNdis_QueryNicSwitchHardwareCapabilities          {37cab40c-d1e8-4301-8c1d-58465e0c4c0f} WmiQueryNICSwitchHardwareCapabilit
+                                                                                          ies
+MSNdis_QueryPciDeviceCustomProperty                {aa39f5ab-e260-4d01-82b0-b737c880ea05} WmiQueryPciDeviceCustomProperty
+MSNdis_QueryPhysicalMediumTypeEx                   {899e7782-035b-43f9-8bb6-2b58971612e5} WmiQueryPhysicalMediumTypeEx
+MSNdis_QueryPortState                              {6fbf2a5f-8b8f-4920-8143-e6c460f52524} WmiQueryPortState
+MSNdis_QueryReceiveFilterCurrentCapabilities       {4054e80f-2bc1-4ccc-b033-4abc0c4a1e8c} WmiQueryReceiveFilterCurrentCapabi
+                                                                                          lities
+MSNdis_QueryReceiveFilterGlobalParameters          {3f2c141a-83bc-11dd-94b8-001d09162bc3} WmiQueryReceiveFilterGlobalParamet
+                                                                                          ers
+MSNdis_QueryReceiveFilterHardwareCapabilities      {3f2c1419-83bc-11dd-94b8-001d09162bc3} WmiQueryReceiveFilterHardwareCapab
+                                                                                          ilities
+MSNdis_QueryReceiveFilterParameters                {3f2c141e-83bc-11dd-94b8-001d09162bc3} WmiQueryReceiveFilterParameters
+MSNdis_QueryReceiveQueueParameters                 {3f2c141c-83bc-11dd-94b8-001d09162bc3} WmiQueryReceiveQueueParameters
+MSNdis_QueryStatisticsInfo                         {368c45b5-c129-43c1-939e-7edc2d7fe621} WmiQueryStatisticsInfo
+MSNdis_ReceiveBlockSize                            {5ec1035d-a61a-11d0-8dd4-00c04fc3358c}
+MSNdis_ReceiveBufferSpace                          {5ec1035b-a61a-11d0-8dd4-00c04fc3358c}
+MSNdis_ReceiveError                                {447956fd-a61b-11d0-8dd4-00c04fc3358c}
+MSNdis_ReceiveFilterCapabilities                   {146360a3-88dd-11dd-94b8-001d09162bc3}
+MSNdis_ReceiveFilterFieldParameters                {146360ab-88dd-11dd-94b8-001d09162bc3}
+MSNdis_ReceiveFilterGlobalParameters               {146360a4-88dd-11dd-94b8-001d09162bc3}
+MSNdis_ReceiveFilterInfo                           {146360a9-88dd-11dd-94b8-001d09162bc3}
+MSNdis_ReceiveFilterInfoArray                      {146360aa-88dd-11dd-94b8-001d09162bc3}
+MSNdis_ReceiveFilterParameters                     {146360ac-88dd-11dd-94b8-001d09162bc3}
+MSNdis_ReceiveNoBuffer                             {447956fe-a61b-11d0-8dd4-00c04fc3358c}
+MSNdis_ReceiveQueueInfo                            {f786fbd7-c049-11dd-b885-001d09162bc3}
+MSNdis_ReceiveQueueInfoArray                       {f786fbd8-c049-11dd-b885-001d09162bc3}
+MSNdis_ReceiveQueueParameters                      {f786fbd6-c049-11dd-b885-001d09162bc3}
+MSNdis_ReceiveScaleCapabilities                    {26c28774-4252-48fe-a610-a58a398c0eb1} WmiQueryReceiveScaleCapabilities
+MSNdis_ReceivesOk                                  {447956fb-a61b-11d0-8dd4-00c04fc3358c}
+MSNdis_RSSEnabled                                  {9565cd55-3402-4e32-a5b6-2f143f2f2c30}
+MSNdis_SetHDSplitParameters                        {8c048bea-2913-4458-b68e-17f6c1e5c60e} WmiSetHDSplitParameters
+MSNdis_SetInterruptModeration                      {d789adfa-9c56-433b-ad01-7574f3cedbe9} WmiSetInterruptModeration
+MSNdis_SetLinkParameters                           {8c7d3579-252b-4614-82c5-a650daa15049} WmiSetLinkParameters
+MSNdis_SetPortParameters                           {aab6ac31-86fb-48fb-8b48-63db235ace16} WmiSetPortParameters
+MSNdis_SetTcpOffloadParameters                     {8ead9a22-7f69-4bc6-949a-c8187b074e61} WmiSetTcpOffloadParameters
+MSNdis_StatisticsInfo                              {8ecc74e1-ba85-482e-afaf-b4f8b087c06b}
+MSNdis_StatusDevicePowerOff                        {81bc8189-b026-46ab-64b9-f182e342934e}
+MSNdis_StatusDevicePowerOffEx                      {4159353c-5cd7-42ce-8fe4-a45a2380cc4f}
+MSNdis_StatusDevicePowerOn                         {5f81cfd0-f046-4342-61af-895acedaefd9}
+MSNdis_StatusDevicePowerOnEx                       {2b440188-92ac-4f60-9b2d-20a30cbb6bbe}
+MSNdis_StatusDot11AssociationCompletion            {458bbea7-45a4-4ae2-b176-e51f96fc0568}
+MSNdis_StatusDot11AssociationStart                 {3927843b-6980-4b48-b15b-4de50977ac40}
+MSNdis_StatusDot11ConnectionCompletion             {96efd9c9-7f1b-4a89-bc04-3e9e271765f1}
+MSNdis_StatusDot11ConnectionStart                  {7b74299d-998f-4454-ad08-c5af28576d1b}
+MSNdis_StatusDot11Disassociation                   {3fbeb6fc-0fe2-43fd-b2ad-bd99b5f93e13}
+MSNdis_StatusDot11LinkQuality                      {a3285184-ea99-48ed-825e-a426b11c2754}
+MSNdis_StatusDot11MPDUMaxLengthChange              {1d6560ec-8e48-4a3e-9fd5-a01b698db6c5}
+MSNdis_StatusDot11PhyStateChange                   {deb45316-71b5-4736-bdef-0a9e9f4e62dc}
+MSNdis_StatusDot11PmkidCandidateList               {26d8b8f6-db82-49eb-8bf3-4c130ef06950}
+MSNdis_StatusDot11RoamingCompletion                {dd9d47d1-282b-41e4-b924-66368817fcd3}
+MSNdis_StatusDot11RoamingStart                     {b2412d0d-26c8-4f4e-93df-f7b705a0b433}
+MSNdis_StatusDot11ScanConfirm                      {8500591e-a0c7-4efb-9342-b674b002cbe6}
+MSNdis_StatusDot11TkipmicFailure                   {442c2ae4-9bc5-4b90-a889-455ef220f4ee}
+MSNdis_StatusExternalConnectivityChange            {fd306974-c420-4433-b0fe-4cf6a613f59f}
+MSNdis_StatusHDSplitCurrentConfig                  {6c744b0e-ee9c-4205-90a2-015f6d65f403}
+MSNdis_StatusLinkSpeedChange                       {981f2d85-b1f3-11d0-8dd7-00c04fc3358c}
+MSNdis_StatusLinkState                             {64c6f797-878c-4311-9246-65dba89c3a61}
+MSNdis_StatusMediaConnect                          {981f2d7d-b1f3-11d0-8dd7-00c04fc3358c}
+MSNdis_StatusMediaDisconnect                       {981f2d7e-b1f3-11d0-8dd7-00c04fc3358c}
+MSNdis_StatusMediaSpecificIndication               {981f2d84-b1f3-11d0-8dd7-00c04fc3358c}
+MSNdis_StatusMediaSpecificIndicationEx             {aaacfca7-954a-4632-a16e-a8a63793a9e5}
+MSNdis_StatusNetworkChange                         {ca8a56f9-ce81-40e6-a70f-a067a476e9e9}
+MSNdis_StatusOperationalStatus                     {f917b663-845e-4d3d-b6d4-15eb27af81c5}
+MSNdis_StatusPacketFilterChange                    {d47c5407-2e75-46dd-8146-1d7ed2d6ab1d}
+MSNdis_StatusPortState                             {1dac0dfe-43e5-44b7-b759-7bf46de32e81}
+MSNdis_StatusProtocolBind                          {5413531c-b1f3-11d0-8dd7-00c04fc3358c}
+MSNdis_StatusProtocolUnbind                        {6e3ce1ec-b1f3-11d0-8dd7-00c04fc3358c}
+MSNdis_StatusResetEnd                              {981f2d77-b1f3-11d0-8dd7-00c04fc3358c}
+MSNdis_StatusResetStart                            {981f2d76-b1f3-11d0-8dd7-00c04fc3358c}
+MSNdis_StatusTaskOffloadChange                     {45049fc6-54d8-40c8-9c3d-b011c4e715bc}
+MSNdis_TcpConnectionOffloadCurrentConfig           {2ee6aef1-0851-458b-bf0d-792343d1cde1} WmiQueryTcpConnectionOffloadCurren
+                                                                                          tConfig
+MSNdis_TcpConnectionOffloadHardwareConfig          {8ce71f2c-d63a-4390-a487-18fa47262ceb} WmiQueryTcpConnectionOffloadHardwa
+                                                                                          reConfig
+MSNdis_TcpOffloadCurrentConfig                     {68542fed-5c74-461e-8934-91c6f9c60960} WmiQueryCurrentOffloadConfig
+MSNdis_TcpOffloadHardwareConfig                    {cd5f1102-590f-4ada-ab65-5b31b1dc0172} WmiQueryHardwareOffloadConfig
+MSNdis_TcpOffloadParameters                        {43fe82d8-3468-497e-9dcf-f8ffc0133744}
+MSNdis_TokenRingCurrentAddress                     {44795708-a61b-11d0-8dd4-00c04fc3358c}
+MSNdis_TokenRingCurrentFunctional                  {44795709-a61b-11d0-8dd4-00c04fc3358c}
+MSNdis_TokenRingCurrentGroup                       {4479570a-a61b-11d0-8dd4-00c04fc3358c}
+MSNdis_TokenRingCurrentRingState                   {acf14032-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_TokenRingCurrentRingStatus                  {890a36ec-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_TokenRingLastOpenStatus                     {4479570b-a61b-11d0-8dd4-00c04fc3358c}
+MSNdis_TokenRingLineErrors                         {acf14033-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_TokenRingLostFrames                         {acf14034-a61c-11d0-8dd4-00c04fc3358c}
+MSNdis_TokenRingPermanentAddress                   {44795707-a61b-11d0-8dd4-00c04fc3358c}
+MSNdis_TransmitBlockSize                           {5ec1035c-a61a-11d0-8dd4-00c04fc3358c}
+MSNdis_TransmitBufferSpace                         {5ec1035a-a61a-11d0-8dd4-00c04fc3358c}
+MSNdis_TransmitsError                              {447956fc-a61b-11d0-8dd4-00c04fc3358c}
+MSNdis_TransmitsOk                                 {447956fa-a61b-11d0-8dd4-00c04fc3358c}
+MSNdis_VendorDescription                           {5ec1035f-a61a-11d0-8dd4-00c04fc3358c}
+MSNdis_VendorDriverVersion                         {447956f9-a61b-11d0-8dd4-00c04fc3358c}
+MSNdis_VendorID                                    {5ec1035e-a61a-11d0-8dd4-00c04fc3358c}
+MSNdis_VlanIdentifier                              {765dc702-c5e8-4b67-843b-3f5a4ff2648b}
+MSNdis_WmiEnumAdapter                              {e7001b59-c3d6-4537-b40e-a163d516e4a3}
+MSNdis_WmiHDSplitCurrentConfig                     {34ff16bf-30ca-4a2a-a46d-c7ee74bc3582}
+MSNdis_WmiIPSecOffloadV1                           {4ec63447-2238-43a7-ac33-11c7cc7d8665}
+MSNdis_WmiIPSecOffloadV1_IPv4AH                    {29bacfdd-f063-48d8-952c-d3dc93300f15}
+MSNdis_WmiIPSecOffloadV1_IPv4ESP                   {86522023-4536-4b58-a1f4-2538941ace43}
+MSNdis_WmiIPSecOffloadV1_Supported                 {f86676b9-d9fa-4d26-95ce-bfbc77d80596}
+MSNdis_WmiMethodHeader                             {e3eac9dd-2fd3-4963-bffd-b4692888c0d4}
+MSNdis_WmiOffload                                  {7a877086-2204-4a8a-92a4-e3e8ab626629}
+MSNdis_WmiOutputInfo                               {7510bb9d-df70-4f7e-ba07-e29d330b3cc5}
+MSNdis_WmiReceiveScaleCapabilities                 {f7a4960a-ace3-44dc-b51e-72e05c5eafa8}
+MSNdis_WmiSetHeader                                {3b5605d8-1aaf-4ff6-85b9-bc5fb973dc54}
+MSNdis_WmiTcpConnectionOffload                     {93cfcd3f-6228-455c-905e-3ab80a2ff090}
+MSNdis_WmiTcpIpChecksumOffload                     {189d4015-1b25-4d8e-a4a9-f9eba82197c7}
+MSNdis_WmiTcpIpChecksumOffload_IPv4TransmitReceive {d63d537a-59c1-4fae-8f9b-cd9fbbecb85a}
+MSNdis_WmiTcpIpChecksumOffload_IPv6TransmitReceive {b9760e75-6662-49e4-aa6c-f028befec8ee}
+MSNdis_WmiTcpLargeSendOffloadV1                    {b9e4e2f9-ee89-4756-b057-38f9d9b59a92}
+MSNdis_WmiTcpLargeSendOffloadV1_IPv4               {d7673b11-e892-4a9d-8bd8-761ff256edd9}
+MSNdis_WmiTcpLargeSendOffloadV2                    {592977c2-cfbe-462c-b5cf-1a7679fe1cba}
+MSNdis_WmiTcpLargeSendOffloadV2_IPv4               {8823d030-fa30-4b73-b339-db19207f0d81}
+MSNdis_WmiTcpLargeSendOffloadV2_IPv6               {a7a9597c-2f8e-410b-9bb3-5c3a50792bfc}
+MSNetLogonTrace                                    {f33959b4-dbec-11d2-895b-00c04f79ab69}
+MSNT_CKCLTraceProvider                             {54dea73a-ed1f-42a4-af71-3e63d056f174}
+MSNT_FileBaseTrace_OptionalData                    {7DA1385C-F8F5-414d-B9D0-02FCA090F1EC}
+MSNT_FileBaseTrace_Set1                            {D75D8303-6C21-4bde-9C98-ECC6320F9291}
+MSNT_FileBaseTrace_Set2                            {058DD951-7604-414d-A5D6-A56D35367A46}
+MSNT_FileBaseTrace_VolumeToLog                     {127D46AF-4AD3-489f-9165-F00BA64D5467}
+MSNT_SystemTrace                                   {9e814aad-3204-11d2-9a82-006008a86939}
+MSParallel_AllocFreeCounts                         {4BBB69EA-6853-11d2-8ECE-00C04F8EF481}
+MSParallel_DeviceBytesTransferred                  {89FEF2D6-654B-11d2-9E15-00C04F8EF481}
+MSPower_DeviceEnable                               827c0a6f-feb0-11d0-bd26-00aa00b7b32a
+MSPower_DeviceWakeEnable                           a9546a82-feb0-11d0-bd26-00aa00b7b32a
+MSRedbook_DriverInformation                        {b90550e7-ae0a-11d1-a571-00c04fa34730}
+MSRedbook_Performance                              {b90550e8-ae0a-11d1-a571-00c04fa34730}
+MSSAMTrace                                         {8e598056-8993-11d2-819e-0000f875a064}
+MSSerial_CommInfo                                  {EDB16A62-B16C-11D1-BD98-00A0C906BE2D}
+MSSerial_CommProperties                            {8209EC2A-2D6B-11d2-BA49-00A0C9062910}
+MSSerial_HardwareConfiguration                     {270B9B86-B16D-11D1-BD98-00A0C906BE2D}
+MSSerial_PerformanceInformation                    {56415ACC-B16D-11D1-BD98-00A0C906BE2D}
+MSSerial_PortName                                  {A0EC11A8-B16C-11D1-BD98-00A0C906BE2D}
+MSSmBios_RawSMBiosTables                           {8F680850-A584-11d1-BF38-00A0C9062910}
+MSSmBios_SMBiosEventlog                            {8F680851-A584-11d1-BF38-00A0C9062910}
+MSSmBios_Sysid1394                                 {8F680854-A584-11d1-BF38-00A0C9062910}
+MSSmBios_Sysid1394List                             {8F680855-A584-11d1-BF38-00A0C9062910}
+MSSmBios_SysidUUID                                 {8F680852-A584-11d1-BF38-00A0C9062910}
+MSSmBios_SysidUUIDList                             {8F680853-A584-11d1-BF38-00A0C9062910}
+MSStorageDriver_ATAPISmartData                     {78ebc103-4cf9-11d2-ba4a-00a0c9062910}
+MSStorageDriver_ClassErrorLog                      D5A9A51E-03F9-404d-9722-15F90EB07038
+MSStorageDriver_ClassErrorLogEntry                 0C9BF007-50E9-407e-A9DA-0F33800E4B45
+MSStorageDriver_FailurePredictData                 {78ebc103-4cf9-11d2-ba4a-00a0c9062910}
+MSStorageDriver_FailurePredictEvent                {78ebc104-4cf9-11d2-ba4a-00a0c9062910}
+MSStorageDriver_FailurePredictFunction             {78ebc105-4cf9-11d2-ba4a-00a0c9062910} AllowPerformanceHit,EnableDisableH
+                                                                                          ardwareFailurePrediction,EnableDis
+                                                                                          ableFailurePredictionPolling,GetFa
+                                                                                          ilurePredictionCapability,EnableOf
+                                                                                          flineDiags,ReadLogSectors,WriteLog
+                                                                                          Sectors,ExecuteSelfTest
+MSStorageDriver_FailurePredictStatus               {78ebc102-4cf9-11d2-ba4a-00a0c9062910}
+MSStorageDriver_FailurePredictThresholds           {DAE10783-CC31-4d2a-8A0F-861C04077A95}
+MSStorageDriver_ScsiInfoExceptions                 {1101D829-167B-4ebf-ACAE-28CAB7C34802}
+MSStorageDriver_ScsiRequestBlock                   F903D6EC-8647-438f-9E42-891F4733EDAF
+MSStorageDriver_SenseData                          9065566F-5FD6-4b40-9961-98E3A3DD174E
+MSTapeDriveParam                                   {B9A8CFD5-8D72-47a4-AC0E-284A3200F4FB}
+MSTapeDriveProblemEvent                            {BC4DD36C-FA66-4080-87A0-0C5922EB7887}
+MSTapeMediaCapacity                                {8C2147A4-FF29-4336-B8A4-227B54CC0966}
+MSTapeProblemDeviceError                           {43EC6B13-10BB-4bf6-B716-1C1E2F10BB5F}
+MSTapeProblemIoError                               {58FD29F9-B516-40fd-871A-7EE76D5BB53E}
+MSTapeSymbolicName                                 {3FB828F7-F119-4066-B1E6-DB407CE9DE91}
+MSV1_0DebugTrace                                   {5BBB6C18-AA45-49b1-A15F-085F7ED0AA90}
+MSV1_0Trace                                        {C92CF544-91B3-4dc0-8E11-C580339A0BF8}
+MSVerifierIrpLogEntry                              {45068237-595D-4C7D-BD80-F84ADC0257F8}
+MSVerifierIrpLogInformation                        {1E2C2980-F7DB-46AA-820E-8734FCC21F4C}
+MSWmi_Guid                                         {F8C60AED-EF8D-4f95-9EA8-F04318A00F30}
+MSWmi_GuidRegistrationInfo                         {B48D49A1-E777-11d0-A50C-00A0C9062910}
+MSWmi_MofData                                      {05901221-D566-11d1-B2F0-00A0C9062910}
+MSWmi_PnPDeviceId                                  {C7BF35D2-AADB-11d1-BF4A-00A0C9062910}
+MSWmi_PnPInstanceNames                             {C7BF35D3-AADB-11d1-BF4A-00A0C9062910}
+MSWmi_ProviderInfo                                 {C7BF35D0-AADB-11d1-BF4A-00A0C9062910}
+MuiTrace                                           {d3de60b2-a663-45d5-9826-a0a5949d2cb0}
+MuiTraceData                                       {d3de60b2-a663-45d5-9826-a0a5949d2cb0}
+MupLog                                             {20c46239-d059-4214-a11e-7d6769cbe020}
+NCSICtlGuid                                        {014DE49F-CE63-4779-BA2B-D616F6963A87}
+NetAdapterCimNDISWMI                               {6cc2405d-817f-4886-886f-d5d1643210f0}
+NetCx_DevicePowerStateChange                       {57a60f36-7b95-4799-9efb-d169e6ea0397}
+NETIO                                              {eb004a05-9b1a-11d4-9123-0050047759bc}
+NetworkItemFactoryTrace                            {D2A60D61-0F87-4673-A86C-9C461457FE27}
+NetworkProfileManagerTraceGUID                     {D9131565-E1DD-4C9E-A728-951999C2ADB5}
+NlaSvcTraceCtlGuid                                 {1ac55562-d4ff-4bc5-8ef3-a18e07c4668e}
+NlSecChanlSetup                                    {63dbb180-dbed-11d2-895b-00c04f79ab69}
+NlServerAuth                                       {393da8c0-dbed-11d2-895b-00c04f79ab69}
+NSHIPSEC                                           {e4ff10d8-8a88-4fc6-82c8-8c23e9462fe5}
+NtfsLog                                            {b2fc00c4-2941-4d11-983b-b16e8aa4e25d}
+NtlmClientInitialize                               {6df28b22-73be-45cc-ba80-8b332b35a21d}
+NtlmLogonUser                                      {19196b33-a302-4c12-9d5a-eac149e93c46}
+NtlmServerAccept                                   {94d4c9eb-0d01-41ae-99e8-15b26b593a83}
+NtlmValidateUser                                   {34d84181-c28a-41d8-bb9e-995190df83df}
+NwfDrvCtlGuid                                      {D905AC1C-65E7-4242-99EA-FE66A8355DF8}
+NwfMsmCtlGuid                                      {D905AC1D-65E7-4242-99EA-FE66A8355DF8}
+ObjectsGuid                                        {aefe45f4-8548-42b4-b1c8-25673b07ad8b}
+ObTrace                                            {89497f50-effe-4440-8cf2-ce6b1cdcaca7}
+OpenPolicy                                         {2306fe3a-dbf6-11d2-9244-006008269001}
+OpenTrustedDomain                                  {2306fe34-dbf6-11d2-9244-006008269001}
+OpTrustedDomByName                                 {2306fe29-dbf6-11d2-9244-006008269001}
+OutputWrapper                                      {0A070742-D55E-4DFE-9682-3EB245105BA8}
+Package                                            {ABBC0F60-8EA1-11d1-00A0-C90629100000}
+Package_1                                          {ABBC0F61-8EA1-11d1-00A0-C90629100000}
+Package_10                                         {ABBC0F62-8EA1-11d1-00A0-C90629100000}
+Package_32                                         {ABBC0F63-8EA1-11d1-00A0-C90629100000}
+Package_64                                         {ABBC0F64-8EA1-11d1-00A0-C90629100000}
+PageFault                                          {3d6fa8d3-fe05-11d0-9dda-00c04fd7ba7c}
+PageFault_V2                                       {3d6fa8d3-fe05-11d0-9dda-00c04fd7ba7c}
+PerfInfo                                           {ce1dbfb4-137e-4da6-87b0-3f59aa102cbc}
+PerfInfo_V0                                        {ce1dbfb4-137e-4da6-87b0-3f59aa102cbc}
+PerfInfo_V1                                        {ce1dbfb4-137e-4da6-87b0-3f59aa102cbc}
+PerfInfo_V2                                        {ce1dbfb4-137e-4da6-87b0-3f59aa102cbc}
+PerformanceState                                   {FDD21E6F-7381-4048-B085-4CE47EDCA2A4}
+PerformanceStates                                  {0F23F5FA-0223-48e3-ADBC-9B56B201E0CD}
+PlatformLibraryTraceGuid                           {485e7de8-0a80-11d8-ad15-505054503030}
+PlugPlay                                           {a676b545-4cfb-4306-a067-502d9a0f2220}
+PoolTrace                                          {0268a8b6-74fd-4302-9dd0-6e8f1795c0cf}
+PortCls_AudioEngine                                {97BCD203-6286-4974-801D-A293B921F84B}
+PortCls_IrpProcessing                              {54aecb26-b9c2-42d7-95d1-cc3710e2aecf}
+PortCls_PinState                                   {ad04e508-145c-40af-8f6a-e6a270c74838}
+PortCls_Position                                   {93bb152d-df9e-4282-b709-1696392f2557}
+PortCls_PowerPolicy                                {47C74B10-D1C0-4E50-ACD1-116E1BD44D3B}
+PortCls_PowerState                                 {2914c71d-777c-4b42-847a-891b21893def}
+PortCls_ServiceGroup                               {e1e2f5e7-d23f-4fca-a0ae-071a4e03f5a5}
+PortCls_SubDevice                                  {a366e409-7bdc-4991-886d-d2cfdd99e2bc}
+PortClsEvent                                       {9502CBC6-AA74-4eff-BA91-D9329BCCE758}
+PowerEvents                                        {e43445e0-0903-48c3-b878-ff0fccebdd04}
+Process                                            {3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c}
+Process_V0                                         {3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c}
+Process_V1                                         {3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c}
+Process_V2                                         {3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c}
+Process_V3                                         {3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c}
+Process_V4                                         {3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c}
+ProcessorAcpiCsd                                   {A9ECEFF7-C502-11DA-82C4-000D5692A4BC}
+ProcessorAcpiCsdDependency                         {A9ECEFF6-C502-11DA-82C4-000D5692A4BC}
+ProcessorAcpiCst                                   {E5639665-C4FC-11DA-82C4-000D5692A4BC}
+ProcessorAcpiCstState                              {E5639664-C4FC-11DA-82C4-000D5692A4BC}
+ProcessorAcpiTsd                                   {DAC60DFB-C50C-11DA-82C4-000D5692A4BC}
+ProcessorAcpiTsdDependency                         {DAC60DFA-C50C-11DA-82C4-000D5692A4BC}
+ProcessorAcpiTss                                   {900ABE68-C4FC-11DA-82C4-000D5692A4BC}
+ProcessorAcpiTssState                              {900ABE67-C4FC-11DA-82C4-000D5692A4BC}
+ProcessorAcpiXpss                                  {C2600530-C4FC-11DA-82C4-000D5692A4BC}
+ProcessorAcpiXpssState                             {C260052F-C4FC-11DA-82C4-000D5692A4BC}
+ProcessorBiosCStates                               {E5639666-C4FC-11DA-82C4-000D5692A4BC}
+ProcessorBiosInfo                                  {313e88de-a4fd-11d8-b301-505054503030}
+ProcessorBiosTStates                               {900ABE69-C4FC-11DA-82C4-000D5692A4BC}
+ProcessorCStateEvent                               {1C9D482E-93CE-4b9e-BDEC-23653CE0CE28}
+ProcessorPerformance                               {7FD18652-0CFE-40d2-B0A1-0B066A87759E}
+ProcessorPerfStateEvent                            {66A9B302-F9DB-4864-B0F1-843905E8080F}
+ProcessorStatus                                    {ee751f9d-cec5-4686-9816-ff6d1ca2261c}
+ProcessorThrottleStateEvent                        {B3C848A7-B870-4C47-AD52-685CC8FACAC9}
+qoswmiQOSWMI                                       {725BA9B3-C1F3-4518-AF1B-C8D669191E15}
+QryInfoTrustDom                                    {2306fe33-dbf6-11d2-9244-006008269001}
+QryTrstDomByNam                                    {2306fe2f-dbf6-11d2-9244-006008269001}
+QueryDomainInfoPolicy                              {2306fe2b-dbf6-11d2-9244-006008269001}
+QueryForestTrustInfo                               {e28ee0eb-6181-49df-b859-2f3fd289a2d1}
+QueryInfoPolicy                                    {2306fe39-dbf6-11d2-9244-006008269001}
+QueryInfoPolicy2                                   {2306fe31-dbf6-11d2-9244-006008269001}
+QuerySecret                                        {cc85922e-db41-11d2-9244-006008269001}
+ReflectorTraceGuid                                 {485e7dee-0a80-11d8-ad15-505054503030}
+Refsv1WppTrace                                     {6d2fd9c5-8bd8-4a5d-8aa8-01e5c3b2ae23}
+RefsWppTrace                                       {740f3c34-57df-4bad-8eea-72ac69ad5df5}
+RegisteredGuids                                    {e3dff7bd-3915-11d2-9103-00c04fb998a2}
+Registry                                           {ae53722e-c863-11d2-8659-00c04fa321a1}
+Registry_V0                                        {ae53722e-c863-11d2-8659-00c04fa321a1}
+Registry_V1                                        {ae53722e-c863-11d2-8659-00c04fa321a1}
+Regular                                            {ebcca1c2-ab46-4a1d-8c2a-906c2ff25f39}
+RestartManager                                     {0888e5ef-9b98-4695-979d-e92ce4247224}
+RFSMon                                             {51734B23-5B7E-4892-BA8E-45BC110B735C}
+RSPNDR                                             {E159FC63-02FE-42F3-A234-028B9B8561CB}
+RSSPlatformBackgroundsyncPerformanceTraceProvider  {ca1cf55c-9e49-4ad3-8038-39cb6f66af11}
+RSSPlatformBackgroundsyncTraceProvider             {f59d1d86-cc03-4736-bc9c-4c7936871b3d}
+RSSPlatformPerformanceTraceProvider                {2b240425-3141-43ee-931f-ec9f997c7d7e}
+RSSPlatformTraceProvider                           {8c50fa6e-394e-4b47-b6d1-a880a5f225a2}
+SamAddMemGrp                                       {f9d2ba6a-899c-11d2-819e-0000f875a064}
+SamAddMemToAlias                                   {3a2e63d1-5dc4-4168-85ea-3e331f88ce83}
+SamChangePwdComputer                               {19b30cde-3e41-4cff-83c8-3df2779f840c}
+SamCloseHandle                                     {dbc0ceab-cff3-4c0f-85f2-0c2107142f36}
+SamCompCreate                                      {abb14b68-899b-11d2-819e-0000f875a064}
+SamCompPwdSet                                      {880217b8-899d-11d2-819e-0000f875a064}
+SamConnect                                         {8c89045c-3f5d-4289-939a-fb854000cb6b}
+SamCreateAliasInDom                                {5e612efd-c05e-4f76-bced-f5607aa3d46e}
+SamDeleteAlias                                     {fbfe2540-452b-41bb-9219-dfb6fd1a129b}
+SamDeleteGrp                                       {5f7c4ba5-d6a4-4625-900e-48fa7811e06a}
+SamDeleteUser                                      {c2a0e094-a178-4372-b4fe-a33e48c3585c}
+SamDelMemGrp                                       {250959aa-899d-11d2-819e-0000f875a064}
+SamEnumAliasesInDom                                {f1fea491-bfa6-436c-a178-a70d03b4fb1a}
+SamEnumDomInSamSrv                                 {7c65ceb0-75ba-46b9-884e-67e038c5b003}
+SamEnumGrpsInDom                                   {5d11e02f-0c36-4180-ad07-89062c9df9ec}
+SamEnumUsersInDom                                  {07ffaa1d-34f6-49cd-b541-2f0d7dff15c4}
+SamGetAliasMem                                     {1cf5fd19-1ac1-4324-84f7-970a634a91ee}
+SamGetBootKeyInfo                                  {33be4128-d02e-4b6f-949e-ab77cc8164b1}
+SamGetDisplayEnumIdx                               {aceb7864-9a14-4c73-8ed0-94ec53f6651c}
+SamGetDomPwdInfo                                   {ff0c6ce2-9528-4a91-b9c7-bcf834b6f79a}
+SamGetGrpsForUser                                  {0e3913c5-9760-4ced-b133-004a64e8d53c}
+SamGetMemInAlias                                   {5cec3d52-6eeb-474d-b468-58362888f1b0}
+SamGetMemInGrp                                     {5954bc51-c5ec-4aaa-831c-6f2c1b2515b6}
+SamGetUserDomPwdInfo                               {4ff7a7db-43ca-470a-8b64-3003e2d22042}
+SamGrpCreate                                       {c8eb5e5c-899c-11d2-819e-0000f875a064}
+SamIdByName                                        {a41d90bc-899d-11d2-819e-0000f875a064}
+SamLookupDomInSamSrv                               {a11e5d6b-353d-4bf6-97a8-ede4cba45524}
+SamNameById                                        {25059476-899f-11d2-819e-0000f875a064}
+SamOpenAlias                                       {ba41c883-592f-4ab9-b2a9-c6263b011fe7}
+SamOpenDomain                                      {6e1f2449-f1f3-4634-b51f-46e2c6625892}
+SamOpenGrp                                         {b41d7bdf-4249-4651-ac0f-1879be0d5c0c}
+SamOpenUser                                        {b8d2bc4a-1525-4386-bb1c-6bb2e24eb001}
+SamProcessMappedAttributes                         {96bd320f-1e51-4c06-86f3-ee64f0a2f0cf}
+SamPwdChng                                         {45fc997e-899d-11d2-819e-0000f875a064}
+SamPwdPushPdc                                      {1f228de8-8a6c-11d2-819e-0000f875a064}
+SamQueryDisplayInfo                                {eb225178-f5f0-42b7-895b-db89276f647a}
+SamQueryInfoAlias                                  {419f025a-bf06-4673-af66-d230bec2af02}
+SamQueryInfoDom                                    {89399c21-4aaf-408e-ba39-ab831a1298d5}
+SamQueryInfoGrp                                    {632fcc78-6057-48f9-8d5f-4bb0f73d3cd1}
+SamQueryInfoUser                                   {e1cb227a-6d55-4282-a5f7-6fa4a5922c0b}
+SamQuerySecurityObj                                {676347f3-fd20-4e7d-90b1-77e35f84af9a}
+SamRemoveMemFromAlias                              {6ba1639c-afc4-454e-b3e0-5e8f7fc39af9}
+SamRemoveMemFromForeignDom                         {8919f267-a053-4669-aa69-2da0d4a20d92}
+SamSetBootKeyInfo                                  {2e991575-c2ed-42a7-97ff-a0d6571f1862}
+SamSetInfoAlias                                    {e712d39d-a3a6-4224-a1bd-4717b24e4e8c}
+SamSetInfoDom                                      {45309ef4-c59e-425e-b95b-19f1c5a3c55a}
+SamSetInfoGrp                                      {26106246-4473-4295-841b-4a51c6afc3db}
+SamSetInfoUser                                     {bc80e27f-6b74-4da9-abfc-2e4e82b81000}
+SamSetMemAttrsOfGrp                                {0254ba6d-7ff0-4bfe-a3f9-8fd8da667641}
+SamSetSecurityObj                                  {74e10cbb-202e-4a97-871d-8547972b5141}
+SamShutdownSamSrv                                  {f8012701-7e99-49c5-b832-1db8bc4a610d}
+SamUserCreate                                      {39511dbe-899b-11d2-819e-0000f875a064}
+SamUserPwdSet                                      {62bef71e-899d-11d2-819e-0000f875a064}
+Sbp2portGuid                                       {6710597F-7319-4AAE-9B85-C8D87136A56B}
+SchannelDebugTrace                                 {37D2C3CD-C5D4-4587-8531-4696C44244C8}
+Sdbus                                              {3b9e3da4-70b8-46d3-9ef2-3ddf128bded8}
+SensorClassExtensionControlGuid                    {A1E89BB0-EF73-4980-8C99-DD15F7271D7E}
+SetDomainInfoPolicy                                {2306fe2a-dbf6-11d2-9244-006008269001}
+SetForestTrustInfo                                 {3d2c9e3e-bb19-4617-8489-cabb9787de7d}
+SetInfoPolicy                                      {2306fe38-dbf6-11d2-9244-006008269001}
+SetInfoPolicy2                                     {2306fe30-dbf6-11d2-9244-006008269001}
+SetInfoTrustedDom                                  {2306fe32-dbf6-11d2-9244-006008269001}
+SetTrstedDomInfoByNam                              {2306fe2e-dbf6-11d2-9244-006008269001}
+SplitIo                                            {d837ca92-12b9-44a5-ad6a-3a65b3578aa8}
+StackWalk                                          {def2fe46-7bd6-4b80-bd94-f57fe20d0ce3}
+SystemConfig                                       {01853a65-418f-4f36-aefc-dc0f1d2fd235}
+SystemConfig_V0                                    {01853a65-418f-4f36-aefc-dc0f1d2fd235}
+SystemConfig_V1                                    {01853a65-418f-4f36-aefc-dc0f1d2fd235}
+SystemConfig_V2                                    {01853a65-418f-4f36-aefc-dc0f1d2fd235}
+SystemConfig_V3                                    {01853a65-418f-4f36-aefc-dc0f1d2fd235}
+SystemConfig_V4                                    {01853a65-418f-4f36-aefc-dc0f1d2fd235}
+TcpIp                                              {9a280ac0-c8e0-11d1-84e2-00c04fb998a2}
+TcpIp_V0                                           {9a280ac0-c8e0-11d1-84e2-00c04fb998a2}
+TcpIp_V1                                           {9a280ac0-c8e0-11d1-84e2-00c04fb998a2}
+TeeDriverAmtAdtRecPkiCertInfoWmiInfo               {708ad9c6-5052-40e3-bdc7-6310e068e403}
+TeeDriverAmtAdtRecWmiInfo                          {708ad9c6-5052-40e3-bdc7-6310e068e403}
+TeeDriverAmtCertificateSerialsWmiInfo              {9541633c-4247-4b63-a0e7-870a9484b0af}
+TeeDriverAmtProvStateNvarWmiInfo                   {52da715b-5e7e-4566-9d74-cf10f5d531b1}
+TeeDriverAMTWmiInfo                                {c78ee939-504c-40c4-a7de-40d08ccb3a0e}
+TeeDriverMeVersionWmiInfo                          {0D6D2587-7EA9-44DE-965E-368BAEF6BDC5}
+TeeDriverWmiInfo                                   {b4f53189-0a5c-42f5-ad90-0f88d1229237}
+TestTraceGuid                                      {485e7deb-0a80-11d8-ad15-505054503030}
+Thread_V0                                          {3d6fa8d1-fe05-11d0-9dda-00c04fd7ba7c}
+Thread_V1                                          {3d6fa8d1-fe05-11d0-9dda-00c04fd7ba7c}
+Thread_V2                                          {3d6fa8d1-fe05-11d0-9dda-00c04fd7ba7c}
+Thread_V3                                          {3d6fa8d1-fe05-11d0-9dda-00c04fd7ba7c}
+Thread_V4                                          {3d6fa8d1-fe05-11d0-9dda-00c04fd7ba7c}
+ThreadPool                                         {c861d0e2-a2c1-4d36-9f9c-970bab943a12}
+ThreadPoolTrace                                    {c861d0e2-a2c1-4d36-9f9c-970bab943a12}
+ThreadPoolTrace_V2                                 {c861d0e2-a2c1-4d36-9f9c-970bab943a12}
+TSClientActiveXControlTrace                        {DAA6CAF5-6678-43f8-A6FE-B40EE096E06E}
+TSClientTrace                                      {0C51B20C-F755-48a8-8123-BF6DA2ADC727}
+TSMFTrace                                          {4199ee71-d55d-47d7-9f57-34a1d5b2c904}
+TSPkgDebugTrace                                    {6165f3e2-ae38-45d4-9b23-6b4818758bd9}
+TSRdpEndPointTrace                                 {5A966D1C-6B48-11DA-8BDE-F66BAD1E3F3A}
+UdpIp                                              {bf3a50c5-a9c9-4988-a005-2df0b7c80f80}
+UdpIp_V0                                           {bf3a50c5-a9c9-4988-a005-2df0b7c80f80}
+UdpIp_V1                                           {bf3a50c5-a9c9-4988-a005-2df0b7c80f80}
+UMBus                                              {f9be9c98-10db-4318-bb61-cb0ddea08bf7}
+UmPass                                             {FF9E2BDD-0E24-437c-84BE-7CFCAE635808}
+UmsEvent                                           {9aec974b-5b8e-4118-9b92-3186d8002ce5}
+UsbstorGuid                                        {72FB9358-A9B3-41E0-AE41-E8DECA41E3A8}
+VideoModeDescriptor                                {4A97ED30-BFAA-491a-9DFD-B43ADEDBF8E3}
+VssTracingEventClass                               {77D8F687-8130-4A14-B8A6-3B922E05B99C}
+VssTracingProvider                                 {9138500E-3648-4EDB-AA4C-859E9F7B7C38}
+WCN                                                {C100BECE-D33A-4A4B-BF23-BBEF4663D017}
+WdfCoreTraceGuid                                   {485e7de9-0a80-11d8-ad15-505054503030}
+WDiagCoreCtlGuid                                   {637a0f36-dff5-4b2f-83dd-b106c1c725e2}
+WFAPIGP                                            {0EFF663F-8B6E-4e6d-8182-087A8EAA29CB}
+WHEAErrorInjectionMethods                          {e808ff73-2093-472a-a5cc-df24f031b035} GetErrorInjectionCapabilitiesRtn,I
+                                                                                          njectErrorRtn
+WHEAErrorSourceMethods                             {91c3c007-185d-4d78-a751-bfcb31c2c64d} GetAllErrorSourcesRtn,GetErrorSour
+                                                                                          ceInfoRtn,SetErrorSourceInfoRtn,En
+                                                                                          ableErrorSourceRtn,DisableErrorSou
+                                                                                          rceRtn
+WHEAPageOfflineMethods                             {8a13d6df-a461-4882-b459-5e68b7146c3d} WheaPageOfflineInterfaceRtn
+WHEAPluginCtlMethods                               {ed16c828-bdec-41a4-8fef-3bfc15adecbd} WheaPluginCtlInterfaceRtn
+WHEAPolicyManagementMethods                        {794569ee-137c-4a06-8add-d225b53dfc4b} WheaGetAllPolicyRtn,WheaGetPolicyR
+                                                                                          tn,WheaSetPolicyRtn,WheaCommitPoli
+                                                                                          cyRtn,WheaResetPolicyRtn
+WiFi_GenericSensorData                             {2BC49DEF-7B15-4F05-8BB7-EE37B9547C0B} WlanGetSensorGetVersion,WlanGetSen
+                                                                                          sorAvailable,WlanGetSensorData
+WiFiSensorNotificationEvent                        {A6FEA33E-DABF-46F5-BFC8-460D961BEC9F}
+WinInit                                            {c2ba06e2-f7ce-44aa-9e7e-62652cdefe97}
+WinLogon                                           {d451642c-63a6-11d7-9720-00b0d03e0347}
+WinRM                                              {04c6e16d-b99f-4a3a-9b3e-b8325bbc781e}
+WlanDlgTraceGuid                                   {520319a9-b932-4ec7-943c-61e560939101}
+WlanGPClientGuid                                   {8A3CF0B5-E0BC-450b-AE4B-61728FFA1D58}
+WlansvcCtlGuid                                     {0C5A3172-2248-44FD-B9A6-8389CB1DC56A}
+WMI_Tracing                                        {1FF6B227-2CA7-40f9-9A66-980EADAA602E}
+WMI_Tracing_Client_Operations                      {8E6B6962-AB54-4335-8229-3255B919DD0E}
+WmiFWVersion                                       {A6E59E35-24C7-49CA-86D8-FB9BD654C02D}
+WmiMonitorAnalogVideoInputParams                   {A56DBCF9-C4F0-44a8-9C1B-BB3B3F774B4D}
+WmiMonitorBasicDisplayParams                       {9831B7E6-09AC-491f-8D07-3C3D649D8240}
+WmiMonitorBrightness                               {d43412ac-67f9-4fbb-a081-1752a2c33e84}
+WmiMonitorBrightnessEvent                          {123c80d2-937f-4cfe-80f4-c40d596e48b7}
+WmiMonitorBrightnessMethods                        {479b20b4-5559-46fe-be97-7d222154421f} WmiSetBrightness,WmiRevertToPolicy
+                                                                                          Brightness,WmiSetALSBrightnessStat
+                                                                                          e,WmiSetALSBrightness
+WmiMonitorColorCharacteristics                     {EA324793-51BB-486a-AA9D-0F5552353413}
+WmiMonitorColorXYZinCIE                            {01FAF041-842C-4230-A31E-1335428CD8F0}
+WmiMonitorConnectionParams                         {2E2D2463-B537-4da7-8EEE-51306F1F482F}
+WmiMonitorDescriptorMethods                        {5341576e-75c4-4aeb-a82b-873cd3c6b384} WmiGetMonitorRawEEdidV1Block
+WmiMonitorDigitalVideoInputParams                  {51565945-498A-4a77-ACC6-151BECC805CA}
+WmiMonitorID                                       {671A8285-4EDB-4cae-99FE-69A15C48C0BC}
+WmiMonitorListedFrequencyRanges                    {E86E9525-65B6-4B85-95C5-00BEACC975ED}
+WmiMonitorListedSupportedSourceModes               {6DC76655-063C-4524-A862-B8410C26281B}
+WmiMonitorRawEEdidV1Block                          {FAEE1471-5149-4a68-AC2C-BF96EC09F004}
+WmiMonitorSupportedDisplayFeatures                 {9FA9C28B-5E5C-4035-A5F8-67D4554F8D04}
+WMPNetwkGuid                                       {a7eb57f6-145e-4f18-bd75-dbbf6f7e23a7}
+WMPNsCfgGuid                                       {d804a67f-4c25-43c1-896f-89ff78b3a911}
+WMPNsSciGuid                                       {8ed60a3a-8c12-49c5-a518-fdf451bc10fc}
+WnfProvider                                        {42695762-ea50-497a-9068-5cbbb35e0b95}
+WNFTrace                                           {42695762-ea50-497a-9068-5cbbb35e0b95}
+WSAT_TraceEvent                                    {eb6517d4-090c-48ab-825e-adad366406a2}
+WSAT_TraceProvider                                 {7f3fe630-462b-47c5-ab07-67ca84934abd}
+Wudfx02000KmdfTraceGuid                            {485e7de9-0a80-11d8-ad15-505054503030}
+XWIZARD_TRACE_GUID                                 {777BA8FF-2498-4875-933A-3067DE883070}
+
+
+
+=== Candidate MSI WMI classes ===
+
+
+Class      : MSI_Event
+Guid       : {5B3CC38A-40D9-7245-8AE6-1145B751BE3F}
+Methods    :
+Properties : SECURITY_DESCRIPTOR,TIME_CREATED,Active,InstanceName,MSIEvt
+
+Class      : MS_SM_AdapterEvent
+Guid       : {7944cf67-697b-4432-953e-1fdada884361}
+Methods    :
+Properties : SECURITY_DESCRIPTOR,TIME_CREATED,Active,EventType,InstanceName,PortWWN
+
+Class      : MS_SM_PortEvent
+Guid       : {0f760256-8fc6-47ad-9d2e-f0d69801de7c}
+Methods    :
+Properties : SECURITY_DESCRIPTOR,TIME_CREATED,Active,EventType,FabricPortId,InstanceName,PortWWN
+
+Class      : MS_SM_TargetEvent
+Guid       : {6e2d8b73-f928-4da9-bda1-ae54189a3825}
+Methods    :
+Properties : SECURITY_DESCRIPTOR,TIME_CREATED,Active,DiscoveredPortWWN,DomainPortWWN,EventType,InstanceName,PortWWN
+
+Class      : MSiSCSI_Eventlog
+Guid       : {E6B8552B-7C62-4c6e-99EB-67CE6087894C}
+Methods    :
+Properties : SECURITY_DESCRIPTOR,TIME_CREATED,Active,AdditionalData,InstanceName,LogToEventlog,Size,Type
+
+Class      : MSiSCSI_InitiatorNodeFailureEvent
+Guid       : {1221948A-6332-4ac2-AA04-268AABCECE4F}
+Methods    :
+Properties : SECURITY_DESCRIPTOR,TIME_CREATED,Active,FailureTime,FailureType,InstanceName,TargetFailureAddr,TargetFailureNam
+             e
+
+Class      : MSiSCSI_InitiatorInstanceFailureEvent
+Guid       : {E67E1BDB-D130-4143-9EB2-8BEE1899FD52}
+Methods    :
+Properties : SECURITY_DESCRIPTOR,TIME_CREATED,Active,FailureType,InstanceName,RemoteNodeName
+
+Class      : MSI_ACPI
+Guid       : {ABBC0F6E-8EA1-11d1-00A0-C90629100000}
+Methods    : GetPackage,SetPackage,Get_EC,Set_EC,Get_BIOS,Set_BIOS,Get_SMBUS,Set_SMBUS,Get_MasterBattery,Set_MasterBattery,G
+             et_SlaveBattery,Set_SlaveBattery,Get_Temperature,Set_Temperature,Get_Thermal,Set_Thermal,Get_Fan,Set_Fan,Get_De
+             vice,Set_Device,Get_Power,Set_Power,Get_Debug,Set_Debug,Get_AP,Set_AP,Get_Data,Set_Data,Get_WMI,Get_PE,Set_PE,G
+             et_EC2,Get_BIOS_64,Set_BIOS_64,Get_SMBUS_64,Set_SMBUS_64,Get_Thermal_64,Set_Thermal_64
+Properties : Active,InstanceName
+
+Class      : MSiSCSI_ConnectionStatistics
+Guid       : {4AE27CD9-8DFA-4c37-A42C-B88A93E3E521}
+Methods    :
+Properties : Caption,Description,Name,Frequency_Object,Frequency_PerfTime,Frequency_Sys100NS,Timestamp_Object,Timestamp_Perf
+             Time,Timestamp_Sys100NS,Active,BytesReceived,BytesSent,CID,InstanceName,iSCSIName,PDUCommandsSent,PDUResponsesR
+             eceived,UniqueAdapterId,USID
+
+Class      : MSiSCSI_InitiatorInstanceStatistics
+Guid       : {FA30C290-68DB-430a-AF76-91A2E1C49154}
+Methods    :
+Properties : Caption,Description,Name,Frequency_Object,Frequency_PerfTime,Frequency_Sys100NS,Timestamp_Object,Timestamp_Perf
+             Time,Timestamp_Sys100NS,Active,InstanceName,SessionConnectionTimeoutErrorCount,SessionDigestErrorCount,SessionF
+             ailureCount,SessionFormatErrorCount,UniqueAdapterId
+
+Class      : MSiSCSI_InitiatorLoginStatistics
+Guid       : {F022F413-3BF5-47ec-A942-33B81CF8E7FF}
+Methods    :
+Properties : Caption,Description,Name,Frequency_Object,Frequency_PerfTime,Frequency_Sys100NS,Timestamp_Object,Timestamp_Perf
+             Time,Timestamp_Sys100NS,Active,InstanceName,LoginAcceptRsps,LoginAuthenticateFails,LoginAuthFailRsps,LoginFailu
+             res,LoginNegotiateFails,LoginOtherFailRsps,LoginRedirectRsps,LogoutNormals,LogoutOtherCodes,UniqueAdapterId
+
+Class      : MSiSCSI_MMIPSECStats
+Guid       : {36B58EA2-C461-4bb0-AC8E-952F59D251ED}
+Methods    :
+Properties : Caption,Description,Name,Frequency_Object,Frequency_PerfTime,Frequency_Sys100NS,Timestamp_Object,Timestamp_Perf
+             Time,Timestamp_Sys100NS,AcquireFailures,AcquireHeapSize,Active,ActiveAcquire,ActiveReceive,AuthenticationFailur
+             es,ConnectionListSize,GetSPIFailures,InstanceName,InvalidCookiesReceived,InvalidPackets,KeyAdditionFailures,Key
+             Additions,KeyUpdateFailures,KeyUpdates,NegotiationFailures,OakleyMainMode,OakleyQuickMode,ReceiveFailures,Recei
+             veHeapSize,SendFailures,SoftAssociations,TotalGetSPI
+
+Class      : MSiSCSI_NICPerformance
+Guid       : {5C59FD61-E919-4687-84E2-7200ABE2209B}
+Methods    :
+Properties : Caption,Description,Name,Frequency_Object,Frequency_PerfTime,Frequency_Sys100NS,Timestamp_Object,Timestamp_Perf
+             Time,Timestamp_Sys100NS,Active,BytesReceived,BytesTransmitted,InstanceName,PDUReceived,PDUTransmitted
+
+Class      : MSiSCSI_QMIPSECStats
+Guid       : {B4D1C606-8682-4b7a-AC6B-D883D91555FB}
+Methods    :
+Properties : Caption,Description,Name,Frequency_Object,Frequency_PerfTime,Frequency_Sys100NS,Timestamp_Object,Timestamp_Perf
+             Time,Timestamp_Sys100NS,Active,ActiveSA,ActiveTunnels,AuthenticatedBytesReceived,AuthenticatedBytesSent,BadSPIP
+             ackets,ConfidentialBytesReceived,ConfidentialBytesSent,InstanceName,KeyAdditions,KeyDeletions,PacketsNotAuthent
+             icated,PacketsNotDecrypted,PacketsWithReplayDetection,PendingKeyOperations,ReKeys,TransportBytesReceived,Transp
+             ortBytesSent,TunnelBytesReceived,TunnelBytesSent
+
+Class      : MSiSCSI_RequestTimeStatistics
+Guid       : {E0B40AA8-544B-4d5e-BA60-A03F136DA83D}
+Methods    :
+Properties : Caption,Description,Name,Frequency_Object,Frequency_PerfTime,Frequency_Sys100NS,Timestamp_Object,Timestamp_Perf
+             Time,Timestamp_Sys100NS,Active,AverageProcessingTime,CID,InstanceName,iSCSIName,MaximumProcessingTime,UniqueAda
+             pterId,USID
+
+Class      : MSiSCSI_SessionStatistics
+Guid       : {C827993C-6D1F-4194-9B5C-D7C0A5F1CFB7}
+Methods    :
+Properties : Caption,Description,Name,Frequency_Object,Frequency_PerfTime,Frequency_Sys100NS,Timestamp_Object,Timestamp_Perf
+             Time,Timestamp_Sys100NS,Active,BytesReceived,BytesSent,ConnectionTimeoutErrors,DigestErrors,FormatErrors,Instan
+             ceName,iSCSIName,PDUCommandsSent,PDUResponsesReceived,UniqueAdapterId,USID
+
+Class      : EnumTrustedDoms_Start
+Guid       :
+Methods    :
+Properties :
+
+Class      : EnumTrustedDoms_End
+Guid       :
+Methods    :
+Properties :
+
+Class      : ISR_MSI
+Guid       :
+Methods    :
+Properties : Flags,InitialTime,MessageNumber,Reserved,ReturnValue,Routine,Vector
+
+Class      : MSiSCSI_PortalInfoClass
+Guid       : {84CA6FD6-B152-4e6a-8869-FDE5E37B6157}
+Methods    :
+Properties : Active,InstanceName,PortalInfoCount,PortalInformation
+
+Class      : MSI_AP
+Guid       : {A1753D7C-B621-de4a-B41A-55716A0ECE7A}
+Methods    :
+Properties : Active,AP,InstanceName
+
+Class      : MSI_Device
+Guid       : {4AFBD56B-9F91-8f49-81F5-995BA73822AF}
+Methods    :
+Properties : Active,Device,InstanceName
+
+Class      : MSIde
+Guid       :
+Methods    :
+Properties :
+
+Class      : MSIde_PortDeviceInfo
+Guid       : {53f5630f-b6bf-11d0-94f2-00a0c91efb8b}
+Methods    :
+Properties : Active,Bus,InstanceName,Lun,Target
+
+Class      : MSiSCSI_LB_Operations
+Guid       : {A7DFE761-B6BC-4490-91B0-D9CF4A24D37C}
+Methods    : SetLoadBalancePolicy
+Properties : Active,InstanceName
+
+Class      : MSiSCSIInitiator_LUNList
+Guid       :
+Methods    :
+Properties : OSLunNumber,TargetLun
+
+Class      : MS_SMHBA_PORTLUN
+Guid       : {0669d100-066e-4e49-a68c-e05199596132}
+Methods    :
+Properties : domainPortWWN,PortWWN,TargetLun
+
+Class      : MSiSCSI_NICConfig
+Guid       : {C75258E9-BE79-4a48-A23D-EEB6F8FB940C}
+Methods    :
+Properties : Active,InstanceName,LinkSpeed,LinkState,MacAddress,MaxFrameSize,MaxLinkSpeed
+
+Class      : MSI_System
+Guid       : {A1753D7B-B621-de4a-B41A-55716A0ECE7A}
+Methods    :
+Properties : Active,InstanceName,System
+
+Class      : MS_SMHBA_SAS_Port
+Guid       : {b914e34f-7b80-46b0-8034-6d9b689e1ddd}
+Methods    :
+Properties : AttachedSASAddress,LocalSASAddress,NumberofDiscoveredPorts,NumberofPhys,PortProtocol
+
+Class      : MSiSCSI_HBAInformation
+Guid       : {58515BF3-2F59-4f37-B74F-85AEEC652AD6}
+Methods    :
+Properties : Active,AsicVersion,BiDiScsiCommands,CacheValid,DriverName,FirmwareVersion,FunctionalitySupported,GenerationalGu
+             id,InstanceName,IntegratedTCPIP,MaxCDBLength,MultifunctionDevice,NumberOfPorts,OptionRomVersion,RequiresBinaryI
+             pAddresses,SerialNumber,Status,UniqueAdapterId,VendorID,VendorModel,VendorVersion,VersionMax,VersionMin
+
+Class      : MSiSCSI_InitiatorSessionInfo
+Guid       : {D7931411-0376-4869-A491-8D679BFC004A}
+Methods    :
+Properties : Active,InstanceName,SessionCount,SessionsList,UniqueAdapterId
+
+Class      : MSiSCSIInitiator_TargetMappings
+Guid       :
+Methods    :
+Properties : InitiatorName,LUNList,OSBusNumber,OSDeviceName,OSTargetNumber,TargetName
+
+Class      : MSiSCSIInitiator_DeviceOnSession
+Guid       :
+Methods    :
+Properties : DeviceInterfaceGuid,DeviceInterfaceName,DeviceNumber,DeviceType,InitiatorName,LegacyName,PartitionNumber,ScsiLu
+             n,ScsiPathId,ScsiPortNumber,ScsiTargetId,TargetName
+
+Class      : MS_SM_FabricAndDomainManagementMethods
+Guid       : {467fea10-701b-4388-917f-730620cea328}
+Methods    : SM_SendTEST,SM_SendECHO,SM_SendSMPPassThru,SM_SendCTPassThru,SM_GetRNIDMgmtInfo,SM_SetRNIDMgmtInfo,SM_SendRNID,
+             SM_SendRPL,SM_SendRPS,SM_SendSRL,SM_SendLIRR,SM_SendRLS
+Properties : Active,InstanceName
+
+Class      : MSiSCSIInitiator_IKEPresharedKeyAuthenticationInfo
+Guid       :
+Methods    :
+Properties : AuthMethod,Id,IdType,key,SecurityFlags
+
+Class      : MSiSCSI_RedirectPortalInfoClass
+Guid       : {DAF7F63A-F9EA-4869-87E1-AE8A7C2261E2}
+Methods    :
+Properties : Active,InstanceName,RedirectSessionList,SessionCount,UniqueAdapterId
+
+Class      : MS_SM_PortInformationMethods
+Guid       : {5b6a8b86-708d-4ec6-82a6-39adcf6f6433}
+Methods    : SM_GetPortType,SM_GetAdapterPortAttributes,SM_GetDiscoveredPortAttributes,SM_GetPortAttributesByWWN,SM_GetProto
+             colStatistics,SM_GetPhyStatistics,SM_GetFCPhyAttributes,SM_GetSASPhyAttributes,SM_RefreshInformation
+Properties : Active,InstanceName
+
+Class      : MSiSCSI_TCPIPConfig
+Guid       : {7A2C6C2B-E5A5-49ad-AD68-133089ACD74D}
+Methods    :
+Properties : Active,AlternateDNSServer,DefaultGateway,EnableDHCP,InstanceName,IpAddress,IPVersions,PreferredDNSServer,Subnet
+             Mask,UseDHCPForDNS,UseLinkLocalAddress
+
+Class      : MSiSCSIInitiator_PersistentDevices
+Guid       :
+Methods    :
+Properties : DevicePath
+
+Class      : MSiSCSI_BootConfiguration
+Guid       : {53EF8D5F-36F3-4124-8B76-C6AD521A1021}
+Methods    :
+Properties : Active,DiscoverBootDevice,InitiatorNode,InstanceName,LoginOptions,LUN,Password,PasswordSize,SecurityFlags,Targe
+             tName,TargetPortal,Username,UsernameSize
+
+Class      : MSI_Software
+Guid       : {24418D6A-0A79-524C-9AB1-18B78CA68CE7}
+Methods    :
+Properties : Active,InstanceName,Software
+
+Class      : MS_SM_HbaApiVersion
+Guid       :
+Methods    :
+Properties : Description,HbaApiVersion,WmiHbaApiVersion
+
+Class      : MS_SMHBA_SCSIENTRY
+Guid       : {125d41bc-7643-4155-b81c-e2f128ad1fb4}
+Methods    :
+Properties : LUID,PortLun,ScsiId
+
+Class      : MSiSCSIInitiator_MethodClass
+Guid       :
+Methods    : RefreshTargetList,SetIScsiTunnelModeOuterAddress,SetIScsiIKEInfo,SetIScsiGroupPresharedKey,SetIScsiInitiatorCHA
+             PSharedSecret,SetIScsiInitiatorRADIUSSharedSecret,SetIScsiInitiatorNodeName,SetupPersistentIScsiVolumes,ClearPe
+             rsistentIScsiVolumes
+Properties : iSCSINodeName
+
+Class      : MSiSCSI_DiscoveryConfig
+Guid       : {45755098-4291-43df-9720-B58642DD63DF}
+Methods    :
+Properties : Active,AutomaticiSNSDiscovery,InitiatorName,InstanceName,iSNSServer,PerformiSNSDiscovery,PerformSLPDiscovery
+
+Class      : MS_SM_AdapterInformationQuery
+Guid       : {bdc67efa-e5e7-4777-b13c-621459657099}
+Methods    :
+Properties : Active,DriverName,DriverVersion,FirmwareVersion,HardwareVersion,HBAStatus,HBASymbolicName,InstanceName,Manufact
+             urer,MfgDomain,Model,ModelDescription,NumberOfPorts,OptionROMVersion,RedundantFirmwareVersion,RedundantOptionRO
+             MVersion,SerialNumber,UniqueAdapterId,VendorSpecificID
+
+Class      : MSiSCSIInitiator_iSNSServerClass
+Guid       :
+Methods    : Refresh
+Properties : iSNSServerAddress
+
+Class      : MSI_CPU
+Guid       : {BD2A216F-2FB9-a640-B807-DDDBAD656891}
+Methods    :
+Properties : Active,CPU,InstanceName
+
+Class      : MS_SMHBA_FC_Port
+Guid       : {96b827a7-2b4a-49c8-9097-078200c5a5cd}
+Methods    :
+Properties : FabricName,FcId,NodeWWN,NumberofDiscoveredPorts,NumberofPhys,PortActiveFc4Types,PortSupportedClassofService,Por
+             tSupportedFc4Types,PortSymbolicName,PortWWN
+
+Class      : MSI_Master_Battery
+Guid       : {40BA026D-075D-cd4a-9710-F7C57347CAC9}
+Methods    :
+Properties : Active,InstanceName,Master_Battery
+
+Class      : MSiSCSI_RADIUSConfig
+Guid       : {8EAEF9D8-C053-49d3-9205-65C703C2ECC1}
+Methods    :
+Properties : Active,BackupRADIUSServer,InstanceName,RADIUSServer,Reserved,SharedSecret,SharedSecretSizeInBytes,UseRADIUSForC
+             HAP
+
+Class      : MS_SM_TargetInformationMethods
+Guid       : {93545055-ab4c-4e80-84ae-6a86a2dc4b84}
+Methods    : SM_GetTargetMapping,SM_GetBindingCapability,SM_GetBindingSupport,SM_SetBindingSupport,SM_GetPersistentBinding,S
+             M_SetPersistentBinding,SM_RemovePersistentBinding,SM_GetLUNStatistics
+Properties : Active,InstanceName
+
+Class      : MSiSCSI_HBASessionConfig
+Guid       : {B35694DE-D323-49d2-ABB2-8139209AD150}
+Methods    :
+Properties : Active,FirstBurstLength,ImmediateData,InitialR2T,InstanceName,MaxBurstLength,MaxOutstandingR2T,MaxRecvDataSegme
+             ntLength
+
+Class      : MSiSCSIInitiator_TargetAddress
+Guid       :
+Methods    :
+Properties : OSBusNumber,OSDeviceName,OSLunNumber,OSTargetNumber
+
+Class      : MS_SMHBA_SASPHYSTATISTICS
+Guid       : {bd458e7d-c40a-4401-a179-11919cbcc5c6}
+Methods    :
+Properties : InvalidDwordCount,LossofDwordSyncCount,PhyResetProblemCount,RunningDisparityErrorCount,RxFrames,RxWords,Seconds
+             SinceLastReset,TxFrames,TxWords
+
+Class      : MS_SMHBA_FC_PHY
+Guid       : {fb66c8fe-1da0-48a2-92db-02c341143c46}
+Methods    :
+Properties : MaxFrameSize,PhySpeed,PhySupportSpeed,PhyType
+
+Class      : MS_WmiInternal
+Guid       :
+Methods    :
+Properties :
+
+Class      : MSiSCSIInitiator_TargetLoginOptions
+Guid       :
+Methods    :
+Properties : AuthType,DataDigest,DefaultTime2Retain,DefaultTime2Wait,HeaderDigest,InformationSpecified,LoginFlags,MaximumCon
+             nections,Password,Username,Version
+
+Class      : MSiSCSIInitiator_PortalGroup
+Guid       :
+Methods    :
+Properties : Index,Portals
+
+Class      : MSiSCSI_ManagementOperations
+Guid       : {B8D765F0-2D93-4da2-8186-A187622B4302}
+Methods    : PingIPAddress
+Properties : Active,InstanceName
+
+Class      : MS_SM_ScsiInformationMethods
+Guid       : {b6661e6f-075e-4209-ae20-fe81db03d979}
+Methods    : SM_ScsiInquiry,SM_ScsiReportLuns,SM_ScsiReadCapacity
+Properties : Active,InstanceName
+
+Class      : MSI_Slave_Battery
+Guid       : {8DBCCF6E-9DB4-0e46-A3F2-99AFAAA77A7A}
+Methods    :
+Properties : Active,InstanceName,Slave_Battery
+
+Class      : MS_SMHBA_PROTOCOLSTATISTICS
+Guid       : {b557bd86-4128-4d5c-b6e6-b65f9bd68722}
+Methods    :
+Properties : ControlRequests,InputMegabytes,InputRequests,OutputMegabytes,OutputRequests,SecondsSinceLastReset
+
+Class      : MSiSCSIInitiator_SendTargetPortalClass
+Guid       :
+Methods    : Refresh
+Properties : InitiatorName,InitiatorPortNumber,LoginOptions,PortalAddress,PortalIdentifierString,PortalPort,PortalSymbolicNa
+             me,SecurityFlags
+
+Class      : MSiSCSIInitiator_SessionClass
+Guid       :
+Methods    : Logout,SendScsiInquiry,SendScsiReadCapacity,SendScsiReportLuns,AddConnection,RemoveConnection
+Properties : ConnectionInformation,Devices,InitiatorName,ISID,SessionId,TargetName,TargetNodeName,TSID
+
+Class      : MS_SMHBA_SAS_PHY
+Guid       : {dde0a090-96bc-452b-9a64-6fbb6a19c47d}
+Methods    :
+Properties : domainPortWWN,HardwareMaxLinkRate,HardwareMinLinkRate,NegotiatedLinkRate,PhyIdentifier,ProgrammedMaxLinkRate,Pr
+             ogrammedMinLinkRate
+
+Class      : MSiSCSIInitiator_TargetClass
+Guid       :
+Methods    : Login
+Properties : DiscoveryMechanism,InitiatorName,LoginOptions,Mappings,PortalGroups,ProtocolType,TargetAlias,TargetFlags,Target
+             Name
+
+Class      : MSiSCSI_QueryLBPolicy
+Guid       : {E0AECAEE-B311-426f-B67A-18D5E55D0996}
+Methods    :
+Properties : Active,InstanceName,LoadBalancePolicies,Reserved,SessionCount,UniqueAdapterId
+
+Class      : MSI_VGA
+Guid       : {1EC3EC7A-1E9B-e74a-9026-CF122B0BBD21}
+Methods    :
+Properties : Active,InstanceName,VGA
+
+Class      : MS_SMHBA_BINDINGENTRY
+Guid       : {65bfb548-d00a-4d4c-a357-7daa23bc2e3d}
+Methods    :
+Properties : LUID,PortLun,ScsiId,Status,type
+
+Class      : MS_SMHBA_PORTATTRIBUTES
+Guid       : {50a97b2d-99ad-4cf9-8437-b4ea0c07be4c}
+Methods    :
+Properties : OSDeviceName,PortSpecificAttributes,PortSpecificAttributesSize,PortState,PortType,Reserved
+
+Class      : MSiSCSIInitiator_InitiatorClass
+Guid       :
+Methods    :
+Properties : InitiatorName
+
+Class      : MSiSCSI_SecurityCapabilities
+Guid       : {225B9D64-47A9-41c8-81CD-69BC02652D87}
+Methods    :
+Properties : Active,CertificatesSupported,EncryptionAvailable,EncryptionAvailableCount,InstanceName,ProtectiScsiTraffic,Prot
+             ectiSNSTraffic
+
+Class      : MSI_Power
+Guid       : {2D3CBA6C-1C9C-7f41-B54C-F5D5D580D482}
+Methods    :
+Properties : Active,InstanceName,Power
+
+Class      : MSiSCSIInitiator_Portal
+Guid       :
+Methods    :
+Properties : Address,Index,Port,SymbolicName
+
+Class      : MS_SM_EventControl
+Guid       : {d6145693-5988-457f-8581-9a0157b58690}
+Methods    : SM_AddTarget,SM_RemoveTarget,SM_AddPort,SM_RemovePort,SM_AddLink,SM_RemoveLink
+Properties : Active,InstanceName
+
+Class      : MSiSCSIInitiator_ConnectionInformation
+Guid       :
+Methods    :
+Properties : CID,ConnectionID,InitiatorAddress,InitiatorPort,TargetAddress,TargetPort
+
+Class      : MS_SystemInformation
+Guid       : {98A2B9D7-94DD-496a-847E-67A5557A59F2}
+Methods    :
+Properties : Active,BaseBoardManufacturer,BaseBoardProduct,BaseBoardVersion,BiosMajorRelease,BiosMinorRelease,BIOSReleaseDat
+             e,BIOSVendor,BIOSVersion,ECFirmwareMajorRelease,ECFirmwareMinorRelease,InstanceName,SystemFamily,SystemManufact
+             urer,SystemProductName,SystemSKU,SystemVersion
+
+Class      : MSiSCSIInitiator_PersistentLoginClass
+Guid       :
+Methods    :
+Properties : InitiatorInstance,InitiatorPortNumber,IsInformationalSession,LoginOptions,Mappings,SecurityFlags,TargetName,Tar
+             getPortal
+
+Class      : MS_SmBios
+Guid       :
+Methods    :
+Properties :
+
+
+
+
+=== Power configuration ===
+Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)
+
+Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)
+  GUID Alias: SCHEME_BALANCED
+
+Baseline complete.
+Next: Probe --dump-acpi C:\acpi, then disassemble and search for _WDG.
+**********************
+Windows PowerShell transcript end
+End time: 20260807204344
+**********************
