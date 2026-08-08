@@ -61,40 +61,34 @@ the laptops that driver covers) — confirm by reading before writing. Expected:
 address there puts a raw byte into real firmware that could land on fan or thermal registers.
 This is enforced in code, not just documented: `--acpi-get` refuses any method not named `Get_*`.
 
-### Step 0 — costs nothing, needs no new build
+### Step 1 — read, and decode the encoding
 
-The Probe already on the Claw can do this. `MSI_Master_Battery` is a WMI class with a readable
-`Master_Battery` property (`device-report.txt:1444-1447`) that may expose the threshold directly:
-
-```powershell
-.\McenterLite.Probe.exe --wmi-instances MSI_Master_Battery
-```
-
-Run it three times, setting **MSI Center's own** charge limit to 100 / 80 / 60 in between. If
-`Master_Battery` tracks those as 228/208/188 (or plain 100/80/60), the encoding is decoded
-read-only, with no method call at all.
-
-### Step 1 — with the rebuilt Probe
-
-Copy over `src/Probe/bin/Release/net8.0-windows/win-x64/publish/McenterLite.Probe.exe`, then in an
-**elevated** PowerShell:
+**No compiled tool needed.** WMI is native to PowerShell, so this needs only one small script —
+copy `Diagnostics/Test-BatteryWmi.ps1` to the Claw (nothing else) and run it in an **elevated**
+PowerShell:
 
 ```powershell
-# Read-only: declared parameter shapes, without calling anything
-.\McenterLite.Probe.exe --wmi-method MSI_ACPI Get_MasterBattery
-.\McenterLite.Probe.exe --wmi-method MSI_ACPI Set_MasterBattery
-
-# Read-only: actually call the getter and dump the buffer as indexed hex
-.\McenterLite.Probe.exe --battery
+powershell -ExecutionPolicy Bypass -File .\Test-BatteryWmi.ps1
 ```
 
-Re-run `--battery` at each of MSI Center's three settings. Whichever byte index tracks 100/80/60 is
-the threshold — that is the fact the fix depends on.
+Read-only. It does three things in one pass: dumps `MSI_Master_Battery`'s properties (a plain
+class read, no method call at all), prints `Get_MasterBattery` / `Set_MasterBattery`'s declared
+parameter shapes, then calls `Get_MasterBattery` and dumps the buffer as indexed hex.
+
+Run it three times, setting **MSI Center's own** charge limit to 100 / 80 / 60 in between.
+Whichever value tracks those three is the threshold — that is the fact the fix depends on.
+
+> Equivalent Probe commands exist (`--wmi-instances MSI_Master_Battery`, `--wmi-method`,
+> `--battery`, `--set-charge-limit`) if the binary is already on the device. The Probe is a single
+> self-contained `.exe` at
+> `src/Probe/bin/Release/net8.0-windows/win-x64/publish/McenterLite.Probe.exe` — copy that one
+> file and run it elevated; it needs no installer, certificate or dependencies. The PowerShell
+> script is the lighter option when it is not already there.
 
 ### Step 2 — the write, once the read makes sense
 
 ```powershell
-.\McenterLite.Probe.exe --set-charge-limit 60
+powershell -ExecutionPolicy Bypass -File .\Test-BatteryWmi.ps1 -SetLimit 60
 ```
 
 Prints the byte it will send, and reads back before and after. Then the test that actually matters,
