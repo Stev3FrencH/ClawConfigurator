@@ -29,8 +29,7 @@ namespace McenterLite.Hardware.Windows
 
         public WindowsHardware(DeviceDetection.DeviceIdentity identity)
         {
-            var tdp = new RegistryTdpProvider();
-
+            // Caps first: the provider needs the battery ceilings to derive the DC pair.
             Caps = new DeviceCaps
             {
                 Model = identity.DisplayName,
@@ -43,9 +42,11 @@ namespace McenterLite.Hardware.Windows
                 MaxPl2 = 45,
                 Pl2MinOffset = 2,
 
-                TdpBackend = (identity.IsClaw8Ex && tdp.Available)
-                    ? tdp.Backend
-                    : TdpBackendKind.Unavailable,
+                // Battery ceilings. Below the AC limits on purpose: an 8-inch handheld running
+                // 35 W unplugged empties itself fast, and the firmware already keeps a separate
+                // DC pair, so this costs nothing to honour.
+                MaxPl1Dc = 25,
+                MaxPl2Dc = 30,
 
                 // Not implemented yet. Reported as absent rather than broken.
                 HasFan = false,
@@ -56,6 +57,11 @@ namespace McenterLite.Hardware.Windows
 
                 FanDutyFloor = ExDutyFloor,
             };
+
+            var tdp = new RegistryTdpProvider(Caps);
+            Caps.TdpBackend = (identity.IsClaw8Ex && tdp.Available)
+                ? tdp.Backend
+                : TdpBackendKind.Unavailable;
 
             // A device we do not recognise gets nothing, whatever the registry contains. Every
             // value above is calibrated to one model, and a wrong power limit on a different Claw

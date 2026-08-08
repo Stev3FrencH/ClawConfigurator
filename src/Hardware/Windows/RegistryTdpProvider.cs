@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.Versioning;
 using McenterLite.Shared.Ipc;
+using McenterLite.Shared.Model;
 using Microsoft.Win32;
 
 namespace McenterLite.Hardware.Windows
@@ -34,9 +35,10 @@ namespace McenterLite.Hardware.Windows
         private const string KeyPath =
             @"SOFTWARE\WOW6432Node\MSI\MSI Center M\Component\User Scenario";
 
-        // Four values, not two. Which pair is live depends on whether the charger is connected,
-        // and MSI's own UI wrote both identically at every captured point - so we do too, rather
-        // than making the result depend on the power source at the moment of the write.
+        // Four values, not two. Which pair is live depends on whether the charger is connected.
+        // MSI's own UI writes both identically; we do NOT - the DC pair is capped to the battery
+        // ceilings, so one user choice yields full power plugged in and a lower limit unplugged
+        // with nothing to remember to switch.
         private const string Pl1Ac = "ManualPL1AC";
         private const string Pl2Ac = "ManualPL2AC";
         private const string Pl1Dc = "ManualPL1DC";
@@ -61,9 +63,12 @@ namespace McenterLite.Hardware.Windows
         private static readonly (int Mode, int ShiftMode, int GamingEvent) AiEngineTriple = (5, 2, 2);
 
         private readonly string _unavailableReason;
+        private readonly DeviceCaps _caps;
 
-        public RegistryTdpProvider()
+        public RegistryTdpProvider(DeviceCaps caps)
         {
+            _caps = caps;
+
             using var key = OpenRead();
             if (key == null)
             {
@@ -115,6 +120,12 @@ namespace McenterLite.Hardware.Windows
         {
             if (!Available) return OpResult.Unavailable(_unavailableReason);
 
+            // The battery pair is the same choice under a lower ceiling. Derived here rather than
+            // asked of the user: a handheld that quietly draws less when unplugged is what people
+            // want, and a second slider they have to remember to move is not.
+            int dcPl1 = pl1, dcPl2 = pl2;
+            _caps?.ClampPowerLimitsForBattery(ref dcPl1, ref dcPl2);
+
             try
             {
                 using var key = OpenWrite();
@@ -127,8 +138,8 @@ namespace McenterLite.Hardware.Windows
 
                 key.SetValue(Pl1Ac, pl1, RegistryValueKind.DWord);
                 key.SetValue(Pl2Ac, pl2, RegistryValueKind.DWord);
-                key.SetValue(Pl1Dc, pl1, RegistryValueKind.DWord);
-                key.SetValue(Pl2Dc, pl2, RegistryValueKind.DWord);
+                key.SetValue(Pl1Dc, dcPl1, RegistryValueKind.DWord);
+                key.SetValue(Pl2Dc, dcPl2, RegistryValueKind.DWord);
             }
             catch (UnauthorizedAccessException)
             {
@@ -152,6 +163,16 @@ namespace McenterLite.Hardware.Windows
                     + "MSI Center may have overwritten them.");
             }
 
+            // The battery pair is verified too. It is the one the user is least likely to notice
+            // going wrong - nothing on screen reflects it until they unplug.
+            if (TryReadDc(out var actualDcPl1, out var actualDcPl2)
+                && (actualDcPl1 != dcPl1 || actualDcPl2 != dcPl2))
+            {
+                return OpResult.Fail(
+                    $"Battery power limits did not stick: asked for {dcPl1}/{dcPl2} W, "
+                    + $"found {actualDcPl1}/{actualDcPl2} W.");
+            }
+
             // Reported, not corrected. The mode is a control of its own (see ApplyMode), so the
             // user can switch to User Scenario deliberately rather than having us do it behind a
             // slider - which would also move settings unrelated to power, since mode changes
@@ -164,6 +185,28 @@ namespace McenterLite.Hardware.Windows
             }
 
             return OpResult.Success();
+        }
+
+        /// <summary>The battery pair, for verifying a write. Not exposed on the interface.</summary>
+        private static bool TryReadDc(out int pl1, out int pl2)
+        {
+            pl1 = 0;
+            pl2 = 0;
+
+            try
+            {
+                using var key = OpenRead();
+                if (key?.GetValue(Pl1Dc) is not int readPl1) return false;
+                if (key.GetValue(Pl2Dc) is not int readPl2) return false;
+
+                pl1 = readPl1;
+                pl2 = readPl2;
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         public bool TryReadMode(out PerfMode mode)

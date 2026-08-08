@@ -173,7 +173,18 @@ mode id — do not treat it as one.
 `Pl2MinOffset = 2` holds at every point (8→10, 17→19, 35→37). Nothing to change.
 
 AC and DC are **separate values**; MSI Center wrote both identically in every capture, so whether
-it ever diverges them is unknown.
+its own UI ever diverges them is unknown.
+
+**We deliberately do diverge them.** The firmware keeps a separate DC pair, so the battery limit
+is free to honour, and an 8-inch handheld running 35 W unplugged empties itself fast. The user's
+single choice is written to the AC pair as-is and to the DC pair under a lower ceiling —
+**25 W PL1 / 30 W PL2** (`DeviceCaps.MaxPl1Dc` / `MaxPl2Dc`). No second control, nothing to
+remember to switch when the charger comes out.
+
+The DC pair goes through the *same clamp* with lower ceilings rather than two `Math.Min` calls,
+so the `Pl2MinOffset` headroom rule is re-satisfied after capping — capping the two independently
+could produce a pair the firmware rejects. Both pairs are read back and verified after the write;
+the battery pair especially, since nothing on screen reflects it until the charger is unplugged.
 
 ### Fan — the EX model is not the model we implemented
 

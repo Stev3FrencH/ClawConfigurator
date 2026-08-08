@@ -13,6 +13,8 @@ namespace McenterLite.Shared.Tests
             MinPl1 = 8,
             MaxPl1 = 35,
             MaxPl2 = 45,
+            MaxPl1Dc = 25,
+            MaxPl2Dc = 30,
             Pl2MinOffset = 2,
             TdpBackend = TdpBackendKind.Wmi,
             HasFan = true,
@@ -32,10 +34,85 @@ namespace McenterLite.Shared.Tests
             Assert.True(parsed.Supported);
             Assert.Equal(35, parsed.MaxPl1);
             Assert.Equal(45, parsed.MaxPl2);
+            Assert.Equal(25, parsed.MaxPl1Dc);
+            Assert.Equal(30, parsed.MaxPl2Dc);
             Assert.Equal(2, parsed.Pl2MinOffset);
             Assert.Equal(TdpBackendKind.Wmi, parsed.TdpBackend);
             Assert.Equal(58, parsed.FanDutyFloor);
             Assert.True(parsed.HasIgcl);
+        }
+
+        [Theory]
+        // Under both ceilings: untouched.
+        [InlineData(8, 10, 8, 10)]
+        [InlineData(17, 19, 17, 19)]
+        [InlineData(25, 30, 25, 30)]
+        // Over PL2 only.
+        [InlineData(20, 45, 20, 30)]
+        // Over both: capped to the battery ceilings.
+        [InlineData(35, 45, 25, 30)]
+        [InlineData(30, 40, 25, 30)]
+        public void ClampForBattery_CapsToTheBatteryCeilings(int pl1, int pl2, int expectedPl1, int expectedPl2)
+        {
+            var caps = Claw8Ex();
+            caps.ClampPowerLimitsForBattery(ref pl1, ref pl2);
+
+            Assert.Equal(expectedPl1, pl1);
+            Assert.Equal(expectedPl2, pl2);
+        }
+
+        [Fact]
+        public void ClampForBattery_KeepsTheHeadroomRuleAfterCapping()
+        {
+            // The reason this is a clamp and not two Math.Min calls. Capping PL1 and PL2
+            // independently could leave less than Pl2MinOffset between them, which is a pair the
+            // firmware rejects - so every AC-valid input must still be valid after the DC cap.
+            var caps = Claw8Ex();
+
+            for (int pl1 = caps.MinPl1; pl1 <= caps.MaxPl1; pl1++)
+            {
+                for (int pl2 = pl1 + caps.Pl2MinOffset; pl2 <= caps.MaxPl2; pl2++)
+                {
+                    int dcPl1 = pl1, dcPl2 = pl2;
+                    caps.ClampPowerLimitsForBattery(ref dcPl1, ref dcPl2);
+
+                    Assert.True(dcPl2 - dcPl1 >= caps.Pl2MinOffset,
+                        $"{pl1}/{pl2} W became {dcPl1}/{dcPl2} W, below the required headroom");
+                    Assert.InRange(dcPl1, caps.MinPl1, caps.MaxPl1Dc);
+                    Assert.InRange(dcPl2, caps.MinPl1, caps.MaxPl2Dc);
+                }
+            }
+        }
+
+        [Fact]
+        public void ClampForBattery_NeverRaisesTheLimitAboveAc()
+        {
+            // A DC ceiling above the AC one is a bad capability value, not permission to draw
+            // more power unplugged than plugged in.
+            var caps = Claw8Ex();
+            caps.MaxPl1Dc = 99;
+            caps.MaxPl2Dc = 99;
+
+            int pl1 = 35, pl2 = 45;
+            caps.ClampPowerLimitsForBattery(ref pl1, ref pl2);
+
+            Assert.Equal(35, pl1);
+            Assert.Equal(45, pl2);
+        }
+
+        [Fact]
+        public void ClampForBattery_IsNeverHigherThanTheAcClamp()
+        {
+            var caps = Claw8Ex();
+
+            int acPl1 = 35, acPl2 = 45;
+            caps.ClampPowerLimits(ref acPl1, ref acPl2);
+
+            int dcPl1 = 35, dcPl2 = 45;
+            caps.ClampPowerLimitsForBattery(ref dcPl1, ref dcPl2);
+
+            Assert.True(dcPl1 <= acPl1);
+            Assert.True(dcPl2 <= acPl2);
         }
 
         [Fact]

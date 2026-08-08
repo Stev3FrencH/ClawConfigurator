@@ -34,6 +34,8 @@ namespace McenterLite.Hardware.Fake
                 MaxPl1 = 35,
                 MaxPl2 = 45,
                 Pl2MinOffset = 2,
+                MaxPl1Dc = 25,
+                MaxPl2Dc = 30,
                 TdpBackend = simulateClaw8Ex ? TdpBackendKind.Wmi : TdpBackendKind.Unavailable,
                 HasFan = simulateClaw8Ex,
                 HasChargeLimit = simulateClaw8Ex,

@@ -136,6 +136,11 @@
                                 TickFrequency="1"
                                 ValueChanged="Pl2Slider_ValueChanged" />
 
+                        <!-- Text is built from DeviceCaps at runtime rather than hardcoded, so the
+                             stated ceiling can never drift from the one actually written. -->
+                        <TextBlock x:Name="BatteryLimitHint"
+                                   Style="{StaticResource HintStyle}" />
+
                         <TextBlock Style="{StaticResource HintStyle}"
                                    Text="Boost is held above sustained by the margin the firmware requires. The helper clamps both, so a value may snap back." />
                     </StackPanel>

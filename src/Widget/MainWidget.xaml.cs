@@ -402,6 +402,18 @@ namespace McenterLite.Widget
                     : $"Power limits via {DescribeBackend(caps.TdpBackend)}.";
             }
 
+            // Say the battery cap out loud. It is applied automatically and has no control of its
+            // own, so without this the user sets 35 W, unplugs, and sees the device behave as
+            // though the setting were ignored.
+            bool capped = caps.MaxPl1Dc < caps.MaxPl1 || caps.MaxPl2Dc < caps.MaxPl2;
+            BatteryLimitHint.Visibility = Visible(capped);
+            if (capped)
+            {
+                BatteryLimitHint.Text =
+                    $"On battery these are capped to {caps.MaxPl1Dc} W sustained and "
+                    + $"{caps.MaxPl2Dc} W boost. Plugged in, the values above apply.";
+            }
+
             // Cards are shown only when the helper reported a value for them. A control the user
             // cannot see is a value they cannot send, which matters because the pipe is reachable
             // by any app on the machine and the helper is the only real gate.
