@@ -507,6 +507,85 @@ function Invoke-Package {
 
 Set-Alias -Name Invoke-Package32 -Value Invoke-Package -Scope Script
 
+function Invoke-AcpiFlexible {
+    <#
+        Calls a method whatever its input shape - embedded package, byte array, or plain scalars -
+        and returns the raw result for the caller to dump. Invoke-Package only handles methods
+        with an embedded-instance INPUT, which is why Get_EC (scalar in, package out) could never
+        be called through it.
+
+        Never throws; $null means the call was rejected.
+    #>
+    param([string]$MethodName, [byte[]]$Payload)
+
+    $method = $class.CimClassMethods[$MethodName]
+    if (-not $method) { return $null }
+
+    $arguments = @{}
+
+    foreach ($p in (Get-InputParameters -Method $method)) {
+        $embedded = $p.Qualifiers['EmbeddedInstance']
+
+        if ($embedded) {
+            $package = Get-MethodPackage -MethodName $MethodName
+            $size = if ($package) { $package.Size } else { 32 }
+            $arrayName = if ($package) { $package.ArrayProperty } else { 'Bytes' }
+
+            $buffer = New-Object byte[] $size
+            for ($i = 0; $i -lt $Payload.Count -and $i -lt $size; $i++) { $buffer[$i] = $Payload[$i] }
+
+            try {
+                $arguments[$p.Name] = New-CimInstance -Namespace $Namespace -ClassName $embedded.Value `
+                                          -Property @{ $arrayName = $buffer } -ClientOnly -ErrorAction Stop
+            }
+            catch { return $null }
+        }
+        elseif ($p.CimType -match 'Array') {
+            $buffer = New-Object byte[] 32
+            for ($i = 0; $i -lt $Payload.Count -and $i -lt 32; $i++) { $buffer[$i] = $Payload[$i] }
+            $arguments[$p.Name] = $buffer
+        }
+        else {
+            # A scalar input on a Get_ is almost certainly the address or index being asked for.
+            $arguments[$p.Name] = if ($Payload.Count -gt 0) { [uint32]$Payload[0] } else { [uint32]0 }
+        }
+    }
+
+    try {
+        if ($arguments.Count -gt 0) {
+            return Invoke-CimMethod -InputObject $acpi -MethodName $MethodName -Arguments $arguments -ErrorAction Stop
+        }
+        return Invoke-CimMethod -InputObject $acpi -MethodName $MethodName -ErrorAction Stop
+    }
+    catch {
+        return $null
+    }
+}
+
+function Get-ResultBytes {
+    <#
+        Pulls the first byte array out of a result, whether it sits directly on the returned
+        object or inside an embedded instance one level down.
+    #>
+    param($Result)
+
+    if ($null -eq $Result) { return $null }
+
+    foreach ($prop in $Result.PSObject.Properties) {
+        if ($prop.Value -is [byte[]]) { return $prop.Value }
+    }
+
+    foreach ($prop in $Result.PSObject.Properties) {
+        if ($prop.Value -is [Microsoft.Management.Infrastructure.CimInstance]) {
+            foreach ($inner in $prop.Value.CimInstanceProperties) {
+                if ($inner.Value -is [byte[]]) { return $inner.Value }
+            }
+        }
+    }
+
+    return $null
+}
+
 function Format-BytesInline {
     param([byte[]]$Bytes, [int]$Count = 16)
     if (-not $Bytes) { return '(no data)' }
@@ -519,6 +598,7 @@ Write-Host "[2c] Every $AcpiClass method and the package class it expects" -Fore
 Write-Host '     Different methods may take different package sizes. Reusing one size for all of' -ForegroundColor DarkGray
 Write-Host '     them is what made every Get_EC read look rejected in the previous run.' -ForegroundColor DarkGray
 
+$unmapped = @()
 foreach ($declared in ($class.CimClassMethods | Sort-Object Name)) {
     $package = Get-MethodPackage -MethodName $declared.Name
     if ($package) {
@@ -527,6 +607,37 @@ foreach ($declared in ($class.CimClassMethods | Sort-Object Name)) {
     }
     else {
         Write-Host ("     {0,-22} (no embedded-instance input)" -f $declared.Name) -ForegroundColor DarkGray
+        $unmapped += $declared.Name
+    }
+}
+
+# "No embedded-instance INPUT" does not mean no package. Get_EC reported this while Set_EC takes a
+# Package_32, which is exactly what a method with scalar inputs and an embedded OUTPUT looks like -
+# and the earlier probe only ever looked at input parameters. Dump these in full.
+if ($unmapped.Count -gt 0) {
+    Write-Host ''
+    Write-Host '[2d] Full signatures for the methods above (in AND out)' -ForegroundColor Yellow
+
+    foreach ($name in $unmapped) {
+        $declared = $class.CimClassMethods[$name]
+        Write-Host "     $name  (returns $($declared.ReturnType))"
+
+        if ($declared.Parameters.Count -eq 0) {
+            Write-Host '       (no declared parameters)' -ForegroundColor DarkGray
+            continue
+        }
+
+        foreach ($p in $declared.Parameters) {
+            $direction = if ($p.Qualifiers['In'] -and $p.Qualifiers['Out']) { 'IN/OUT' }
+                         elseif ($p.Qualifiers['Out']) { 'OUT   ' }
+                         elseif ($p.Qualifiers['In'])  { 'IN    ' }
+                         else { '?     ' }
+
+            $embedded = $p.Qualifiers['EmbeddedInstance']
+            $suffix = if ($embedded) { "  -> $($embedded.Value)" } else { '' }
+
+            Write-Host "       $direction $($p.Name) : $($p.CimType)$suffix"
+        }
     }
 }
 
@@ -592,28 +703,36 @@ foreach ($ecMethod in 'Get_EC', 'Get_EC2') {
         continue
     }
 
-    $package = Get-MethodPackage -MethodName $ecMethod
-    $shape = if ($package) { "$($package.ClassName), $($package.Size) bytes" } else { 'no embedded input' }
-    Write-Host "    $ecMethod  ($shape)" -ForegroundColor Cyan
+    Write-Host "    $ecMethod" -ForegroundColor Cyan
 
-    foreach ($base in 0x00, 0x80, 0xC0, 0xD0, 0xE0, 0xF0) {
-        # The input convention is itself unknown, so try the plausible framings. Whichever
-        # returns non-zero data is the one this firmware uses.
-        $conventions = @(
-            @{ Label = 'addr@0';     Payload = @([byte]$base) }
-            @{ Label = 'addr@0,len'; Payload = @([byte]$base, [byte]32) }
-            @{ Label = 'addr@1';     Payload = @([byte]0, [byte]$base) }
-        )
+    # Sweep the candidate addresses. msi-ec puts the threshold at 0xD7 (gen 2) or 0xEF (gen 1),
+    # so those two matter most, but neighbours are included because a handheld may differ and a
+    # read costs nothing.
+    foreach ($address in 0x00, 0x80, 0xC0, 0xD0, 0xD7, 0xE0, 0xEF, 0xF0) {
+        $result = Invoke-AcpiFlexible -MethodName $ecMethod -Payload @([byte]$address)
+        if ($null -eq $result) {
+            if ($address -eq 0x00) { Write-Host '      (all calls rejected)' -ForegroundColor DarkYellow }
+            continue
+        }
 
-        foreach ($convention in $conventions) {
-            $bytes = Invoke-Package -MethodName $ecMethod -Payload $convention.Payload
-            if (-not $bytes) { continue }
+        $bytes = Get-ResultBytes -Result $result
 
+        if ($bytes) {
             $nonZero = @($bytes | Where-Object { $_ -ne 0 }).Count
             if ($nonZero -eq 0) { continue }   # a successful call returning nothing is not data
+            Write-Host ("      0x{0:X2} -> {1}" -f $address, (Format-BytesInline -Bytes $bytes -Count 32))
+        }
+        else {
+            # No buffer: the value may come back as a plain scalar out-parameter instead.
+            $scalars = @($result.PSObject.Properties |
+                         Where-Object { $_.Name -notin @('PSComputerName') -and
+                                        $null -ne $_.Value -and
+                                        $_.Value.GetType().IsValueType } |
+                         ForEach-Object { "$($_.Name)=0x{0:X2}" -f [int]$_.Value })
 
-            Write-Host ("      0x{0:X2} [{1,-9}] {2}" -f $base, $convention.Label,
-                (Format-BytesInline -Bytes $bytes -Count 32))
+            if ($scalars.Count -gt 0) {
+                Write-Host ("      0x{0:X2} -> {1}" -f $address, ($scalars -join ' '))
+            }
         }
     }
 }
