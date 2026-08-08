@@ -59,6 +59,12 @@ can be compiled here to find out. Every key `MainWidget.xaml` references is defi
   with no compile error.
 - **`TextBlock.FontFeatures` does not exist in UWP.** Value alignment uses `MinWidth` +
   `TextAlignment` instead of tabular figures. If you reach for font features later, it is not there.
+- **`x:Double` and `Thickness` resources.** The size tokens are declared as
+  `<x:Double x:Key="BodySize">14</x:Double>` and `<Thickness x:Key="CardPadding">16</Thickness>`.
+  Both are standard UWP, but they are the newest thing in the file — if `App.xaml` fails to parse,
+  start here.
+- **`RootContent`.** The root `Grid` is named because Game Bar's transparency setting is applied to
+  its `Opacity`. Renaming it breaks `ApplyRequestedOpacity` at runtime, not at build.
 - **`CycleButtonStyle`'s `ContentTemplate`.** Every selector is a `Button` whose `Content` is a
   plain string, rendered by a `DataTemplate` that binds `{Binding}` and appends a chevron. If the
   buttons come out blank, that binding is the first thing to check — `{Binding}` against a
@@ -66,6 +72,52 @@ can be compiled here to find out. Every key `MainWidget.xaml` references is defi
 - **Selector option lists live in `MainWidget.xaml.cs`, not in XAML.** `OptionCycler` is
   constructed with them, and **the index is the wire value** — cast straight to `PerfMode`,
   `FanPreset`, `LedMode` and so on. Reordering a list silently changes what the helper is told.
+
+### Sizing: the numbers and where they come from
+
+Every size is an **effective pixel**, so it stays physically consistent whatever display scaling
+the device is set to. The target panel is 8-inch, 1920x1200, **283 PPI**. Microsoft's touch
+minimum is **40 epx**, recommended 7-9 mm:
+
+| | 200% scaling | 250% | 300% |
+|---|---|---|---|
+| logical screen | 960x600 | 768x480 | 640x400 |
+| 32 epx (old slider) | 5.7 mm | 7.2 mm | 8.6 mm |
+| 38 epx (old button) | 6.8 mm | 8.5 mm | 10.2 mm |
+| **44 epx (current)** | **7.9 mm** | **9.9 mm** | 11.8 mm |
+
+The old 32 epx sliders were under the minimum at the likely 200% scaling, and the slider thumb is
+the hardest thing on the page to hit. Sizes now come from tokens at the top of `App.xaml`
+(`ControlHeight`, `CardTitleSize`, `BodySize`, `HintSize`, `CardPadding`, `CardGap`) — change the
+scale there, not in the individual styles.
+
+Note the logical screen height: at 250% the whole screen is 480 epx tall, so a widget cannot show
+many cards at once. That is why `MaxWindowSize` is generous but the layout scrolls.
+
+### Deliberate deviations from the Game Bar design guide
+
+- **Dark only.** The guide says honour `RequestedTheme` *"if your widget is able"*. A light palette
+  means a second set of brushes and a second rendering path that cannot be tested here. The Game
+  Bar overlays gameplay and is dark in practice. Revisit if this ever ships beyond one device.
+- **One size, not two.** The guide asks for larger content in Compact mode than Desktop. There is
+  one scale here, permanently at the larger end, because the target is a handheld in both modes.
+  `CompactModeEnabled` is deliberately not subscribed to. If the widget is ever shown on a desktop
+  monitor it will look oversized.
+
+### Gamepad buttons we must not take
+
+From the guide's reserved list. Worth writing down because an earlier note in this project
+suggested the opposite:
+
+- **Left/right bumpers are reserved by Game Bar** for moving between widgets. Do not bind them —
+  an earlier suggestion to use them for paging option lists was wrong.
+- **B is Back/Close.** Do not handle it, and do not add a back button.
+- Left/right **triggers** already page the `ScrollViewer`; that is built in.
+
+Sliders deliberately do **not** set `IsFocusEngagementEnabled`. The documented fix for slider
+focus-trapping is a vertical layout, which this already is: D-pad up/down moves between controls
+while left/right adjusts the focused slider. Engagement would add an A press per slider for
+nothing.
 
 ### Why buttons instead of dropdowns
 
@@ -148,7 +200,21 @@ These are real tests even with no MSI hardware present:
   Cross-check with `powercfg /q SCHEME_CURRENT SUB_PROCESSOR PERFBOOSTMODE`.
 - `--uninstall` removes the task and the deployed folder.
 
+Design-guide conformance, all observable without MSI hardware:
+
+- **No horizontal scrollbar at the minimum window size** (320x320). The value columns are the
+  first thing to collide with their labels if a font size grows.
+- **Pin the widget, then dismiss the Game Bar.** `Visible` must stay true and the fan telemetry
+  must keep flowing. This is the one bug the `VisibleChanged` change fixes and the only way to see
+  it — the old `Window.Current.VisibilityChanged` reported a pinned widget as hidden.
+- **Drag Game Bar's transparency slider** — the whole widget should fade, text included.
+- **Gamepad:** D-pad reaches every control, the focus rectangle is always visible against the dark
+  cards, sliders adjust with left/right without trapping focus, B closes the widget.
+- **Initial focus** lands on the first available control rather than nowhere.
+- **Touch:** every control is comfortably hittable with a thumb.
+
 Run the helper with `--fake-hardware` for everything above; simulated hardware reports
-`Supported=false`, so the hardware cards stay hidden and nothing pretends to work.
+`Supported=false`, so the hardware cards stay hidden and nothing pretends to work. That also
+exercises the initial-focus fallback, since it has to skip the hidden cards.
 
 Logs: `%LOCALAPPDATA%\Packages\<package family>\LocalCache\McenterLite\helper.log`

@@ -5,6 +5,7 @@ using McenterLite.Shared.Model;
 using McenterLite.Widget.Ipc;
 using Microsoft.Gaming.XboxGameBar;
 using Windows.ApplicationModel.FullTrustProcess;
+using Windows.Foundation;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -139,25 +140,112 @@ namespace McenterLite.Widget
 
             _widget = e.Parameter as XboxGameBarWidget;
 
-            // Telemetry is only pushed while the widget is on screen. The Game Bar suspends this
-            // process whenever it is dismissed, so the helper has to be told rather than left to
-            // poll the embedded controller for a reader that is not running.
-            Window.Current.VisibilityChanged += OnWindowVisibilityChanged;
+            ConfigureWidget();
+
+            // Telemetry is only pushed while the widget is on screen, so this has to be right.
+            //
+            // NOT Window.Current.VisibilityChanged, which was the original and was wrong. Game Bar
+            // documents Visible as a COMPOSITE of GameBarDisplayMode, WindowState and Pinned - a
+            // pinned widget stays visible when the Game Bar overlay itself is dismissed, and the
+            // window-level event does not know that. Getting it backwards means either polling the
+            // embedded controller for a reader that is not there, or a pinned widget showing fan
+            // telemetry that has silently stopped updating.
+            if (_widget != null)
+                _widget.VisibleChanged += OnWidgetVisibleChanged;
 
             await StartAsync();
         }
 
         protected override void OnNavigatedFrom(NavigationEventArgs e)
         {
-            Window.Current.VisibilityChanged -= OnWindowVisibilityChanged;
+            if (_widget != null)
+            {
+                _widget.VisibleChanged -= OnWidgetVisibleChanged;
+                _widget.RequestedOpacityChanged -= OnRequestedOpacityChanged;
+            }
+
             _connection.Dispose();
             base.OnNavigatedFrom(e);
         }
 
-        private async void OnWindowVisibilityChanged(object sender, VisibilityChangedEventArgs e)
+        /// <summary>
+        /// Tells Game Bar what this widget supports.
+        /// </summary>
+        /// <remarks>
+        /// These are not cosmetic. Game Bar surfaces them in its own chrome - the pin button, the
+        /// resize grips, the transparency slider - so leaving them unset makes the widget look
+        /// broken next to every other one rather than merely unconfigured.
+        ///
+        /// Every call is guarded individually. A throw here happens during activation, and an
+        /// exception on that path takes the whole Game Bar panel down with no indication why.
+        /// </remarks>
+        private void ConfigureWidget()
         {
-            try { await _connection.SetVisibleAsync(e.Visible); }
+            if (_widget == null) return;
+
+            try
+            {
+                // Min is roughly one card plus the header; below that the value columns collide
+                // with their labels. Max is generous because Game Bar clamps to the screen anyway,
+                // which on this device is 960x600 effective pixels at 200% scaling.
+                _widget.MinWindowSize = new Size(320, 320);
+                _widget.MaxWindowSize = new Size(560, 1000);
+                _widget.HorizontalResizeSupported = true;
+                _widget.VerticalResizeSupported = true;
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[widget] sizing: {ex.Message}"); }
+
+            try
+            {
+                // A device control panel is the archetypal thing to pin over a game.
+                _widget.PinningSupported = true;
+
+                // There is no settings widget. Claiming otherwise puts a button in the title bar
+                // that does nothing when pressed.
+                _widget.SettingsSupported = false;
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[widget] flags: {ex.Message}"); }
+
+            try
+            {
+                ApplyRequestedOpacity();
+                _widget.RequestedOpacityChanged += OnRequestedOpacityChanged;
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[widget] opacity: {ex.Message}"); }
+        }
+
+        private async void OnWidgetVisibleChanged(XboxGameBarWidget sender, object args)
+        {
+            try
+            {
+                bool visible = sender.Visible;
+                await _connection.SetVisibleAsync(visible);
+            }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[widget] {ex.Message}"); }
+        }
+
+        private async void OnRequestedOpacityChanged(XboxGameBarWidget sender, object args)
+        {
+            try { await RunOnUiAsync(ApplyRequestedOpacity); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[widget] {ex.Message}"); }
+        }
+
+        /// <summary>
+        /// Applies the user's Game Bar transparency setting to the whole widget.
+        /// </summary>
+        /// <remarks>
+        /// Game Bar reports 0-100. Applied to the root, so text fades with the panel rather than
+        /// staying opaque over a see-through background - the setting means "let me see the game
+        /// through this", and half-honouring it looks like a rendering bug.
+        /// </remarks>
+        private void ApplyRequestedOpacity()
+        {
+            if (_widget == null) return;
+
+            double requested = _widget.RequestedOpacity;
+            if (requested <= 0 || requested > 100) return;
+
+            RootContent.Opacity = requested / 100.0;
         }
 
         // ── Startup ─────────────────────────────────────────────────────────────
@@ -218,8 +306,66 @@ namespace McenterLite.Widget
                 {
                     _applyingFromHelper = false;
                 }
+
+                SetInitialFocus();
             });
         }
+
+        /// <summary>
+        /// Puts gamepad focus on the first control the user is likely to act on.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Game Bar's guidance is to focus the first element the user would take action on, near
+        /// the top-left. With a gamepad there is no cursor, so without this the first D-pad press
+        /// goes somewhere arbitrary and the user has to hunt for the focus rectangle.
+        /// </para>
+        /// <para>
+        /// It walks a list rather than naming one control because cards are HIDDEN when the helper
+        /// reports the feature unavailable - on a machine with no MSI hardware the power card does
+        /// not exist, and focusing it would focus nothing. Runs after the snapshot for the same
+        /// reason: before that, visibility is not yet known.
+        /// </para>
+        /// <para>
+        /// Only ever set once. Re-focusing on every snapshot would yank focus out from under
+        /// someone mid-adjustment whenever a value arrived.
+        /// </para>
+        /// </remarks>
+        private void SetInitialFocus()
+        {
+            if (_initialFocusSet) return;
+
+            Control[] candidates =
+            {
+                PerfModeButton,
+                Pl1Slider,
+                FanEnabledToggle,
+                ChargeLimitToggle,
+                LedModeButton,
+                HwMouseToggle,
+                CpuBoostToggle,
+            };
+
+            foreach (var control in candidates)
+            {
+                // A collapsed parent card leaves the control itself Visible, so the ancestor has
+                // to be consulted - IsLoaded plus a non-zero size is the reliable signal here.
+                if (control == null) continue;
+                if (control.Visibility != Visibility.Visible) continue;
+                if (!control.IsEnabled) continue;
+                if (control.ActualHeight <= 0) continue;
+
+                // Programmatic, not Pointer: it preserves whether the focus rectangle was already
+                // being shown, so a touch user does not suddenly get gamepad chrome.
+                if (control.Focus(FocusState.Programmatic))
+                {
+                    _initialFocusSet = true;
+                    return;
+                }
+            }
+        }
+
+        private bool _initialFocusSet;
 
         private async void OnValueChanged(Function function, string value)
         {

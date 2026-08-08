@@ -45,6 +45,29 @@
             <SolidColorBrush x:Key="ErrorBrush" Color="#FF7A6B" />
             <SolidColorBrush x:Key="SuccessBrush" Color="#6BD98A" />
 
+            <!--
+                SIZE AND TYPE SCALE
+
+                All sizes are effective pixels, so they stay physically consistent whatever display
+                scaling the device is set to. Sized for the one device this ships to: an 8-inch
+                1920x1200 panel at 283 PPI, driven with a thumb and a gamepad.
+
+                ControlHeight is 44 rather than Microsoft's 40 epx touch minimum, which buys margin
+                without costing a card per screen. On this panel that is 7.9 mm at 200% scaling and
+                9.9 mm at 250% - inside the recommended 7-9 mm band either way. The previous 32 epx
+                sliders measured 5.7 mm, well under.
+
+                The Game Bar design guide asks for larger content in Compact mode than Desktop.
+                There is one scale here, permanently at the larger end, because the target is a
+                handheld in both modes. See docs/building-the-widget.md.
+            -->
+            <x:Double x:Key="ControlHeight">44</x:Double>
+            <x:Double x:Key="CardTitleSize">16</x:Double>
+            <x:Double x:Key="BodySize">14</x:Double>
+            <x:Double x:Key="HintSize">12</x:Double>
+            <Thickness x:Key="CardPadding">16</Thickness>
+            <Thickness x:Key="CardGap">0,0,0,12</Thickness>
+
             <!-- ── Cards ───────────────────────────────────────────────────────────────── -->
 
             <Style x:Key="CardStyle" TargetType="Border">
@@ -52,8 +75,8 @@
                 <Setter Property="BorderBrush" Value="{StaticResource SurfaceStrokeBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="CornerRadius" Value="8" />
-                <Setter Property="Padding" Value="14,12,14,14" />
-                <Setter Property="Margin" Value="0,0,0,10" />
+                <Setter Property="Padding" Value="{StaticResource CardPadding}" />
+                <Setter Property="Margin" Value="{StaticResource CardGap}" />
             </Style>
 
             <!-- Card header icon. Segoe Fluent Icons is the Windows 11 face; the comma fallback
@@ -61,14 +84,14 @@
                  one the reference widget already ships on this device. -->
             <Style x:Key="CardIconStyle" TargetType="FontIcon">
                 <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
-                <Setter Property="FontSize" Value="15" />
+                <Setter Property="FontSize" Value="{StaticResource CardTitleSize}" />
                 <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
                 <Setter Property="VerticalAlignment" Value="Center" />
-                <Setter Property="Margin" Value="0,0,9,0" />
+                <Setter Property="Margin" Value="0,0,10,0" />
             </Style>
 
             <Style x:Key="CardTitleStyle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="13" />
+                <Setter Property="FontSize" Value="{StaticResource CardTitleSize}" />
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
                 <Setter Property="VerticalAlignment" Value="Center" />
@@ -83,27 +106,27 @@
                 label to its left never shifts as a slider is dragged.
             -->
             <Style x:Key="ValueStyle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="13" />
+                <Setter Property="FontSize" Value="{StaticResource BodySize}" />
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
                 <Setter Property="VerticalAlignment" Value="Center" />
                 <Setter Property="TextAlignment" Value="Right" />
-                <Setter Property="MinWidth" Value="44" />
+                <Setter Property="MinWidth" Value="52" />
             </Style>
 
             <Style x:Key="RowLabelStyle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="12" />
+                <Setter Property="FontSize" Value="{StaticResource BodySize}" />
                 <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
                 <Setter Property="VerticalAlignment" Value="Center" />
                 <Setter Property="TextWrapping" Value="Wrap" />
             </Style>
 
             <Style x:Key="HintStyle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="11" />
+                <Setter Property="FontSize" Value="{StaticResource HintSize}" />
                 <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
                 <Setter Property="TextWrapping" Value="Wrap" />
                 <Setter Property="Margin" Value="0,8,0,0" />
-                <Setter Property="LineHeight" Value="15" />
+                <Setter Property="LineHeight" Value="17" />
             </Style>
 
             <!-- ── Controls ────────────────────────────────────────────────────────────── -->
@@ -116,6 +139,7 @@
             -->
             <Style x:Key="CompactToggleStyle" TargetType="ToggleSwitch">
                 <Setter Property="MinWidth" Value="0" />
+                <Setter Property="MinHeight" Value="{StaticResource ControlHeight}" />
                 <Setter Property="OnContent" Value="" />
                 <Setter Property="OffContent" Value="" />
                 <Setter Property="HorizontalAlignment" Value="Right" />
@@ -126,7 +150,7 @@
                  every interaction is a thumb or a stick, never a mouse. -->
             <Style x:Key="CardSliderStyle" TargetType="Slider">
                 <Setter Property="Margin" Value="0,2,0,0" />
-                <Setter Property="MinHeight" Value="32" />
+                <Setter Property="MinHeight" Value="{StaticResource ControlHeight}" />
                 <Setter Property="IsThumbToolTipEnabled" Value="False" />
             </Style>
 
@@ -151,11 +175,11 @@
             <Style x:Key="CycleButtonStyle" TargetType="Button">
                 <Setter Property="HorizontalAlignment" Value="Stretch" />
                 <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                <Setter Property="MinHeight" Value="38" />
+                <Setter Property="MinHeight" Value="{StaticResource ControlHeight}" />
                 <Setter Property="CornerRadius" Value="6" />
                 <Setter Property="Padding" Value="12,6" />
                 <Setter Property="Margin" Value="0,2,0,0" />
-                <Setter Property="FontSize" Value="13" />
+                <Setter Property="FontSize" Value="{StaticResource BodySize}" />
                 <Setter Property="ContentTemplate">
                     <Setter.Value>
                         <DataTemplate>
@@ -172,8 +196,8 @@
                                 <FontIcon Grid.Column="1"
                                           Glyph="&#xE76C;"
                                           FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                          FontSize="12"
-                                          Margin="8,0,0,0"
+                                          FontSize="14"
+                                          Margin="10,0,0,0"
                                           VerticalAlignment="Center"
                                           Opacity="0.6" />
                             </Grid>
@@ -191,10 +215,10 @@
             </Style>
 
             <Style x:Key="NoticeTextStyle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="11" />
+                <Setter Property="FontSize" Value="{StaticResource HintSize}" />
                 <Setter Property="TextWrapping" Value="Wrap" />
                 <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-                <Setter Property="LineHeight" Value="15" />
+                <Setter Property="LineHeight" Value="17" />
             </Style>
         </ResourceDictionary>
     </Application.Resources>
