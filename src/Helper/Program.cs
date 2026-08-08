@@ -459,15 +459,10 @@ namespace McenterLite.Helper
                     : $"Could not re-apply the charge limit: {result.Error}");
             }
 
-            if (hardware.Led.Available)
-            {
-                var stored = settings.Get(SettingsKeys.LedSpec);
-                if (stored != null)
-                {
-                    var result = hardware.Led.Apply(Shared.Model.LedSpec.Parse(stored));
-                    if (!result.Ok) Log.Info($"Could not re-apply the LED settings: {result.Error}");
-                }
-            }
+            // Lighting is deliberately NOT re-applied here, for the same reason as the power-mode
+            // overlay below: MSI's own performance-mode selector writes this same registry value
+            // (Endurance turns it off), so it is shared state, not ours alone, and reasserting our
+            // last write on every start would fight whatever mode MSI last left it in.
 
             // CPU boost is only re-applied once the user has actually chosen a value. Writing a
             // default here would silently overwrite a system-wide setting we do not own and were

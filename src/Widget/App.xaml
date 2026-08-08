@@ -168,9 +168,9 @@
                 its markup defaults during construction, which is why every helper-driven update
                 has to be wrapped in a guard. A Button raises Click only when something clicks it.
 
-                The trade is that reaching option 5 of 5 takes four presses. That is acceptable at
-                these list lengths - the longest here is the five LED effects - and would not be
-                if any list grew much beyond that.
+                The trade is that reaching the last option takes one press per step. That is
+                acceptable at these list lengths - the longest here is the four Endurance Gaming
+                tiers - and would not be if any list grew much beyond that.
             -->
             <Style x:Key="CycleButtonStyle" TargetType="Button">
                 <Setter Property="HorizontalAlignment" Value="Stretch" />

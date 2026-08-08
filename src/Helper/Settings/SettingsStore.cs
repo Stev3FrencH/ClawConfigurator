@@ -161,7 +161,7 @@ namespace McenterLite.Helper.Settings
         public const string ChargeLimitEnabled = "ChargeLimitEnabled";
         public const string ChargeLimitPercent = "ChargeLimitPercent";
 
-        public const string LedSpec = "LedSpec";
+        public const string LedEnabled = "LedEnabled";
 
         public const string CpuBoost = "CpuBoost";
         public const string OsPowerMode = "OsPowerMode";

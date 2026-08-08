@@ -79,9 +79,15 @@ namespace McenterLite.Shared.Ipc
         /// <summary>Charge ceiling percent. Clamped server-side to [60, 100].</summary>
         ChargeLimitPercent = 31,
 
-        // ── 4. RGB LED ───────────────────────────────────────────────────────────
-        /// <summary>Whole LED configuration as one serialized <c>LedSpec</c>.</summary>
-        LedSpec = 40,
+        // ── 4. Lighting ──────────────────────────────────────────────────────────
+        /// <summary>
+        /// True = lighting on. The vendor HID report that carries mode/colour/effect is still
+        /// undecoded, so this is the one lighting fact we can act on: MSI's own on/off switch,
+        /// <c>OsdEditor\LightingBrightness</c>. Note MSI's performance-mode selector also writes
+        /// this value (Endurance turns it off), so a read after a <see cref="PerfMode"/> change can
+        /// legitimately disagree with the last value sent here.
+        /// </summary>
+        LedEnabled = 40,
 
         // ── 5. Controller mode ───────────────────────────────────────────────────
         /// <summary>

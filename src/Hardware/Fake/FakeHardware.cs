@@ -263,24 +263,23 @@ namespace McenterLite.Hardware.Fake
 
     internal sealed class FakeLed : ILedProvider
     {
-        private LedSpec _spec = new LedSpec();
+        private bool _enabled;
 
         public FakeLed(bool available) => Available = available;
 
         public bool Available { get; }
         public string UnavailableReason => Available ? null : "LED control is not available on this device.";
 
-        public bool TryRead(out LedSpec spec)
+        public bool TryRead(out bool enabled)
         {
-            spec = LedSpec.Parse(_spec.Serialize());
+            enabled = _enabled;
             return Available;
         }
 
-        public OpResult Apply(LedSpec spec)
+        public OpResult Apply(bool enabled)
         {
             if (!Available) return OpResult.Unavailable(UnavailableReason);
-            if (spec == null) return OpResult.Fail("No LED specification supplied.");
-            _spec = LedSpec.Parse(spec.Serialize());
+            _enabled = enabled;
             return OpResult.Success();
         }
     }

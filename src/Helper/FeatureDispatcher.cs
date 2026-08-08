@@ -114,8 +114,8 @@ namespace McenterLite.Helper
                         ? PipeEnvelope.FromBool(chargeOn)
                         : PipeEnvelope.FromInt(chargePct);
 
-                case Function.LedSpec:
-                    return _hw.Led.TryRead(out var led) ? led.Serialize() : null;
+                case Function.LedEnabled:
+                    return _hw.Led.TryRead(out bool ledOn) ? PipeEnvelope.FromBool(ledOn) : null;
 
                 case Function.HwMouseMode:
                     return _hw.HwMouse.TryRead(out bool desktopMode)
@@ -192,7 +192,7 @@ namespace McenterLite.Helper
                 case Function.ChargeLimitPercent:
                     return SetChargeLimit(request);
 
-                case Function.LedSpec:
+                case Function.LedEnabled:
                     return SetLed(request);
 
                 case Function.HwMouseMode:
@@ -336,23 +336,16 @@ namespace McenterLite.Helper
             if (!_hw.Led.Available)
                 return PipeEnvelope.Failure(request.Id, request.Fn, _hw.Led.UnavailableReason);
 
-            if (_hw.Led.TryRead(out var current))
-                _settings.CaptureOriginal(SettingsKeys.LedSpec, current.Serialize());
+            if (_hw.Led.TryRead(out bool current))
+                _settings.CaptureOriginal(SettingsKeys.LedEnabled, PipeEnvelope.FromBool(current));
 
-            var desired = LedSpec.Parse(request.Value);
+            bool enabled = request.AsBool();
 
-            // Skip a HID write that would change nothing. The colour picker generates a stream of
-            // near-identical values as it is dragged, and this device does not enjoy being
-            // written to at UI frame rate.
-            if (current != null && current.IsEquivalentTo(desired))
-                return Ok(request, desired.Serialize());
-
-            var result = _hw.Led.Apply(desired);
+            var result = _hw.Led.Apply(enabled);
             if (!result.Ok) return PipeEnvelope.Failure(request.Id, request.Fn, result.Error);
 
-            _settings.Set(SettingsKeys.LedSpec, desired.Serialize());
-
-            return Ok(request, _hw.Led.TryRead(out var actual) ? actual.Serialize() : desired.Serialize());
+            return Ok(request, PipeEnvelope.FromBool(
+                _hw.Led.TryRead(out bool actual) ? actual : enabled));
         }
 
         private PipeEnvelope SetCpuBoost(PipeEnvelope request)
@@ -464,11 +457,11 @@ namespace McenterLite.Helper
                 if (!r.Ok) problems.Add($"power mode: {r.Error}");
             }
 
-            var originalLed = _settings.GetOriginal(SettingsKeys.LedSpec);
+            var originalLed = _settings.GetOriginal(SettingsKeys.LedEnabled);
             if (originalLed != null && _hw.Led.Available)
             {
-                var r = _hw.Led.Apply(LedSpec.Parse(originalLed));
-                if (!r.Ok) problems.Add($"LED: {r.Error}");
+                var r = _hw.Led.Apply(originalLed == "1");
+                if (!r.Ok) problems.Add($"lighting: {r.Error}");
             }
 
             if (problems.Count > 0)
@@ -529,7 +522,7 @@ namespace McenterLite.Helper
             Function.FanFullSpeed,
             Function.ChargeLimitEnabled,
             Function.ChargeLimitPercent,
-            Function.LedSpec,
+            Function.LedEnabled,
             Function.HwMouseMode,
             Function.CpuBoost,
             Function.OsPowerMode,

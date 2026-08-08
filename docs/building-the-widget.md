@@ -271,7 +271,7 @@ can be compiled here to find out. Every key `MainWidget.xaml` references is defi
   `ContentPresenter` resolves to the content itself, which is correct but easy to break.
 - **Selector option lists live in `MainWidget.xaml.cs`, not in XAML.** `OptionCycler` is
   constructed with them, and **the index is the wire value** — cast straight to `PerfMode`,
-  `FanPreset`, `LedMode` and so on. Reordering a list silently changes what the helper is told.
+  `FanPreset` and so on. Reordering a list silently changes what the helper is told.
 
 ### Sizing: the numbers and where they come from
 

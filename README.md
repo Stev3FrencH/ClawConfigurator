@@ -12,10 +12,13 @@ AI+ (Panther Lake, `CG3EM` / board `1T91`), delivered as an Xbox Game Bar widget
 > verified working end-to-end through the real widget, including reflecting changes made outside
 > it (Windows Settings, the taskbar flyout, the physical mode button). Everything else is
 > implemented but unverified against the real Claw hardware — the only device this has run on so
-> far is a different, correctly-gated-off-as-unsupported machine. Fan (gate G2) and RGB LED
-> (gate G4) also need Phase 0 discovery finished before they can be turned on at all; desktop/
-> gamepad mode (G5) and Intel GPU controls (G6) are unimplemented stubs regardless of their gate
-> status. See [docs/hardware-notes.md](docs/hardware-notes.md) for the full gate-by-gate picture.
+> far is a different, correctly-gated-off-as-unsupported machine. Fan (gate G2) still needs Phase 0
+> discovery finished before it can be turned on at all. RGB LED (gate G4) is deliberately reduced
+> in scope to on/off — the byte layout for mode/colour/effect is still undecoded, but on/off rides
+> the same registry model as TDP/fan/charge limit, so it ships now rather than waiting on the rest
+> of the gate. Desktop/gamepad mode (G5) and Intel GPU controls (G6) are unimplemented stubs
+> regardless of their gate status. See [docs/hardware-notes.md](docs/hardware-notes.md) for the
+> full gate-by-gate picture.
 
 ## Scope
 
@@ -26,7 +29,7 @@ Eight features, deliberately few:
 | 1 | TDP (PL1 / PL2) — via MSI Center's registry model | ✅ implemented, unverified on device |
 | 2 | Fan presets — 3 fixed profiles, no custom curve | blocked on gate G2 |
 | 3 | Battery charge limit — 60 / 80 / 100 % | ✅ implemented, unverified on device |
-| 4 | RGB LED | blocked on gate G4 |
+| 4 | Lighting — on/off only; mode/colour/effect blocked on gate G4 | ✅ implemented, unverified on device |
 | 5 | Desktop / gamepad mode (firmware) | blocked on gate G5 |
 | 6 | CPU Boost | ✅ implemented |
 | 7 | OS Power Mode | ✅ implemented |

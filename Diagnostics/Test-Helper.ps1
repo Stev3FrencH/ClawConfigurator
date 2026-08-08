@@ -75,7 +75,7 @@ $Fn = @{
     Pl1 = 10; Pl2 = 11; TdpBackend = 12; PerfMode = 13
     FanEnabled = 20; FanPreset = 21; FanState = 22; FanFullSpeed = 23
     ChargeLimitEnabled = 30; ChargeLimitPercent = 31
-    LedSpec = 40; HwMouseMode = 50
+    LedEnabled = 40; HwMouseMode = 50
     CpuBoost = 60; OsPowerMode = 61
     IntelFpsTier = 70; IntelLowLatency = 71; IntelFrameSync = 72
     IntelAdaptiveSharpness = 73; IntelSaturation = 74; IntelContrast = 75; IntelGamma = 76

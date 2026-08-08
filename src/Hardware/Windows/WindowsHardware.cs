@@ -14,8 +14,8 @@ namespace McenterLite.Hardware.Windows
     /// than offering a control that does nothing.
     /// </para>
     /// <para>
-    /// Live today: power limits and battery charge limit (registry), CPU boost and OS power mode
-    /// (plain Windows APIs). Pending: fan, LED, firmware mouse mode, Intel GPU.
+    /// Live today: power limits, battery charge limit and lighting on/off (registry), CPU boost
+    /// and OS power mode (plain Windows APIs). Pending: fan, firmware mouse mode, Intel GPU.
     /// </para>
     /// </remarks>
     [SupportedOSPlatform("windows")]
@@ -51,7 +51,7 @@ namespace McenterLite.Hardware.Windows
                 // Not implemented yet. Reported as absent rather than broken.
                 HasFan = false,
                 HasChargeLimit = false,   // set below, once the provider has probed
-                HasLed = false,
+                HasLed = false,           // set below, once the provider has probed
                 HasHwMouse = false,
                 HasIgcl = false,
 
@@ -66,6 +66,9 @@ namespace McenterLite.Hardware.Windows
             var chargeLimit = new RegistryChargeLimitProvider();
             Caps.HasChargeLimit = identity.IsClaw8Ex && chargeLimit.Available;
 
+            var led = new RegistryLedProvider();
+            Caps.HasLed = identity.IsClaw8Ex && led.Available;
+
             // A device we do not recognise gets nothing, whatever the registry contains. Every
             // value above is calibrated to one model, and a wrong power limit on a different Claw
             // is a real write to real firmware.
@@ -77,7 +80,9 @@ namespace McenterLite.Hardware.Windows
             ChargeLimit = identity.IsClaw8Ex
                 ? (IChargeLimitProvider)chargeLimit
                 : new UnavailableChargeLimit("This device is not an MSI Claw 8 EX AI+.");
-            Led = new UnavailableLed("Lighting is not implemented yet.");
+            Led = identity.IsClaw8Ex
+                ? (ILedProvider)led
+                : new UnavailableLed("This device is not an MSI Claw 8 EX AI+.");
             HwMouse = new UnavailableHwMouse("Desktop mouse mode is not implemented yet.");
             Igcl = new UnavailableIgcl("Intel graphics controls are not implemented yet.");
 
@@ -181,13 +186,13 @@ namespace McenterLite.Hardware.Windows
         public bool Available => false;
         public string UnavailableReason { get; }
 
-        public bool TryRead(out LedSpec spec)
+        public bool TryRead(out bool enabled)
         {
-            spec = null;
+            enabled = false;
             return false;
         }
 
-        public OpResult Apply(LedSpec spec) => OpResult.Unavailable(UnavailableReason);
+        public OpResult Apply(bool enabled) => OpResult.Unavailable(UnavailableReason);
     }
 
     internal sealed class UnavailableHwMouse : IHwMouseProvider

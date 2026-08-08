@@ -70,7 +70,7 @@ namespace McenterLite.Widget
         /// </para>
         /// <para>
         /// The option strings live here rather than in XAML because the index IS the wire value -
-        /// it is cast straight to <c>PerfMode</c>, <c>FanPreset</c>, <c>LedMode</c> and friends.
+        /// it is cast straight to <c>PerfMode</c>, <c>FanPreset</c> and friends.
         /// Keeping the list next to the code that casts it makes that coupling visible; in XAML it
         /// was three files apart.
         /// </para>
@@ -180,7 +180,6 @@ namespace McenterLite.Widget
 
         private SegmentedControl _perfMode;
         private OptionCycler _fanPreset;
-        private OptionCycler _ledMode;
         private SegmentedControl _powerMode;
         private OptionCycler _intelFpsTier;
         private OptionCycler _intelLowLatency;
@@ -206,9 +205,6 @@ namespace McenterLite.Widget
 
                 _fanPreset = new OptionCycler(FanPresetButton,
                     "MSI Default", "Quiet Idle", "Cooling \u00B7 Early Ramp");
-
-                _ledMode = new OptionCycler(LedModeButton,
-                    "Off", "Static", "Breathing", "Colour cycle", "Wave");
 
                 _powerMode = new SegmentedControl(PowerModeSegments,
                     "Efficiency", "Balanced", "Performance");
@@ -485,7 +481,7 @@ namespace McenterLite.Widget
                 Pl1Slider,
                 FanEnabledToggle,
                 ChargeLimitSlider,
-                LedModeButton,
+                LedToggle,
                 HwMouseToggle,
                 CpuBoostToggle,
             };
@@ -591,7 +587,7 @@ namespace McenterLite.Widget
             ApplyValue(Function.FanPreset);
             ApplyValue(Function.FanState);
             ApplyValue(Function.ChargeLimitPercent);
-            ApplyValue(Function.LedSpec);
+            ApplyValue(Function.LedEnabled);
             ApplyValue(Function.HwMouseMode);
             ApplyValue(Function.CpuBoost);
             ApplyValue(Function.OsPowerMode);
@@ -644,8 +640,8 @@ namespace McenterLite.Widget
                     break;
                 }
 
-                case Function.LedSpec:
-                    ApplyLedSpec(_connection.Get(Function.LedSpec));
+                case Function.LedEnabled:
+                    LedToggle.IsOn = _connection.GetBool(Function.LedEnabled);
                     break;
 
                 case Function.HwMouseMode:
@@ -705,14 +701,6 @@ namespace McenterLite.Widget
             FanMismatchText.Visibility = Visible(state.ControlEnabled && !state.Matches);
             if (state.ControlEnabled && !state.Matches)
                 FanMismatchText.Text = "The controller is not running the selected profile.";
-        }
-
-        private void ApplyLedSpec(string payload)
-        {
-            var spec = LedSpec.Parse(payload ?? "");
-            _ledMode.Show(Clamp((int)spec.Mode, 0, 4));
-            LedBrightnessSlider.Value = spec.Brightness;
-            LedBrightnessValueText.Text = $"{spec.Brightness}%";
         }
 
         // ── User input ──────────────────────────────────────────────────────────
@@ -843,36 +831,10 @@ namespace McenterLite.Widget
             await SendAsync(Function.ChargeLimitPercent, percent);
         }
 
-        private async void LedModeButton_Click(object sender, RoutedEventArgs e)
+        private async void LedToggle_Toggled(object sender, RoutedEventArgs e)
         {
             if (_applyingFromHelper) return;
-            _ledMode.Advance();
-            await SendLedAsync();
-        }
-
-        private async void LedBrightnessSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
-        {
-            if (_applyingFromHelper) return;
-            LedBrightnessValueText.Text = $"{(int)e.NewValue}%";
-            await SendLedAsync();
-        }
-
-        /// <summary>
-        /// Sends the whole LED configuration as one value.
-        /// </summary>
-        /// <remarks>
-        /// The device applies lighting as a single indivisible report, so sending mode and
-        /// brightness separately would leave it half-configured between the two writes. The
-        /// helper additionally suppresses writes that would change nothing, which matters because
-        /// dragging a slider produces a stream of near-identical values.
-        /// </remarks>
-        private async Task SendLedAsync()
-        {
-            var spec = LedSpec.Parse(_connection.Get(Function.LedSpec) ?? "");
-            spec.Mode = (LedMode)Clamp(_ledMode.Index, 0, 4);
-            spec.Brightness = (int)LedBrightnessSlider.Value;
-
-            await SendAsync(Function.LedSpec, spec.Serialize());
+            await SendAsync(Function.LedEnabled, LedToggle.IsOn);
         }
 
         private async void HwMouseToggle_Toggled(object sender, RoutedEventArgs e)

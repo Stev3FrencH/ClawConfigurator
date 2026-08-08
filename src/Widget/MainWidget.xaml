@@ -217,9 +217,12 @@
                 </Border>
 
                 <!-- 4. Lighting -->
+                <!-- On/off only. The vendor HID report that would carry mode/colour/effect is
+                     still undecoded (Gate G4 in hardware-notes.md) - the registry only holds an
+                     on/off switch, so that is all this card offers. -->
                 <Border x:Name="LedCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
                     <StackPanel>
-                        <Grid Margin="0,0,0,4">
+                        <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
@@ -227,24 +230,14 @@
                             </Grid.ColumnDefinitions>
                             <FontIcon Grid.Column="0" Glyph="&#xE790;" Style="{StaticResource CardIconStyle}" />
                             <TextBlock Grid.Column="1" Text="Lighting" Style="{StaticResource CardTitleStyle}" />
-                            <TextBlock x:Name="LedBrightnessValueText" Grid.Column="2" Style="{StaticResource ValueStyle}" />
+                            <ToggleSwitch x:Name="LedToggle"
+                                          Grid.Column="2"
+                                          Style="{StaticResource CompactToggleStyle}"
+                                          Toggled="LedToggle_Toggled" />
                         </Grid>
 
-                        <Button x:Name="LedModeButton"
-                                Style="{StaticResource CycleButtonStyle}"
-                                Margin="0,12,0,0"
-                                Click="LedModeButton_Click" />
-
-                        <Grid Margin="0,12,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Brightness" Style="{StaticResource RowLabelStyle}" />
-                        </Grid>
-                        <Slider x:Name="LedBrightnessSlider"
-                                Style="{StaticResource CardSliderStyle}"
-                                Minimum="0" Maximum="100" StepFrequency="5"
-                                ValueChanged="LedBrightnessSlider_ValueChanged" />
+                        <TextBlock Style="{StaticResource HintStyle}"
+                                   Text="MSI's performance mode also controls this - Endurance turns lighting off, leaving it turns it back on." />
                     </StackPanel>
                 </Border>
 

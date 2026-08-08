@@ -100,13 +100,4 @@ namespace McenterLite.Shared.Ipc
         Start = 2,
     }
 
-    /// <summary>LED animation. A trimmed subset - battery-tinted and sync modes are out of scope.</summary>
-    public enum LedMode
-    {
-        Off = 0,
-        Static = 1,
-        Breathing = 2,
-        ColorCycle = 3,
-        Wave = 4,
-    }
 }
