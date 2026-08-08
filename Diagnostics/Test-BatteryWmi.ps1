@@ -105,7 +105,24 @@ function Show-CimResult {
         return
     }
 
-    foreach ($prop in $Result.CimInstanceProperties) {
+    # Two different shapes arrive here and they enumerate differently. Invoke-CimMethod returns a
+    # PSCustomObject whose properties are the out parameters - it has no CimInstanceProperties, so
+    # reading that (as an earlier version did) silently yielded nothing and hid the answer. A
+    # nested embedded instance IS a CimInstance and does use CimInstanceProperties.
+    $properties = if ($Result -is [Microsoft.Management.Infrastructure.CimInstance]) {
+        @($Result.CimInstanceProperties | ForEach-Object {
+            [pscustomobject]@{ Name = $_.Name; Value = $_.Value } })
+    }
+    else {
+        @($Result.PSObject.Properties | ForEach-Object {
+            [pscustomobject]@{ Name = $_.Name; Value = $_.Value } })
+    }
+
+    foreach ($prop in $properties) {
+        if ($prop.Name -in @('PSComputerName', 'CimClass', 'CimInstanceProperties', 'CimSystemProperties')) {
+            continue
+        }
+
         if ($prop.Value -is [byte[]]) {
             Write-Host "$Indent$($prop.Name) = byte[$($prop.Value.Count)]"
             Show-Bytes -Bytes $prop.Value -Indent "$Indent  "
@@ -115,6 +132,11 @@ function Show-CimResult {
             # where the answer actually shows up - not at the top level.
             Write-Host "$Indent$($prop.Name) = [$($prop.Value.CimSystemProperties.ClassName)]"
             Show-CimResult -Result $prop.Value -Indent "$Indent  "
+        }
+        elseif ($prop.Value -is [bool]) {
+            # Booleans are value types but have no sensible hex rendering. These methods return
+            # one, so without this the result line reads "0xTrue".
+            Write-Host "$Indent$($prop.Name) = $($prop.Value)"
         }
         elseif ($null -ne $prop.Value -and $prop.Value.GetType().IsValueType) {
             Write-Host ("{0}{1} = 0x{2:X} ({2})" -f $Indent, $prop.Name, $prop.Value)
