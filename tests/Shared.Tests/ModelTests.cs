@@ -272,6 +272,33 @@ namespace McenterLite.Shared.Tests
         }
 
         [Fact]
+        public void LevelsAreEvenlySpacedSoASliderCanReachExactlyThem()
+        {
+            // The widget renders these as a Slider with Minimum 60, Maximum 100 and
+            // StepFrequency 20. That only lands on the real levels if they are evenly spaced and
+            // span the whole range - so this test is what keeps the XAML honest. Adding a level
+            // (say 70) breaks the spacing and must fail here rather than silently produce a
+            // control that can select a value the hardware cannot hold.
+            var levels = ChargeLevels.All();
+
+            Assert.Equal(60, levels[0]);
+            Assert.Equal(100, levels[levels.Length - 1]);
+
+            int step = levels[1] - levels[0];
+            Assert.Equal(20, step);
+            for (int i = 1; i < levels.Length; i++)
+                Assert.Equal(step, levels[i] - levels[i - 1]);
+        }
+
+        [Fact]
+        public void EverySliderStopSnapsToItself()
+        {
+            // Walking the slider's reachable positions must never move the value.
+            for (int v = 60; v <= 100; v += 20)
+                Assert.Equal(v, ChargeLevels.Snap(v));
+        }
+
+        [Fact]
         public void AllIsAscendingSoTheDropdownOrderIsStable()
         {
             var levels = ChargeLevels.All();

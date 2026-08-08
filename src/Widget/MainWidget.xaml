@@ -202,13 +202,21 @@
                             <TextBlock x:Name="ChargeLimitValueText" Grid.Column="1" Style="{StaticResource ValueStyle}" />
                         </Grid>
 
-                        <!-- Three fixed choices, not a slider. MSI stores a three-state selector
-                             (BatteryLevel "0"/"1"/"2"), not a percentage - measured 2026-08-07.
-                             A 60-100 slider would offer values the device cannot hold and snap
-                             back on almost every drag. Order matches ChargeLevels.All(). -->
-                        <Button x:Name="ChargeLimitButton"
-                                Style="{StaticResource CycleButtonStyle}"
-                                Click="ChargeLimitButton_Click" />
+                        <!-- A three-position slider, not a continuous one.
+                             MSI stores a three-state selector (BatteryLevel "0"/"1"/"2"), not a
+                             percentage - measured 2026-08-07. StepFrequency 20 over 60..100 makes
+                             the only reachable values 60, 80 and 100, so the control cannot offer
+                             a limit the device has no way to represent. SnapsTo is what enforces
+                             that on a drag; without it the thumb moves continuously and only the
+                             committed value snaps, which reads as the control fighting back. -->
+                        <Slider x:Name="ChargeLimitSlider"
+                                Style="{StaticResource CardSliderStyle}"
+                                Minimum="60" Maximum="100"
+                                StepFrequency="20"
+                                SnapsTo="StepValues"
+                                TickFrequency="20"
+                                TickPlacement="Outside"
+                                ValueChanged="ChargeLimitSlider_ValueChanged" />
 
                         <TextBlock Style="{StaticResource HintStyle}"
                                    Text="Stored in the controller, so it survives a reboot." />

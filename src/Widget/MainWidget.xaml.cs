@@ -100,7 +100,6 @@ namespace McenterLite.Widget
 
         private OptionCycler _perfMode;
         private OptionCycler _fanPreset;
-        private OptionCycler _chargeLimit;
         private OptionCycler _ledMode;
         private OptionCycler _powerMode;
         private OptionCycler _intelFpsTier;
@@ -116,10 +115,6 @@ namespace McenterLite.Widget
 
             _fanPreset = new OptionCycler(FanPresetButton,
                 "MSI Default", "Quiet Idle", "Cooling \u00B7 Early Ramp");
-
-            // Ascending, matching ChargeLevels.All().
-            _chargeLimit = new OptionCycler(ChargeLimitButton,
-                "60%  \u00B7  best for longevity", "80%  \u00B7  balanced", "100%  \u00B7  full capacity");
 
             _ledMode = new OptionCycler(LedModeButton,
                 "Off", "Static", "Breathing", "Colour cycle", "Wave");
@@ -345,14 +340,14 @@ namespace McenterLite.Widget
 
                 case Function.ChargeLimitEnabled:
                     ChargeLimitToggle.IsOn = _connection.GetBool(Function.ChargeLimitEnabled);
-                    _chargeLimit.IsEnabled = ChargeLimitToggle.IsOn;
+                    ChargeLimitSlider.IsEnabled = ChargeLimitToggle.IsOn;
                     break;
 
                 case Function.ChargeLimitPercent:
                 {
                     int percent = ChargeLevels.Snap(
                         _connection.GetInt(Function.ChargeLimitPercent, ChargeLevels.Default));
-                    _chargeLimit.Show(ChargeLevels.ToIndex(percent));
+                    ChargeLimitSlider.Value = percent;
                     ChargeLimitValueText.Text = $"{percent}%";
                     break;
                 }
@@ -497,14 +492,18 @@ namespace McenterLite.Widget
         private async void ChargeLimitToggle_Toggled(object sender, RoutedEventArgs e)
         {
             if (_applyingFromHelper) return;
-            _chargeLimit.IsEnabled = ChargeLimitToggle.IsOn;
+            ChargeLimitSlider.IsEnabled = ChargeLimitToggle.IsOn;
             await SendAsync(Function.ChargeLimitEnabled, ChargeLimitToggle.IsOn);
         }
 
-        private async void ChargeLimitButton_Click(object sender, RoutedEventArgs e)
+        private async void ChargeLimitSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
             if (_applyingFromHelper) return;
-            int percent = ChargeLevels.FromIndex(_chargeLimit.Advance());
+
+            // Snapped again even though StepFrequency should already guarantee it. The slider's
+            // step is a UI affordance; this is the value that goes on the wire, and the helper is
+            // entitled to assume it is one the hardware can hold.
+            int percent = ChargeLevels.Snap((int)e.NewValue);
             ChargeLimitValueText.Text = $"{percent}%";
             await SendAsync(Function.ChargeLimitPercent, percent);
         }
