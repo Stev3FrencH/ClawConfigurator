@@ -178,7 +178,7 @@ namespace McenterLite.Widget
             }
         }
 
-        private OptionCycler _perfMode;
+        private SegmentedControl _perfMode;
         private OptionCycler _fanPreset;
         private OptionCycler _ledMode;
         private SegmentedControl _powerMode;
@@ -200,8 +200,9 @@ namespace McenterLite.Widget
             try
             {
                 // Order is the contract: every index below is cast directly to the enum it names.
-                _perfMode = new OptionCycler(PerfModeButton,
+                _perfMode = new SegmentedControl(PerfModeSegments,
                     "Endurance", "User Scenario", "AI Engine");
+                _perfMode.Selected += OnPerfModeSelected;
 
                 _fanPreset = new OptionCycler(FanPresetButton,
                     "MSI Default", "Quiet Idle", "Cooling \u00B7 Early Ramp");
@@ -481,10 +482,9 @@ namespace McenterLite.Widget
 
             Control[] candidates =
             {
-                PerfModeButton,
                 Pl1Slider,
                 FanEnabledToggle,
-                ChargeLimitToggle,
+                ChargeLimitSlider,
                 LedModeButton,
                 HwMouseToggle,
                 CpuBoostToggle,
@@ -554,18 +554,6 @@ namespace McenterLite.Widget
             Pl2Slider.Minimum = caps.MinPl1 + caps.Pl2MinOffset;
             Pl2Slider.Maximum = caps.MaxPl2;
 
-            // Say the battery cap out loud. It is applied automatically and has no control of its
-            // own, so without this the user sets 35 W, unplugs, and sees the device behave as
-            // though the setting were ignored.
-            bool capped = caps.MaxPl1Dc < caps.MaxPl1 || caps.MaxPl2Dc < caps.MaxPl2;
-            BatteryLimitHint.Visibility = Visible(capped);
-            if (capped)
-            {
-                BatteryLimitHint.Text =
-                    $"On battery these are capped to {caps.MaxPl1Dc} W sustained and "
-                    + $"{caps.MaxPl2Dc} W boost. Plugged in, the values above apply.";
-            }
-
             // Cards are shown only when the helper reported a value for them. A control the user
             // cannot see is a value they cannot send, which matters because the pipe is reachable
             // by any app on the machine and the helper is the only real gate.
@@ -602,7 +590,6 @@ namespace McenterLite.Widget
             ApplyValue(Function.FanEnabled);
             ApplyValue(Function.FanPreset);
             ApplyValue(Function.FanState);
-            ApplyValue(Function.ChargeLimitEnabled);
             ApplyValue(Function.ChargeLimitPercent);
             ApplyValue(Function.LedSpec);
             ApplyValue(Function.HwMouseMode);
@@ -646,11 +633,6 @@ namespace McenterLite.Widget
 
                 case Function.FanState:
                     ApplyFanState(_connection.Get(Function.FanState));
-                    break;
-
-                case Function.ChargeLimitEnabled:
-                    ChargeLimitToggle.IsOn = _connection.GetBool(Function.ChargeLimitEnabled);
-                    ChargeLimitSlider.IsEnabled = ChargeLimitToggle.IsOn;
                     break;
 
                 case Function.ChargeLimitPercent:
@@ -758,11 +740,12 @@ namespace McenterLite.Widget
             PerfModeHint.Visibility = manual ? Visibility.Collapsed : Visibility.Visible;
         }
 
-        private async void PerfModeButton_Click(object sender, RoutedEventArgs e)
+        private async void OnPerfModeSelected(int index)
         {
             if (_applyingFromHelper) return;
 
-            var mode = (PerfMode)_perfMode.Advance();
+            _perfMode.Show(index);
+            var mode = (PerfMode)index;
             ApplyPerfMode(mode);
             await SendAsync(Function.PerfMode, (int)mode);
 
@@ -846,13 +829,6 @@ namespace McenterLite.Widget
         {
             if (_applyingFromHelper) return;
             await SendAsync(Function.FanPreset, _fanPreset.Advance());
-        }
-
-        private async void ChargeLimitToggle_Toggled(object sender, RoutedEventArgs e)
-        {
-            if (_applyingFromHelper) return;
-            ChargeLimitSlider.IsEnabled = ChargeLimitToggle.IsOn;
-            await SendAsync(Function.ChargeLimitEnabled, ChargeLimitToggle.IsOn);
         }
 
         private async void ChargeLimitSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)

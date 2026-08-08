@@ -97,10 +97,7 @@
 
                         <!-- Mode sits ABOVE the sliders because it gates them: MSI only honours
                              manual limits in User Scenario. Order matches PerfMode's ordinals. -->
-                        <Button x:Name="PerfModeButton"
-                                Style="{StaticResource CycleButtonStyle}"
-                                Margin="0,12,0,0"
-                                Click="PerfModeButton_Click" />
+                        <Grid x:Name="PerfModeSegments" Margin="0,12,0,0" />
 
                         <TextBlock x:Name="PerfModeHint"
                                    Style="{StaticResource HintStyle}"
@@ -135,14 +132,6 @@
                                 Minimum="10" Maximum="45" StepFrequency="1"
                                 TickFrequency="1"
                                 ValueChanged="Pl2Slider_ValueChanged" />
-
-                        <!-- Text is built from DeviceCaps at runtime rather than hardcoded, so the
-                             stated ceiling can never drift from the one actually written. -->
-                        <TextBlock x:Name="BatteryLimitHint"
-                                   Style="{StaticResource HintStyle}" />
-
-                        <TextBlock Style="{StaticResource HintStyle}"
-                                   Text="Boost is held above sustained by the margin the firmware requires. The helper clamps both, so a value may snap back." />
                     </StackPanel>
                 </Border>
 
@@ -190,14 +179,9 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <FontIcon Grid.Column="0" Glyph="&#xE83F;" Style="{StaticResource CardIconStyle}" />
                             <TextBlock Grid.Column="1" Text="Battery" Style="{StaticResource CardTitleStyle}" />
-                            <ToggleSwitch x:Name="ChargeLimitToggle"
-                                          Grid.Column="2"
-                                          Style="{StaticResource CompactToggleStyle}"
-                                          Toggled="ChargeLimitToggle_Toggled" />
                         </Grid>
 
                         <Grid Margin="0,12,0,0">
@@ -215,7 +199,12 @@
                              the only reachable values 60, 80 and 100, so the control cannot offer
                              a limit the device has no way to represent. SnapsTo is what enforces
                              that on a drag; without it the thumb moves continuously and only the
-                             committed value snaps, which reads as the control fighting back. -->
+                             committed value snaps, which reads as the control fighting back.
+
+                             Always enabled - no separate toggle. 100% already IS "off" at the
+                             hardware level (a three-state selector, not a percentage; see
+                             RegistryChargeLimitProvider.Apply), so there is nothing a toggle would
+                             mean that moving the slider to 100 does not already mean. -->
                         <Slider x:Name="ChargeLimitSlider"
                                 Style="{StaticResource CardSliderStyle}"
                                 Minimum="60" Maximum="100"
@@ -224,9 +213,6 @@
                                 TickFrequency="20"
                                 TickPlacement="Outside"
                                 ValueChanged="ChargeLimitSlider_ValueChanged" />
-
-                        <TextBlock Style="{StaticResource HintStyle}"
-                                   Text="Stored in the controller, so it survives a reboot." />
                     </StackPanel>
                 </Border>
 

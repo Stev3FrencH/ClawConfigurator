@@ -309,6 +309,14 @@ namespace McenterLite.Helper
                 // Snapped, not clamped: the device holds one of three levels, and a value between
                 // them is not a smaller mistake than one outside the range.
                 percent = ChargeLevels.Snap(request.AsInt(percent));
+
+                // The widget has no separate enable/disable control - picking a percent IS the
+                // whole interface, and 100% already means "off" at the hardware level (see
+                // Apply() below). Without this, a percent sent while the device happened to be at
+                // 100% from a PREVIOUS disable would be silently ignored: Apply(enabled=false, _)
+                // maps to Full regardless of percent, and enabled here is still whatever TryRead
+                // just reported.
+                enabled = true;
             }
 
             var result = _hw.ChargeLimit.Apply(enabled, percent);
