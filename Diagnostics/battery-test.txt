@@ -17,6 +17,13 @@ WARNING: Could not read MSI_Master_Battery: Not supported
 
 [3] MSI_ACPI.Get_MasterBattery
     [payload 32] OK
+      Data = [Package_32]
+        Bytes = byte[32]
+          [ 0] 01 09 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+                 1   9   0   0   0   0   0   0   0   0   0   0   0   0   0   0
+          [16] 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+                 0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
+      ReturnValue = True
     -> shape that worked: payload 32
 
 Expected if the percent|0x80 encoding holds:
