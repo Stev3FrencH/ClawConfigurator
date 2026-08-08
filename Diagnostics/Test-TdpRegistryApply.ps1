@@ -156,6 +156,24 @@ if ($original.Mode -ne $ModeUserScenario) {
     if ($answer -ne 'y') { return }
 }
 
+# Which MSI process is present changes what a passing result MEANS, so record it rather than
+# leaving it to memory. The registry is applied by MSI Center - the open question is whether the
+# UWP front end has to be running, or whether the background server is enough. A pass with the
+# window open proves less than a pass without it.
+Write-Host ''
+Write-Host '=== MSI Center processes ===' -ForegroundColor Cyan
+$ui     = Get-Process -Name 'MSI Center M' -ErrorAction SilentlyContinue
+$server = Get-Process -Name 'MSI_Center_M_Server_UserScenario' -ErrorAction SilentlyContinue
+Write-Host ("  UWP window  : {0}" -f $(if ($ui)     { "RUNNING (pid $($ui.Id -join ','))" }     else { 'not running' }))
+Write-Host ("  UserScenario: {0}" -f $(if ($server) { "RUNNING (pid $($server.Id -join ','))" } else { 'not running' }))
+if ($ui) {
+    Write-Host '  -> A pass here only proves the registry works WITH the MSI Center window open.' -ForegroundColor DarkGray
+    Write-Host '     Close it and re-run to find out whether the background server alone suffices.' -ForegroundColor DarkGray
+}
+else {
+    Write-Host '  -> The window is closed, so a pass here proves the background server applies it.' -ForegroundColor DarkGray
+}
+
 $jobs = @()
 try {
     Write-Host ''

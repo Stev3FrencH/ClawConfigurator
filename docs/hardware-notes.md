@@ -73,11 +73,25 @@ This is the driver-free EC path the project was designed around, and it is **pre
 enumerable without MSI Center**. Sibling classes: `MSI_AP`, `MSI_CPU`, `MSI_Device`, `MSI_Event`,
 `MSI_Master_Battery`, `MSI_Power`, `MSI_Slave_Battery`, `MSI_Software`, `MSI_System`, `MSI_VGA`.
 
-> **Not yet established: whether writing the registry alone applies anything.** MSI Center's UI
-> may write the registry *and separately* call the ACPI-WMI methods, in which case the registry is
-> persistence, not a control surface, and writing it by itself does nothing until MSI Center next
-> reads it. Every transcript captured a UI-driven change, so it cannot distinguish the two. **This
-> is the single most important remaining experiment** — see [Open questions](#open-questions).
+> **Settled 2026-08-07: writing the registry alone DOES apply.** `Test-TdpRegistryApply.ps1` drove
+> PL1 from 8 W to 25 W by registry write only, under sustained load, and the clock followed.
+>
+> **MSI Center's own UI updated to match while the test ran.** That is not a confound — it is the
+> mechanism becoming visible. Nothing but the registry was written, so MSI Center must be watching
+> those values, and it is MSI Center that pushes them to the EC. The registry is a live control
+> surface.
+>
+> Two things follow, and the second is not yet tested:
+>
+> 1. **MSI Center is an active participant, not a passive store.** It can and will overwrite us —
+>    on its own UI interactions, and plausibly on mode changes, AC↔DC transitions and resume. Our
+>    helper has to re-read rather than assume its last write still stands.
+> 2. **Unknown: whether the MSI Center *window* has to be open.** The test was run with the UI up.
+>    The applier could be the UWP process (`MSI Center M`, from `WindowsApps`) or the background
+>    server (`MSI_Center_M_Server_UserScenario`, from `Program Files (x86)`). If it is the UI, this
+>    feature only works while MSI Center is on screen, which would be unusable.
+>    **Re-run the test with the MSI Center window closed** — confirm the `MSI Center M` process is
+>    gone and `MSI_Center_M_Server_UserScenario` is still running — before building on this.
 
 ### Registry map
 
@@ -410,13 +424,19 @@ writes, confirming the service is the applier. No decompilation needed for any o
 | PL1 range accepted | | plan assumes 8–35 W |
 | PL2 range accepted | | plan assumes ≥ PL1+2, ≤ 45 W |
 
-**Result: GREEN.** `HKLM\SOFTWARE\WOW6432Node\MSI\MSI Center M\Component\User Scenario`,
-values `ManualPL1AC` / `ManualPL2AC` / `ManualPL1DC` / `ManualPL2DC`, REG_DWORD, **watts 1:1**,
-confirmed at four points. Ranges and `Pl2MinOffset = 2` match `DeviceCaps` exactly. A second,
-MSI-Center-independent path exists via `MSI_ACPI.Set_Power`. See
-[Measured on device](#measured-on-device-2026-08-07).
+**Result: GREEN, and the mechanism is confirmed working.**
+`HKLM\SOFTWARE\WOW6432Node\MSI\MSI Center M\Component\User Scenario`, values
+`ManualPL1AC` / `ManualPL2AC` / `ManualPL1DC` / `ManualPL2DC`, REG_DWORD, **watts 1:1**, confirmed
+at four points. Ranges and `Pl2MinOffset = 2` match `DeviceCaps` exactly.
 
-Still open: whether a registry write **alone** applies, or only persists.
+**A registry write alone applies.** Measured 2026-08-07: PL1 driven 8 W -> 25 W by registry write
+only, under sustained load, and the sustained clock followed. MSI Center's UI updated to match,
+which is the mechanism made visible - it watches these values and pushes them to the EC.
+
+A second, MSI-Center-independent path exists via `MSI_ACPI.Set_Power`, unexercised.
+
+Remaining before M2: confirm it still applies with the MSI Center **window closed** (the run that
+settled this had the UI open), and find out what re-asserts MSI's own values over ours.
 
 ---
 
@@ -633,16 +653,18 @@ only found this by also matching `TFN1` — worth correcting before it misses so
 
 Ordered by how much they block. The first one decides the architecture.
 
-1. **Does writing the registry alone apply anything?** Every transcript captured a change made in
-   MSI Center's UI, which may write the registry *and* call the ACPI-WMI methods. If the registry
-   is only persistence, writing it does nothing until MSI Center next reads it — and the whole
-   "front-end for MSI Center" plan rests on it being a control surface.
+1. ~~**Does writing the registry alone apply anything?**~~ **Answered: yes.** Measured 2026-08-07
+   with `Diagnostics/Test-TdpRegistryApply.ps1` — see
+   [Two independent control surfaces](#two-independent-control-surfaces).
 
-   **Run `Diagnostics/Test-TdpRegistryApply.ps1` elevated.** It loads the CPU, drives PL1 to 8 W
-   and then 35 W by registry write alone, and reports whether the sustained clock followed. It
-   backs up and restores the original values in a `finally`, so an interrupted run is recoverable
-   with `-RestoreOnly`. **Put the device in User Scenario mode first** — the script warns if
-   `Mode` is not 4, because a run in AI Engine or Endurance would produce a false negative.
+   **What replaces it: does it still apply with the MSI Center window closed?** The run that
+   settled the question had the UI open, so it cannot distinguish the UWP front end from the
+   background server as the applier. Same script, MSI Center closed. If the answer is "only with
+   the window open", TDP has to move to `MSI_ACPI.Set_Power` regardless of the registry working.
+
+1. **When does MSI Center overwrite our values?** It watches the registry, so it presumably also
+   re-asserts its own view on some events — mode change, AC↔DC, resume from sleep, its UI opening.
+   Each one that overwrites us is a case the helper has to detect and re-apply after.
 
 2. **Are the ClawTweaks duty numbers and MSI's `Default_Fan` on the same scale?** ClawTweaks says
    raw EC byte 0–150 with 75 = half fan; MSI ships `{70,74,76,78,80,84}` as a factory curve. If
