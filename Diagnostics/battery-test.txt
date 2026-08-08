@@ -7,13 +7,17 @@ WARNING: Could not read MSI_Master_Battery: Not supported
 [2] MSI_ACPI declared method shapes (nothing called)
     Get_MasterBattery  (returns Boolean)
       Data : Instance   [EmbeddedInstance,in,id,out]
+        EmbeddedInstance -> Package_32
     Set_MasterBattery  (returns Boolean)
       Data : Instance   [EmbeddedInstance,in,id,out]
+        EmbeddedInstance -> Package_32
+
+[2b] Embedded payload class: Package_32
+      Bytes : UInt8Array   [Description,MAX,read,WmiDataId,write]
 
 [3] MSI_ACPI.Get_MasterBattery
-    note: skipping parameter(s) of type Instance/Reference: Data
-    [no arguments] Invalid parameter
-WARNING: Every argument shape tried for Get_MasterBattery failed. The declared shape is in [2] above.
+    [payload 32] OK
+    -> shape that worked: payload 32
 
 Expected if the percent|0x80 encoding holds:
   100% -> 0xE4 (228)
