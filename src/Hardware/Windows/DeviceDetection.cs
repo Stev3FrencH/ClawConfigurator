@@ -92,17 +92,35 @@ namespace McenterLite.Hardware.Windows
         }
 
         /// <summary>
-        /// True when MSI Center M is running. It contends for the same EC, ACPI-WMI interface and
-        /// vendor HID endpoint, so several features have to be gated or warned about while it is up.
+        /// True when the MSI Center M component that APPLIES our settings is running.
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This deliberately does not look for the MSI Center window. Measured on device
+        /// 2026-08-07: power limits written to the registry are applied by the background process
+        /// <c>MSI_Center_M_Server_UserScenario</c>, and they apply just as well with the UWP front
+        /// end (<c>MSI Center M</c>) closed - which is the normal state.
+        /// </para>
+        /// <para>
+        /// Matching the window would therefore report "MSI Center is not running" for a machine
+        /// where everything works, and the widget would show a warning contradicted by the
+        /// hardware. The servers are what matter; the window is incidental.
+        /// </para>
+        /// </remarks>
         public static bool IsMsiCenterRunning()
         {
             if (!OperatingSystem.IsWindows()) return false;
 
-            // Matched by process name rather than service state: MSI ships several differently
-            // named components across versions, and it is the running process that holds the
-            // device handles.
-            string[] names = { "MSI Center M", "MSI.CentralServer", "MSICenterM", "MSI_Center_M" };
+            // The UserScenario server is the one that applies power limits. The others are listed
+            // because MSI has renamed components across versions and any of them being up means
+            // the stack is present; the front end is intentionally absent from this list.
+            string[] names =
+            {
+                "MSI_Center_M_Server_UserScenario",
+                "MSI_Center_M_Server",
+                "MSI_Center_M_Server_Service",
+                "MSI.CentralServer",
+            };
 
             foreach (var name in names)
             {

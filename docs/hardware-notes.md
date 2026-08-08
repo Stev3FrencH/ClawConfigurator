@@ -81,17 +81,18 @@ enumerable without MSI Center**. Sibling classes: `MSI_AP`, `MSI_CPU`, `MSI_Devi
 > those values, and it is MSI Center that pushes them to the EC. The registry is a live control
 > surface.
 >
-> Two things follow, and the second is not yet tested:
+> **The applier is the background server, not the window.** Re-run with the MSI Center UWP window
+> closed and only `MSI_Center_M_Server_UserScenario` running: still applies. So this works in the
+> normal state of the machine, with MSI Center installed and its services up but nothing on screen.
 >
-> 1. **MSI Center is an active participant, not a passive store.** It can and will overwrite us —
->    on its own UI interactions, and plausibly on mode changes, AC↔DC transitions and resume. Our
->    helper has to re-read rather than assume its last write still stands.
-> 2. **Unknown: whether the MSI Center *window* has to be open.** The test was run with the UI up.
->    The applier could be the UWP process (`MSI Center M`, from `WindowsApps`) or the background
->    server (`MSI_Center_M_Server_UserScenario`, from `Program Files (x86)`). If it is the UI, this
->    feature only works while MSI Center is on screen, which would be unusable.
->    **Re-run the test with the MSI Center window closed** — confirm the `MSI Center M` process is
->    gone and `MSI_Center_M_Server_UserScenario` is still running — before building on this.
+> **What follows: MSI Center is an active participant, not a passive store.** It watches these
+> values, so it can also overwrite them — from its own UI, and plausibly on mode changes, AC↔DC
+> transitions and resume. The helper re-reads after every write and must not assume its last write
+> still stands.
+>
+> **Consequence for `IsMsiCenterRunning()`:** it must detect the *server*, not the window. Matching
+> the UWP process would report "MSI Center is not running" on a machine where everything works, and
+> the widget would show a warning the hardware contradicts.
 
 ### Registry map
 
@@ -657,10 +658,8 @@ Ordered by how much they block. The first one decides the architecture.
    with `Diagnostics/Test-TdpRegistryApply.ps1` — see
    [Two independent control surfaces](#two-independent-control-surfaces).
 
-   **What replaces it: does it still apply with the MSI Center window closed?** The run that
-   settled the question had the UI open, so it cannot distinguish the UWP front end from the
-   background server as the applier. Same script, MSI Center closed. If the answer is "only with
-   the window open", TDP has to move to `MSI_ACPI.Set_Power` regardless of the registry working.
+   ~~**Does it still apply with the MSI Center window closed?**~~ **Answered: yes.** The
+   background server `MSI_Center_M_Server_UserScenario` is the applier, so no window is needed.
 
 1. **When does MSI Center overwrite our values?** It watches the registry, so it presumably also
    re-asserts its own view on some events — mode change, AC↔DC, resume from sleep, its UI opening.

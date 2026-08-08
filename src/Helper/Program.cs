@@ -217,11 +217,23 @@ namespace McenterLite.Helper
                 return new FakeHardware(simulateClaw8Ex: false);
             }
 
-            // TODO(M1): return RealHardware once Phase 0 has established the WMI and HID
-            // protocol for this device. Until then the fake keeps every non-hardware layer
-            // developable, and reports Supported=false so nothing pretends to work.
-            Log.Warn("Real hardware providers are not implemented yet (pending Phase 0 discovery).");
-            return new FakeHardware(simulateClaw8Ex: false);
+            var identity = McenterLite.Hardware.Windows.DeviceDetection.Detect();
+            Log.Info($"Detected: {identity.DisplayName}");
+
+            if (!identity.IsClaw8Ex)
+            {
+                // Not a refusal to run - the Windows power features are device-independent and
+                // still work. It is a refusal to write anything model-specific.
+                Log.Warn("This is not an MSI Claw 8 EX AI+. Device-specific features are disabled.");
+            }
+
+            var hardware = new McenterLite.Hardware.Windows.WindowsHardware(identity);
+
+            Log.Info(hardware.Tdp.Available
+                ? $"Power limits: {hardware.Tdp.Backend}."
+                : $"Power limits unavailable: {hardware.Tdp.UnavailableReason}");
+
+            return hardware;
         }
 
         /// <summary>
