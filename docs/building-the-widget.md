@@ -1,43 +1,243 @@
-# Building the widget and package
+# Building the widget and the MSIX package
+
+A step-by-step guide for the one part of this project that cannot be built on the authoring
+machine.
 
 Everything under `src/Shared`, `src/Hardware`, `src/Helper`, `src/Probe` and `tests/` builds
-anywhere with `dotnet build McenterLite.sln`, including macOS.
+anywhere with `dotnet build McenterLite.sln`, including macOS. **`src/Widget` and the packaging
+project do not.** They need MSBuild from Visual Studio, and they are deliberately **not** in
+`McenterLite.sln` — adding them would break the cross-platform build the whole authoring workflow
+depends on.
 
-**`src/Widget` and the packaging project do not.** They need MSBuild from Visual Studio, and they
-are deliberately **not** in `McenterLite.sln` — adding them would break the cross-platform build
-that the whole authoring workflow depends on.
+> **Read this first.** The widget has been **authored but never compiled**, and roughly 2,100
+> lines have accumulated that way. Everything checkable without a compiler has been checked —
+> the XAML parses, every `StaticResource` key resolves against `App.xaml`, and every `x:Name` and
+> event handler is wired on both sides — but none of that catches a wrong API shape. **Expect
+> compile errors on the first build.** That is the expected outcome of this session, not a sign
+> something is broken.
 
-## Prerequisites (Windows only)
+---
 
-- Visual Studio 2022 with the **Universal Windows Platform development** workload
-- **Windows 11 SDK 10.0.26100**
-- Windows 10 version 22000 or later
+## 0. What you are building
 
-## Status of this code
+| Piece | Produces | Needs |
+|---|---|---|
+| `src/Widget` | `McenterLite.Widget` — the UWP AppContainer UI | VS 2022 + UWP workload |
+| `src/Package` | the signed `.msix` that actually installs | Windows Application Packaging Project |
+| `src/Helper` | `McenterLite.Helper.exe`, bundled into the package | plain .NET SDK |
 
-> The widget has been **authored but never compiled**. It was written on macOS, where no UWP
-> toolchain exists. Expect to fix compile errors on the first VM build — particularly around
-> Game Bar API surface, which could not be checked against the real reference assemblies.
+The helper is already proven on the device. This session is about the UI and the packaging
+around it.
 
-Known places to verify first:
+---
+
+## 1. Machine setup
+
+A Windows 11 VM (or any Windows 11 box that is not the Claw — you want to fix compile errors
+somewhere comfortable). Build 22000 or later.
+
+Install Visual Studio 2022 with these components. From the installer UI pick the workloads, or
+run this from an elevated prompt if VS is already present:
+
+```powershell
+# Adjust the path for Community/Professional/Enterprise as needed.
+$vs = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
+
+& $vs modify `
+  --installPath "${env:ProgramFiles}\Microsoft Visual Studio\2022\Community" `
+  --add Microsoft.VisualStudio.Workload.Universal `
+  --add Microsoft.VisualStudio.Workload.ManagedDesktop `
+  --add Microsoft.VisualStudio.Component.Windows11SDK.26100 `
+  --passive --norestart
+```
+
+- **Universal Windows Platform development** — the UWP workload. Without it the `.csproj` will
+  not even load, and VS reports it as an unsupported project type rather than a missing workload.
+- **.NET desktop development** — for the helper and the packaging project.
+- **Windows 11 SDK 10.0.26100** — the exact version `McenterLite.Widget.csproj` targets. A
+  different SDK is the single most common reason a UAP project refuses to load.
+
+Also enable **Developer Mode** (Settings → System → For developers). Sideloading a self-signed
+package needs it.
+
+Verify before going further:
+
+```powershell
+Test-Path "${env:ProgramFiles(x86)}\Windows Kits\10\Platforms\UAP\10.0.26100.0"   # must be True
+```
+
+---
+
+## 2. Get the code and prove the baseline
+
+```powershell
+git clone https://github.com/Stev3FrencH/msi-mcenter-lite.git
+cd msi-mcenter-lite
+dotnet build McenterLite.sln
+dotnet test McenterLite.sln
+```
+
+**Both must pass before you touch the widget.** They exclude the widget entirely, so a failure
+here is an environment problem, and diagnosing it alongside UWP errors is much harder than
+diagnosing it alone. Expect 140 passing tests.
+
+---
+
+## 3. Generate the assets
+
+Both manifests reference five PNGs that do not exist. `MakeAppx` fails the build naming the
+missing file, which reads like a broken repository rather than absent artwork.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\src\Widget\New-PlaceholderAssets.ps1
+```
+
+That writes `src/Widget/Assets/`. Copy the same folder into the packaging project once it exists
+(step 5) — the shipping manifest resolves asset paths relative to itself.
+
+---
+
+## 4. First compile of the widget, alone
+
+Open `src/Widget/McenterLite.Widget.csproj` in Visual Studio **on its own**, not through a
+solution. Set the configuration to **Debug | x64** — the project is x64-only by design, and
+`Any CPU` will fail with an unhelpful platform error.
+
+Build it. **This is the step that will produce errors**, and fixing them is the point of the
+session. Work through the list in [What is most likely to break](#what-is-most-likely-to-break)
+below, which is ordered by risk.
+
+Do not move on until this project builds clean. Everything after depends on it.
+
+---
+
+## 5. Create the packaging project
+
+This does not exist in the repo, because a `.wapproj` cannot be authored blind with any
+confidence — it embeds absolute-ish tooling paths and a project GUID.
+
+1. Create a solution containing `McenterLite.Widget.csproj` and `McenterLite.Helper.csproj`.
+2. **Add → New Project → Windows Application Packaging Project**, name it `McenterLite.Package`,
+   and put it at `src/Package` so it lands beside the existing manifest and `Install.ps1`.
+3. Target version 10.0.26100.0, minimum 10.0.22000.0 — matching the widget.
+4. Under the new project's **Dependencies → Applications**, add a reference to
+   **McenterLite.Widget**. Set it as the **entry point**.
+5. **Replace the generated `Package.appxmanifest` with the one already in `src/Package`.** That
+   is the file that declares the Game Bar extension and the full-trust helper; the generated one
+   declares neither, and a package built from it installs and then does nothing.
+6. Copy `src/Widget/Assets` into `src/Package/Assets`.
+
+### Getting the helper into the package
+
+The manifest declares `Executable="Helper\McenterLite.Helper.exe"`, so the helper must land in a
+`Helper` folder inside the package. Publish it self-contained:
+
+```powershell
+dotnet publish src\Helper\McenterLite.Helper.csproj -c Release -r win-x64 --self-contained -o publish\helper
+```
+
+Then add the published output to the packaging project under a `Helper` folder, with
+**Build Action = Content**. Self-contained matters: the package cannot rely on a .NET runtime
+being installed on the target.
+
+Verify the path inside the built package matches the manifest exactly. A mismatch here produces
+a package that installs cleanly and whose widget then reports "could not reach the helper"
+forever, with nothing in any log explaining why.
+
+---
+
+## 6. Create the signing certificate
+
+Sideloading needs a signed package and a trusted certificate. The certificate subject must match
+the manifest `Publisher` **exactly** — a mismatch is the most common cause of a package that
+builds but refuses to install.
+
+```powershell
+New-SelfSignedCertificate -Type Custom -Subject "CN=msi-mcenter-lite" `
+  -KeyUsage DigitalSignature -FriendlyName "msi-mcenter-lite" `
+  -CertStoreLocation "Cert:\CurrentUser\My" `
+  -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
+```
+
+Note the thumbprint it prints, then point the packaging project at it: project properties →
+**Packaging** → **Choose Certificate** → **Select from store**.
+
+Export the public half for the install step:
+
+```powershell
+$cert = Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.Subject -eq 'CN=msi-mcenter-lite' }
+Export-Certificate -Cert $cert -FilePath .\src\Package\msi-mcenter-lite.cer
+```
+
+---
+
+## 7. Build and install the package
+
+Right-click the packaging project → **Publish → Create App Packages** → **Sideloading**, x64 only.
+
+Then, from an elevated PowerShell:
+
+```powershell
+.\src\Package\Install.ps1
+```
+
+It finds the newest `.msixbundle`/`.msix` and `.cer` beside itself, imports the certificate to
+`LocalMachine\TrustedPeople` (never `Root`), stops any running helper, and installs.
+
+**It deliberately does not copy the helper anywhere or create a scheduled task.** The signed
+helper does both itself on first run. A PowerShell script that copies an executable into
+LocalAppData and registers a HIGHEST-privilege ONLOGON task is behaviourally indistinguishable
+from persistence malware — the reference project documents exactly that being quarantined as
+`Behavior:Win32/Persistence.A!ml`.
+
+---
+
+## 8. First run
+
+1. Open the Game Bar with **Win+G** and pin **M Center Lite**.
+2. The widget calls `FullTrustProcessLauncher`, which starts the helper from inside the package.
+3. That instance sees nothing deployed, relaunches itself elevated with `--setup` — **one UAC
+   prompt** — copies itself to `LocalCache\McenterLite\Helper\`, registers the scheduled task,
+   and exits.
+4. The task starts the deployed helper, which opens the pipe.
+5. The widget reconnects on its own. This can take a few seconds after the prompt is accepted.
+
+If the prompt is declined the widget says so and offers a retry; it does not re-prompt in a loop.
+
+Logs: `%LOCALAPPDATA%\Packages\<package family>\LocalCache\McenterLite\helper.log`
+
+---
+
+## What is most likely to break
+
+Ordered by risk. The first two are the ones that stop the build; the rest mostly misrender.
+
+### Game Bar API surface
+
+None of this could be checked against the real reference assemblies.
 
 1. **`XboxGameBarWidget` construction** in `App.xaml.cs`. The activation-args cast and constructor
-   signature vary across `Microsoft.Gaming.XboxGameBar` versions.
-2. **Widget visibility.** `MainWidget` uses `Window.Current.VisibilityChanged`, which is plain UWP
-   and certain to exist. `XboxGameBarWidget` also exposes its own visibility events; if the plain
-   one proves unreliable inside the Game Bar host, switch to those. This drives whether the helper
-   pushes fan telemetry, so getting it wrong costs battery, not correctness.
-3. **The two manifests.** `src/Widget/Package.appxmanifest` is minimal and exists only so the
-   widget project builds standalone. `src/Package/Package.appxmanifest` is the one that ships and
-   declares the Game Bar extension plus the full-trust helper. Keep `Identity` and the
-   `Application Id` in sync.
-4. **Assets.** Neither manifest's referenced PNGs exist yet. Generate placeholders or the package
-   will not build:
-   `Assets\StoreLogo.png`, `Square150x150Logo.png`, `Square44x44Logo.png`,
-   `Wide310x150Logo.png`, `SplashScreen.png`.
-5. **The visual styling**, which is also unverified. Specifics below.
+   signature vary across `Microsoft.Gaming.XboxGameBar` versions. This is the single most likely
+   compile error.
+2. **The properties set in `ConfigureWidget`** — `MinWindowSize`, `MaxWindowSize`,
+   `HorizontalResizeSupported`, `VerticalResizeSupported`, `PinningSupported`,
+   `SettingsSupported`. Some are settable properties in some SDK versions and methods in others.
+3. **`VisibleChanged` and `RequestedOpacityChanged`** handler signatures.
+   `TypedEventHandler<XboxGameBarWidget, object>` is what the docs say; confirm against IntelliSense.
+4. **`RequestedOpacity`** arrived in SDK 5.3. The package reference is 7.3.2506120, so it should be
+   present — if it is not, that call is the first thing to drop.
 
-### Styling — what to check first
+### Manifest and project shape
+
+- **The two manifests.** `src/Widget/Package.appxmanifest` is minimal and exists only so the widget
+  project builds standalone. `src/Package/Package.appxmanifest` is the one that ships. Keep
+  `Identity` and the `Application Id` in sync between them.
+- **Window size is declared twice and they disagree.** The shipping manifest says min 380x420,
+  max 640x1080; `ConfigureWidget` sets min 320x320, max 560x1000. The manifest is the initial
+  declaration and the API overrides at runtime, so this is not fatal — but pick one and make them
+  agree once you have seen the widget at its minimum size.
+
+### Styling
 
 The palette and card styles in `App.xaml` are **deliberately self-contained** rather than built on
 WinUI's theme-resource keys (`CardBackgroundFillColorDefaultBrush` and friends). Those would be
@@ -130,63 +330,6 @@ It also removes a bug class: a `ComboBox` raises `SelectionChanged` while XAML a
 defaults during construction, which is exactly what `_applyingFromHelper` exists to suppress. A
 `Button` raises `Click` only when something clicks it.
 
-## Creating the packaging project
-
-Not created here, because a `.wapproj` cannot be authored blind with any confidence. On the VM:
-
-1. Add a **Windows Application Packaging Project** to the solution as `src/Package`.
-2. Add a reference from it to `McenterLite.Widget`.
-3. Replace its generated manifest with `src/Package/Package.appxmanifest`.
-4. Add the published helper output so it lands at `Helper\McenterLite.Helper.exe` inside the
-   package — that path is what the manifest's `windows.fullTrustProcess` extension names.
-
-Publish the helper self-contained first:
-
-```powershell
-dotnet publish src\Helper\McenterLite.Helper.csproj -c Release -r win-x64 --self-contained
-```
-
-## Signing and installing
-
-Sideloading needs a signed package and a trusted certificate.
-
-```powershell
-# One-off: create a self-signed certificate whose subject MATCHES the manifest Publisher exactly.
-New-SelfSignedCertificate -Type Custom -Subject "CN=msi-mcenter-lite" `
-  -KeyUsage DigitalSignature -FriendlyName "msi-mcenter-lite" `
-  -CertStoreLocation "Cert:\CurrentUser\My" `
-  -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
-```
-
-A mismatch between the certificate subject and the manifest `Publisher` is the most common cause
-of a package that builds but refuses to install.
-
-Then build the package in Visual Studio, and install with `src/Package/Install.ps1`.
-
-## What the installer does and does not do
-
-`Install.ps1` installs the package and nothing else. It does **not** copy the helper anywhere and
-does **not** create a scheduled task — the signed helper does both itself on first run, behind a
-single elevation prompt.
-
-That split is not stylistic. A PowerShell script that copies an executable into LocalAppData and
-then registers a HIGHEST-privilege ONLOGON task is behaviourally indistinguishable from
-persistence malware; the reference project documents that exact approach being detected as
-`Behavior:Win32/Persistence.A!ml` and having its helper quarantined. The same work done in-process
-by a signed binary is not that pattern.
-
-## First-run sequence to expect
-
-1. Open the Game Bar (`Win+G`), pin **M Center Lite**.
-2. The widget calls `FullTrustProcessLauncher`, which starts the helper from inside the package.
-3. That instance sees nothing deployed, relaunches itself elevated with `--setup` — **one UAC
-   prompt** — copies itself to `LocalCache\McenterLite\Helper\`, registers the scheduled task, and
-   exits.
-4. The task starts the deployed helper, which opens the pipe.
-5. The widget reconnects on its own. This can take a few seconds after the prompt is accepted.
-
-If the prompt is declined the widget says so and offers a retry; it does not re-prompt in a loop.
-
 ## Verifying on the VM before touching the Claw
 
 These are real tests even with no MSI hardware present:
@@ -218,3 +361,32 @@ Run the helper with `--fake-hardware` for everything above; simulated hardware r
 exercises the initial-focus fallback, since it has to skip the hidden cards.
 
 Logs: `%LOCALAPPDATA%\Packages\<package family>\LocalCache\McenterLite\helper.log`
+
+---
+
+## Troubleshooting
+
+Symptoms whose cause is not obvious from the message.
+
+| Symptom | Cause |
+|---|---|
+| VS reports the widget project as an **unsupported project type** | UWP workload not installed. It is not a missing-SDK error even though it reads like one. |
+| **"The project needs Windows SDK 10.0.26100"** | That exact SDK is missing. A newer one does not substitute — the version is pinned in the `.csproj`. |
+| Build fails on **`Any CPU`** | The project is x64-only by design. Switch the configuration. |
+| **`MakeAppx` fails naming a PNG** | Assets not generated. Run `New-PlaceholderAssets.ps1`, and copy the folder into the packaging project too. |
+| Package builds but **will not install** | Certificate subject does not match the manifest `Publisher` exactly. Both must be `CN=msi-mcenter-lite`. |
+| Package installs but **the widget never appears in the Game Bar** | The generated manifest was used instead of `src/Package/Package.appxmanifest`, so the `microsoft.gameBarUIExtension` registration is missing. |
+| Widget appears but says **"could not reach the helper"** forever | Either the helper is not at `Helper\McenterLite.Helper.exe` inside the package, or the elevation prompt was declined. Check `helper.log`. |
+| Widget renders but **every card is hidden** | Expected on a machine that is not a Claw 8 EX — `DeviceCaps.Supported` is false and hardware cards hide themselves. CPU boost and power mode should still show. |
+| **Cards appear, controls do nothing** | The pipe connected but the AppContainer cannot write. Check the `S-1-15-2-1` ACE in `PipeServer.BuildSecurity`. |
+| Widget crashes **immediately on open** | Almost certainly an unresolved `StaticResource`. Those are runtime failures, not build failures. |
+
+### Testing without a Claw
+
+Run the helper with `--fake-hardware` and every non-hardware layer becomes exercisable: IPC,
+clamping, the deployment flow, settings, uninstall restore. Simulated hardware reports
+`Supported=false`, so hardware cards stay hidden and nothing pretends to work.
+
+`Diagnostics/Test-Helper.ps1` drives the helper over the same pipe the widget uses, which is worth
+running **before** the widget works — if the script can talk to the helper and the widget cannot,
+the problem is in the widget or the AppContainer boundary, not in anything below it.
