@@ -73,6 +73,23 @@ namespace McenterLite.Widget.Ipc
             return true;
         }
 
+        /// <summary>
+        /// Re-fetches the whole snapshot, for when something changed more than it was asked to.
+        /// </summary>
+        /// <remarks>
+        /// Used after a performance-mode switch. MSI couples unrelated settings to the mode -
+        /// entering Endurance switches the LEDs off - so re-reading only the value that was
+        /// written would leave the widget showing state the device no longer holds. Cheaper to
+        /// re-sync everything than to model the blast radius of someone else's state machine.
+        /// </remarks>
+        public async Task RefreshAsync()
+        {
+            var reply = await _client.RequestAsync(Command.Get, Function.Snapshot).ConfigureAwait(false);
+            if (reply == null || reply.Cmd == Command.Error) return;
+
+            ApplySnapshot(reply.Value);
+        }
+
         /// <summary>Decodes a snapshot and replaces the cached state.</summary>
         internal void ApplySnapshot(string payload)
         {

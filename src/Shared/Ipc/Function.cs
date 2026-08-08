@@ -47,6 +47,16 @@ namespace McenterLite.Shared.Ipc
         /// <summary>Which backend applies TDP. See <see cref="TdpBackendKind"/>.</summary>
         TdpBackend = 12,
 
+        /// <summary>
+        /// MSI's performance mode. See <see cref="PerfMode"/>.
+        /// </summary>
+        /// <remarks>
+        /// Lives in the TDP group because it GATES the power limits: MSI only honours
+        /// <see cref="Pl1"/> and <see cref="Pl2"/> in <see cref="PerfMode.UserScenario"/>. In the
+        /// other modes MSI drives power itself and the sliders do nothing.
+        /// </remarks>
+        PerfMode = 13,
+
         // ── 2. Fan presets ───────────────────────────────────────────────────────
         /// <summary>Master switch. When false the firmware's own curve drives the fan.</summary>
         FanEnabled = 20,

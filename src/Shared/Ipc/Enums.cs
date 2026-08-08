@@ -1,6 +1,37 @@
 namespace McenterLite.Shared.Ipc
 {
     /// <summary>How TDP reaches the hardware. Resolved at runtime; see <see cref="Function.TdpBackend"/>.</summary>
+    /// <summary>
+    /// MSI's performance mode selector, as offered by MSI Center M.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// These ordinals are OURS, not MSI's. On device MSI stores 3 = Endurance, 4 = User Scenario,
+    /// 5 = AI Engine across three separate registry values that move together
+    /// (<c>Mode</c>, <c>ShiftMode</c>, <c>GamingEvent</c>) - the hardware layer owns that mapping.
+    /// Putting MSI's raw numbers on the wire would bake a firmware detail into a contract the
+    /// widget also speaks, and it would silently change meaning if MSI ever renumbered.
+    /// </para>
+    /// <para>
+    /// This matters more than usual because the mode <b>gates the power limits</b>: manual PL1/PL2
+    /// are only honoured in <see cref="UserScenario"/>.
+    /// </para>
+    /// </remarks>
+    public enum PerfMode
+    {
+        /// <summary>Battery-first. MSI manages power; manual limits are ignored.</summary>
+        Endurance = 0,
+
+        /// <summary>The only mode in which manual power limits apply.</summary>
+        UserScenario = 1,
+
+        /// <summary>MSI's automatic mode. Manual limits are ignored.</summary>
+        AiEngine = 2,
+
+        /// <summary>MSI reported a mode we do not recognise. Treated as "not User Scenario".</summary>
+        Unknown = 99,
+    }
+
     public enum TdpBackendKind
     {
         /// <summary>

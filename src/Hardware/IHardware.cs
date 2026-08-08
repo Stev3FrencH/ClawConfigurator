@@ -61,6 +61,21 @@ namespace McenterLite.Hardware
         /// Implementations must still read back rather than assume the write took.
         /// </summary>
         OpResult Apply(int pl1, int pl2);
+
+        /// <summary>MSI's current performance mode, which gates whether the limits are honoured.</summary>
+        bool TryReadMode(out PerfMode mode);
+
+        /// <summary>
+        /// Switches MSI's performance mode.
+        /// </summary>
+        /// <remarks>
+        /// Exposed as a control of its own rather than something applied silently behind a power
+        /// limit. Only <see cref="PerfMode.UserScenario"/> honours manual limits, so the user needs
+        /// to be able to see which mode they are in and change it deliberately - a hidden switch
+        /// would also move settings that have nothing to do with power, since mode changes affect
+        /// lighting too.
+        /// </remarks>
+        OpResult ApplyMode(PerfMode mode);
     }
 
     /// <summary>The EC fan curve, exposed only as a small fixed set of presets.</summary>

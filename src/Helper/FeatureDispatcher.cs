@@ -85,6 +85,11 @@ namespace McenterLite.Helper
                 case Function.TdpBackend:
                     return PipeEnvelope.FromEnum(_hw.Tdp.Backend);
 
+                case Function.PerfMode:
+                    return _hw.Tdp.TryReadMode(out var perfMode)
+                        ? PipeEnvelope.FromEnum(perfMode)
+                        : null;
+
                 case Function.FanEnabled:
                     return _hw.Fan.TryReadState(out var fanEnabledState)
                         ? PipeEnvelope.FromBool(fanEnabledState.ControlEnabled)
@@ -161,6 +166,13 @@ namespace McenterLite.Helper
                 case Function.Pl1:
                 case Function.Pl2:
                     return SetTdp(request);
+
+                case Function.PerfMode:
+                    // Switching mode changes what MSI honours, and it also moves settings that
+                    // have nothing to do with power - entering Endurance switches the LEDs off.
+                    // The widget re-reads from the snapshot rather than assuming only this changed.
+                    return Apply(request, _hw.Tdp.ApplyMode(request.AsEnum(PerfMode.UserScenario)),
+                        () => ReadValue(Function.PerfMode));
 
                 case Function.FanEnabled:
                     return Apply(request, _hw.Fan.SetEnabled(request.AsBool()), () =>
@@ -459,6 +471,7 @@ namespace McenterLite.Helper
             Function.Pl1,
             Function.Pl2,
             Function.TdpBackend,
+            Function.PerfMode,
             Function.FanEnabled,
             Function.FanPreset,
             Function.FanState,

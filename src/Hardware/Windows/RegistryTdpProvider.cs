@@ -42,13 +42,23 @@ namespace McenterLite.Hardware.Windows
         private const string Pl1Dc = "ManualPL1DC";
         private const string Pl2Dc = "ManualPL2DC";
 
+        // MSI's mode is not one value but three that move together. Decoded from the mode
+        // transcripts, verified by a full round trip through all three modes.
         private const string ModeValue = "Mode";
+        private const string ShiftModeValue = "ShiftMode";
+        private const string GamingEventValue = "GamingEvent";
 
         /// <summary>
-        /// The performance mode in which MSI honours the manual limits. Decoded from the mode
-        /// transcripts: 3 = Endurance, 4 = User Scenario, 5 = AI Engine.
+        /// MSI's raw triples, indexed by our <see cref="PerfMode"/>.
         /// </summary>
-        private const int ModeUserScenario = 4;
+        /// <remarks>
+        /// All three are written together because all three moved together in every captured
+        /// transition. Writing only <c>Mode</c> would leave MSI's model internally inconsistent,
+        /// and there is no evidence it would be noticed at all.
+        /// </remarks>
+        private static readonly (int Mode, int ShiftMode, int GamingEvent) EnduranceTriple = (3, 3, 1);
+        private static readonly (int Mode, int ShiftMode, int GamingEvent) UserScenarioTriple = (4, 6, 4);
+        private static readonly (int Mode, int ShiftMode, int GamingEvent) AiEngineTriple = (5, 2, 2);
 
         private readonly string _unavailableReason;
 
@@ -142,44 +152,97 @@ namespace McenterLite.Hardware.Windows
                     + "MSI Center may have overwritten them.");
             }
 
-            // Deliberately reported rather than corrected.
-            //
-            // Manual limits are only expected to be honoured in User Scenario mode; the other two
-            // modes are MSI driving power itself. We could force Mode=4 and make the slider always
-            // "work", but that silently overrides a choice the user made in MSI Center, and it has
-            // side effects beyond power - entering Endurance also switches the LEDs off, so the
-            // reverse is likely true too. Telling the truth is better than a hidden mode change.
-            int mode = ReadMode();
-            if (mode >= 0 && mode != ModeUserScenario)
+            // Reported, not corrected. The mode is a control of its own (see ApplyMode), so the
+            // user can switch to User Scenario deliberately rather than having us do it behind a
+            // slider - which would also move settings unrelated to power, since mode changes
+            // affect lighting too.
+            if (TryReadMode(out var mode) && mode != PerfMode.UserScenario)
             {
                 return OpResult.Fail(
-                    $"Saved {pl1}/{pl2} W, but MSI Center is in {DescribeMode(mode)} mode and is "
-                    + "managing power itself. Switch it to User Scenario for these limits to take effect.");
+                    $"Saved {pl1}/{pl2} W, but MSI Center is in {Describe(mode)} mode and is managing "
+                    + "power itself. Switch to User Scenario for these limits to take effect.");
             }
 
             return OpResult.Success();
         }
 
-        /// <summary>The current MSI performance mode, or -1 if it cannot be read.</summary>
-        private static int ReadMode()
+        public bool TryReadMode(out PerfMode mode)
         {
+            mode = PerfMode.Unknown;
+            if (!Available) return false;
+
             try
             {
                 using var key = OpenRead();
-                return key?.GetValue(ModeValue) is int mode ? mode : -1;
+                if (key?.GetValue(ModeValue) is not int raw) return false;
+
+                mode = raw switch
+                {
+                    3 => PerfMode.Endurance,
+                    4 => PerfMode.UserScenario,
+                    5 => PerfMode.AiEngine,
+                    _ => PerfMode.Unknown,
+                };
+                return true;
             }
             catch (Exception)
             {
-                return -1;
+                return false;
             }
         }
 
-        private static string DescribeMode(int mode) => mode switch
+        public OpResult ApplyMode(PerfMode mode)
         {
-            3 => "Endurance",
-            4 => "User Scenario",
-            5 => "AI Engine",
-            _ => $"an automatic (mode {mode})",
+            if (!Available) return OpResult.Unavailable(_unavailableReason);
+
+            if (mode == PerfMode.Unknown)
+                return OpResult.Fail("Cannot switch to an unknown performance mode.");
+
+            var triple = mode switch
+            {
+                PerfMode.Endurance => EnduranceTriple,
+                PerfMode.AiEngine => AiEngineTriple,
+                _ => UserScenarioTriple,
+            };
+
+            try
+            {
+                using var key = OpenWrite();
+                if (key == null)
+                {
+                    return OpResult.Fail(
+                        "Could not open MSI Center's key for writing. The helper needs to run elevated.");
+                }
+
+                key.SetValue(ModeValue, triple.Mode, RegistryValueKind.DWord);
+                key.SetValue(ShiftModeValue, triple.ShiftMode, RegistryValueKind.DWord);
+                key.SetValue(GamingEventValue, triple.GamingEvent, RegistryValueKind.DWord);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return OpResult.Fail(
+                    "Access denied writing MSI Center's key. The helper needs to run elevated.");
+            }
+            catch (Exception ex)
+            {
+                return OpResult.Fail($"Could not change the performance mode: {ex.Message}");
+            }
+
+            if (!TryReadMode(out var actual))
+                return OpResult.Fail("Changed the performance mode but could not read it back.");
+
+            if (actual != mode)
+                return OpResult.Fail($"Performance mode did not stick: asked for {mode}, found {actual}.");
+
+            return OpResult.Success();
+        }
+
+        private static string Describe(PerfMode mode) => mode switch
+        {
+            PerfMode.Endurance => "Endurance",
+            PerfMode.UserScenario => "User Scenario",
+            PerfMode.AiEngine => "AI Engine",
+            _ => "an unrecognised",
         };
 
         // WOW6432Node is already in the path, so the 32-bit view must NOT be requested as well -

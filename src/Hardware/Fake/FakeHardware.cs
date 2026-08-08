@@ -96,8 +96,35 @@ namespace McenterLite.Hardware.Fake
             _caps.ClampPowerLimits(ref pl1, ref pl2);
             _pl1 = pl1;
             _pl2 = pl2;
+
+            // Models the real gate rather than always succeeding: MSI only honours manual limits
+            // in User Scenario. Without this the widget's mode gating is untestable off-device.
+            if (_mode != PerfMode.UserScenario)
+            {
+                return OpResult.Fail(
+                    $"Saved {pl1}/{pl2} W, but MSI Center is in {_mode} mode and is managing power "
+                    + "itself. Switch to User Scenario for these limits to take effect.");
+            }
+
             return OpResult.Success();
         }
+
+        public bool TryReadMode(out PerfMode mode)
+        {
+            mode = _mode;
+            return Available;
+        }
+
+        public OpResult ApplyMode(PerfMode mode)
+        {
+            if (!Available) return OpResult.Unavailable(UnavailableReason);
+            if (mode == PerfMode.Unknown) return OpResult.Fail("Cannot switch to an unknown performance mode.");
+
+            _mode = mode;
+            return OpResult.Success();
+        }
+
+        private PerfMode _mode = PerfMode.UserScenario;
     }
 
     internal sealed class FakeFan : IFanProvider

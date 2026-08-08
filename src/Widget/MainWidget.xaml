@@ -93,6 +93,23 @@
                             <TextBlock Grid.Column="1" Text="Power limits" Style="{StaticResource CardTitleStyle}" />
                         </Grid>
 
+                        <!-- Mode sits ABOVE the sliders because it gates them: MSI only honours
+                             manual limits in User Scenario. Order matches PerfMode's ordinals. -->
+                        <ComboBox x:Name="PerfModeCombo"
+                                  Style="{StaticResource CardComboStyle}"
+                                  Margin="0,8,0,0"
+                                  SelectionChanged="PerfModeCombo_SelectionChanged">
+                            <ComboBoxItem Content="Endurance" />
+                            <ComboBoxItem Content="User Scenario" />
+                            <ComboBoxItem Content="AI Engine" />
+                        </ComboBox>
+
+                        <TextBlock x:Name="PerfModeHint"
+                                   Style="{StaticResource HintStyle}"
+                                   Visibility="Collapsed"
+                                   Foreground="{StaticResource WarningBrush}"
+                                   Text="MSI is managing power in this mode. Switch to User Scenario to set limits yourself." />
+
                         <Grid Margin="0,8,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />

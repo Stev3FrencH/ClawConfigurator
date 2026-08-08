@@ -209,6 +209,7 @@ namespace McenterLite.Widget
 
         private void ApplyAllValues()
         {
+            ApplyValue(Function.PerfMode);
             ApplyValue(Function.Pl1);
             ApplyValue(Function.Pl2);
             ApplyValue(Function.FanEnabled);
@@ -229,6 +230,14 @@ namespace McenterLite.Widget
         {
             switch (function)
             {
+                case Function.PerfMode:
+                {
+                    var mode = (PerfMode)_connection.GetInt(
+                        Function.PerfMode, (int)PerfMode.UserScenario);
+                    ApplyPerfMode(mode);
+                    break;
+                }
+
                 case Function.Pl1:
                     Pl1Slider.Value = _connection.GetInt(Function.Pl1, (int)Pl1Slider.Minimum);
                     Pl1ValueText.Text = $"{(int)Pl1Slider.Value} W";
@@ -339,6 +348,42 @@ namespace McenterLite.Widget
 
         // ── User input ──────────────────────────────────────────────────────────
         // Every handler starts with the same guard. See _applyingFromHelper.
+
+        /// <summary>
+        /// Paints the mode dropdown and enables or disables the sliders it gates.
+        /// </summary>
+        /// <remarks>
+        /// The sliders are disabled rather than hidden in the non-manual modes. A control that
+        /// vanishes leaves the user with no way to understand why - a greyed one next to the mode
+        /// that greyed it explains itself.
+        /// </remarks>
+        private void ApplyPerfMode(PerfMode mode)
+        {
+            bool manual = mode == PerfMode.UserScenario;
+
+            // Unknown is not in the dropdown: MSI reported a mode we do not model, so leave the
+            // selection alone rather than misrepresenting it as one of the three we do.
+            if (mode != PerfMode.Unknown)
+                PerfModeCombo.SelectedIndex = (int)mode;
+
+            Pl1Slider.IsEnabled = manual;
+            Pl2Slider.IsEnabled = manual;
+            PerfModeHint.Visibility = manual ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        private async void PerfModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_applyingFromHelper) return;
+
+            var mode = (PerfMode)PerfModeCombo.SelectedIndex;
+            ApplyPerfMode(mode);
+            await SendAsync(Function.PerfMode, (int)mode);
+
+            // A mode change moves more than the mode: MSI couples lighting to it, and the power
+            // limits it reports can change too. Re-sync everything rather than guessing the blast
+            // radius of someone else's state machine.
+            await _connection.RefreshAsync();
+        }
 
         private async void Pl1Slider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {

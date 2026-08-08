@@ -135,8 +135,15 @@ its starting number.
    the manual power limits — they persist underneath it. But "User Scenario" is evidently the mode
    in which MSI *honours* them; Endurance and AI Engine are MSI driving the limits itself. So
    **setting `ManualPL*` while the device is in AI Engine or Endurance most likely does nothing
-   visible**, and any TDP feature has to assert `Mode = 4` first or explain why the slider had no
-   effect. Unverified, but it is the obvious reading and it is cheap to test.
+   visible**. Unverified, but it is the obvious reading.
+
+   **How the app handles it:** the mode is exposed as its own control above the power sliders, and
+   the sliders are disabled in the two automatic modes with a line saying why. Neither forcing
+   `Mode = 4` behind a slider nor merely failing after the fact — the precondition is made visible
+   and the user changes it deliberately. Writing the mode writes **all three** values
+   (`Mode`, `ShiftMode`, `GamingEvent`), because all three moved together in every transition and
+   there is no evidence a partial write is noticed. **Still to verify on device: that writing them
+   actually switches the mode.** Only reading was confirmed.
 
 2. **Changing mode changes the LED.** `LightingBrightness` went 1 → 0 entering Endurance and
    0 → 1 leaving it. So MSI couples lighting to performance mode, and our LED state can be

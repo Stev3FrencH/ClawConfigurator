@@ -175,6 +175,50 @@ namespace McenterLite.Shared.Tests
         }
     }
 
+    public class PerfModeTests
+    {
+        [Fact]
+        public void OrdinalsMatchTheWidgetDropdownOrder()
+        {
+            // The widget sets SelectedIndex from the enum value directly, so the dropdown order
+            // in MainWidget.xaml is part of this contract: Endurance, User Scenario, AI Engine.
+            Assert.Equal(0, (int)PerfMode.Endurance);
+            Assert.Equal(1, (int)PerfMode.UserScenario);
+            Assert.Equal(2, (int)PerfMode.AiEngine);
+        }
+
+        [Fact]
+        public void UnknownIsOutsideTheDropdownRange()
+        {
+            // Unknown must never be a selectable index, or a mode we do not model would be
+            // painted as one we do.
+            Assert.True((int)PerfMode.Unknown > 2);
+        }
+
+        [Theory]
+        [InlineData(PerfMode.Endurance)]
+        [InlineData(PerfMode.UserScenario)]
+        [InlineData(PerfMode.AiEngine)]
+        [InlineData(PerfMode.Unknown)]
+        public void RoundTripsThroughTheWire(PerfMode mode)
+        {
+            var wire = PipeEnvelope.FromEnum(mode);
+            var envelope = new PipeEnvelope(1, Command.Response, Function.PerfMode, wire);
+
+            Assert.Equal(mode, envelope.AsEnum(PerfMode.Unknown));
+        }
+
+        [Fact]
+        public void PerfModeHasItsOwnOrdinalInTheTdpGroup()
+        {
+            // Ordinals are never reused. PerfMode belongs to the TDP group because it gates it.
+            Assert.Equal(13, (int)Function.PerfMode);
+            Assert.NotEqual((int)Function.Pl1, (int)Function.PerfMode);
+            Assert.NotEqual((int)Function.Pl2, (int)Function.PerfMode);
+            Assert.NotEqual((int)Function.TdpBackend, (int)Function.PerfMode);
+        }
+    }
+
     public class ChargeLevelsTests
     {
         [Theory]
