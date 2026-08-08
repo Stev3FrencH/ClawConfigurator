@@ -425,38 +425,79 @@ $before = Invoke-AcpiMethod -MethodName $ReadMethod
 # can call directly instead of re-searching shapes. Everything below is a Get_, and every round
 # trip to the device is expensive, so one run gathers as much as possible.
 
-function Invoke-Package32 {
+function Get-MethodPackage {
     <#
-        Calls a method with the now-known shape and returns the returned Bytes array, or $null.
-        Never throws - a rejected sub-function is a measurement.
-    #>
-    param([string]$MethodName, [byte[]]$Payload)
+        The EmbeddedInstance parameter of one method: its name, the class it expects, and how
+        many bytes that class's array holds.
 
-    if (-not $EmbeddedClassName) { return $null }
+        Resolved PER METHOD. An earlier version reused the class taken from Get_MasterBattery for
+        every call, so any method wanting a different package size was handed a Package_32 and
+        reported as "rejected" - which is why every Get_EC read appeared to fail.
+    #>
+    param([string]$MethodName)
 
     $method = $class.CimClassMethods[$MethodName]
     if (-not $method) { return $null }
 
-    $parameterName = (Get-InputParameters -Method $method |
-                      Where-Object { $_.Qualifiers['EmbeddedInstance'] } |
-                      Select-Object -First 1).Name
-    if (-not $parameterName) { return $null }
+    $parameter = Get-InputParameters -Method $method |
+                 Where-Object { $_.Qualifiers['EmbeddedInstance'] } |
+                 Select-Object -First 1
+    if (-not $parameter) { return $null }
 
-    $buffer = New-Object byte[] 32
-    for ($i = 0; $i -lt $Payload.Count -and $i -lt 32; $i++) { $buffer[$i] = $Payload[$i] }
+    $className = $parameter.Qualifiers['EmbeddedInstance'].Value
+    $size = 32
+    $arrayProperty = 'Bytes'
 
     try {
-        $payloadInstance = New-CimInstance -Namespace $Namespace -ClassName $EmbeddedClassName `
-                               -Property @{ Bytes = $buffer } -ClientOnly -ErrorAction Stop
+        $decl = Get-CimClass -Namespace $Namespace -ClassName $className -ErrorAction Stop
+        $arrayDecl = $decl.CimClassProperties | Where-Object { $_.CimType -match 'Array' } | Select-Object -First 1
+
+        if ($arrayDecl) {
+            $arrayProperty = $arrayDecl.Name
+            # Size comes from the MAX qualifier where present, otherwise the Package_NN name.
+            $max = $arrayDecl.Qualifiers['MAX']
+            if ($max -and $max.Value) { $size = [int]$max.Value }
+            elseif ($className -match '_(\d+)$') { $size = [int]$Matches[1] }
+        }
+        elseif ($className -match '_(\d+)$') { $size = [int]$Matches[1] }
+    }
+    catch {
+        if ($className -match '_(\d+)$') { $size = [int]$Matches[1] }
+    }
+
+    return @{
+        ParameterName = $parameter.Name
+        ClassName     = $className
+        ArrayProperty = $arrayProperty
+        Size          = $size
+    }
+}
+
+function Invoke-Package {
+    <#
+        Calls a method with its own declared package shape and returns the returned bytes, or
+        $null. Never throws - a rejected sub-function is a measurement, not an error.
+    #>
+    param([string]$MethodName, [byte[]]$Payload)
+
+    $package = Get-MethodPackage -MethodName $MethodName
+    if (-not $package) { return $null }
+
+    $buffer = New-Object byte[] $package.Size
+    for ($i = 0; $i -lt $Payload.Count -and $i -lt $package.Size; $i++) { $buffer[$i] = $Payload[$i] }
+
+    try {
+        $payloadInstance = New-CimInstance -Namespace $Namespace -ClassName $package.ClassName `
+                               -Property @{ $package.ArrayProperty = $buffer } -ClientOnly -ErrorAction Stop
 
         $result = Invoke-CimMethod -InputObject $acpi -MethodName $MethodName `
-                      -Arguments @{ $parameterName = $payloadInstance } -ErrorAction Stop
+                      -Arguments @{ $package.ParameterName = $payloadInstance } -ErrorAction Stop
 
         $embeddedOut = $result.PSObject.Properties |
                        Where-Object { $_.Value -is [Microsoft.Management.Infrastructure.CimInstance] } |
                        Select-Object -First 1
 
-        if ($embeddedOut) { return $embeddedOut.Value.Bytes }
+        if ($embeddedOut) { return $embeddedOut.Value.($package.ArrayProperty) }
         return $null
     }
     catch {
@@ -464,11 +505,29 @@ function Invoke-Package32 {
     }
 }
 
+Set-Alias -Name Invoke-Package32 -Value Invoke-Package -Scope Script
+
 function Format-BytesInline {
     param([byte[]]$Bytes, [int]$Count = 16)
     if (-not $Bytes) { return '(no data)' }
     $take = @($Bytes[0..([Math]::Min($Count, $Bytes.Count) - 1)])
     return (($take | ForEach-Object { '{0:X2}' -f $_ }) -join ' ')
+}
+
+Write-Host ''
+Write-Host "[2c] Every $AcpiClass method and the package class it expects" -ForegroundColor Yellow
+Write-Host '     Different methods may take different package sizes. Reusing one size for all of' -ForegroundColor DarkGray
+Write-Host '     them is what made every Get_EC read look rejected in the previous run.' -ForegroundColor DarkGray
+
+foreach ($declared in ($class.CimClassMethods | Sort-Object Name)) {
+    $package = Get-MethodPackage -MethodName $declared.Name
+    if ($package) {
+        Write-Host ("     {0,-22} {1} [{2} bytes, .{3}]" -f
+            $declared.Name, $package.ClassName, $package.Size, $package.ArrayProperty)
+    }
+    else {
+        Write-Host ("     {0,-22} (no embedded-instance input)" -f $declared.Name) -ForegroundColor DarkGray
+    }
 }
 
 Write-Host ''
@@ -488,15 +547,36 @@ Write-Host '    Tests the msi-ec hypothesis directly: the charge threshold is re
 Write-Host '    EC 0xD7 (gen 2) or 0xEF (gen 1), holding percent|0x80. The input convention here is' -ForegroundColor DarkGray
 Write-Host '    itself a guess, so a rejected row means the guess was wrong, not that the EC is.' -ForegroundColor DarkGray
 
-if ($class.CimClassMethods['Get_EC']) {
-    foreach ($base in 0x00, 0xC0, 0xD0, 0xE0, 0xF0) {
-        $bytes = Invoke-Package32 -MethodName 'Get_EC' -Payload @([byte]$base)
-        $rendered = if ($bytes) { Format-BytesInline -Bytes $bytes } else { '(rejected)' }
-        Write-Host ("    base 0x{0:X2} -> {1}" -f $base, $rendered)
+foreach ($ecMethod in 'Get_EC', 'Get_EC2') {
+    if (-not $class.CimClassMethods[$ecMethod]) {
+        Write-Host "    ($ecMethod not present on this class)" -ForegroundColor DarkGray
+        continue
     }
-}
-else {
-    Write-Host '    (Get_EC not present on this class)' -ForegroundColor DarkGray
+
+    $package = Get-MethodPackage -MethodName $ecMethod
+    $shape = if ($package) { "$($package.ClassName), $($package.Size) bytes" } else { 'no embedded input' }
+    Write-Host "    $ecMethod  ($shape)" -ForegroundColor Cyan
+
+    foreach ($base in 0x00, 0x80, 0xC0, 0xD0, 0xE0, 0xF0) {
+        # The input convention is itself unknown, so try the plausible framings. Whichever
+        # returns non-zero data is the one this firmware uses.
+        $conventions = @(
+            @{ Label = 'addr@0';     Payload = @([byte]$base) }
+            @{ Label = 'addr@0,len'; Payload = @([byte]$base, [byte]32) }
+            @{ Label = 'addr@1';     Payload = @([byte]0, [byte]$base) }
+        )
+
+        foreach ($convention in $conventions) {
+            $bytes = Invoke-Package -MethodName $ecMethod -Payload $convention.Payload
+            if (-not $bytes) { continue }
+
+            $nonZero = @($bytes | Where-Object { $_ -ne 0 }).Count
+            if ($nonZero -eq 0) { continue }   # a successful call returning nothing is not data
+
+            Write-Host ("      0x{0:X2} [{1,-9}] {2}" -f $base, $convention.Label,
+                (Format-BytesInline -Bytes $bytes -Count 32))
+        }
+    }
 }
 
 Write-Host ''
