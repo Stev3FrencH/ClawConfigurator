@@ -402,6 +402,14 @@ namespace McenterLite.Widget
                     : $"Power limits via {DescribeBackend(caps.TdpBackend)}.";
             }
 
+            // Ranges come from the device, not the markup defaults. The helper is the only
+            // authority on what this firmware accepts, and a slider that can reach a value the
+            // helper will clamp is a slider that visibly snaps back.
+            Pl1Slider.Minimum = caps.MinPl1;
+            Pl1Slider.Maximum = caps.MaxPl1;
+            Pl2Slider.Minimum = caps.MinPl1 + caps.Pl2MinOffset;
+            Pl2Slider.Maximum = caps.MaxPl2;
+
             // Say the battery cap out loud. It is applied automatically and has no control of its
             // own, so without this the user sets 35 W, unplugs, and sees the device behave as
             // though the setting were ignored.
@@ -620,18 +628,67 @@ namespace McenterLite.Widget
             await _connection.RefreshAsync();
         }
 
+        /// <summary>
+        /// Guards the moment one power slider moves the other.
+        /// </summary>
+        /// <remarks>
+        /// Separate from <see cref="_applyingFromHelper"/> on purpose. That one means "this change
+        /// came from the device, do not echo it back"; this one means "this change came from the
+        /// OTHER slider, do not recurse". Sharing a flag would work today and mislead whoever next
+        /// has to reason about which suppression is in effect.
+        /// </remarks>
+        private bool _couplingLimits;
+
         private async void Pl1Slider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
-            if (_applyingFromHelper) return;
-            Pl1ValueText.Text = $"{(int)e.NewValue} W";
-            await SendAsync(Function.Pl1, (int)e.NewValue);
+            if (_applyingFromHelper || _couplingLimits) return;
+
+            int pl1 = (int)e.NewValue;
+            int pl2 = (int)Pl2Slider.Value;
+            _connection.Caps.CoupleFromPl1(ref pl1, ref pl2);
+
+            await ApplyCoupledLimitsAsync(pl1, pl2);
         }
 
         private async void Pl2Slider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
-            if (_applyingFromHelper) return;
-            Pl2ValueText.Text = $"{(int)e.NewValue} W";
-            await SendAsync(Function.Pl2, (int)e.NewValue);
+            if (_applyingFromHelper || _couplingLimits) return;
+
+            int pl1 = (int)Pl1Slider.Value;
+            int pl2 = (int)e.NewValue;
+            _connection.Caps.CoupleFromPl2(ref pl1, ref pl2);
+
+            await ApplyCoupledLimitsAsync(pl1, pl2);
+        }
+
+        /// <summary>
+        /// Paints a coupled pair and sends both halves.
+        /// </summary>
+        /// <remarks>
+        /// Both are always sent, whichever slider the user touched, because the coupling means one
+        /// gesture changes two values. Sending only the moved one would leave the helper holding a
+        /// pair the widget is no longer showing.
+        ///
+        /// PL1 goes first: the helper clamps PL2 to at least PL1 + the firmware headroom, so
+        /// raising PL1 before PL2 never transits through a pair that gets clamped and echoed back.
+        /// </remarks>
+        private async Task ApplyCoupledLimitsAsync(int pl1, int pl2)
+        {
+            _couplingLimits = true;
+            try
+            {
+                Pl1Slider.Value = pl1;
+                Pl2Slider.Value = pl2;
+                Pl1ValueText.Text = $"{pl1} W";
+                Pl2ValueText.Text = $"{pl2} W";
+            }
+            finally
+            {
+                _couplingLimits = false;
+            }
+
+            await SendAsync(Function.Pl1, pl1);
+            await SendAsync(Function.Pl2, pl2);
         }
 
         private async void FanEnabledToggle_Toggled(object sender, RoutedEventArgs e)

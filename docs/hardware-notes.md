@@ -175,16 +175,40 @@ mode id — do not treat it as one.
 AC and DC are **separate values**; MSI Center wrote both identically in every capture, so whether
 its own UI ever diverges them is unknown.
 
+### The two limits move as a pair
+
+The captured values are not four arbitrary points — they are the shape of MSI's own slider
+behaviour, and the app now reproduces it:
+
+| | AC | On battery |
+|---|---|---|
+| Minimum | 8 / 10 W | 8 / 10 W |
+| Coupled range | rises together, PL2 = PL1 + 2 | same |
+| Knee (PL1 maxed) | **35 / 37 W** | **25 / 27 W** |
+| PL2 alone, past the knee | up to **45 W** | up to **30 W** |
+| Headroom rule | PL2 ≥ PL1 + 2 | PL2 ≥ PL1 + 2 |
+
+Moving either slider moves the other by the same watt, so the pair walks up as one until PL1
+reaches its ceiling; past that PL1 is pinned and only PL2 continues. That is exactly the four
+captured pairs: `8/10`, `17/19`, `35/37` (the knee), and `35/45` (PL1 pinned, PL2 raised alone).
+
+Consequence worth knowing: lowering PL1 from its ceiling pulls a widened PL2 back down to
+PL1 + 2. That is what "they move together" means, and it is also the only way to close a gap
+once opened.
+
 **We deliberately do diverge them.** The firmware keeps a separate DC pair, so the battery limit
 is free to honour, and an 8-inch handheld running 35 W unplugged empties itself fast. The user's
 single choice is written to the AC pair as-is and to the DC pair under a lower ceiling —
 **25 W PL1 / 30 W PL2** (`DeviceCaps.MaxPl1Dc` / `MaxPl2Dc`). No second control, nothing to
 remember to switch when the charger comes out.
 
-The DC pair goes through the *same clamp* with lower ceilings rather than two `Math.Min` calls,
-so the `Pl2MinOffset` headroom rule is re-satisfied after capping — capping the two independently
-could produce a pair the firmware rejects. Both pairs are read back and verified after the write;
-the battery pair especially, since nothing on screen reflects it until the charger is unplugged.
+The DC pair **carries the gap down** rather than capping the two limits independently, so a
+coupled 35/37 becomes 25/27 — the same relationship at a lower ceiling — where independent capping
+would give 25/30 and hand the user boost headroom they never asked for. A deliberately widened
+pair keeps its gap until the PL2 ceiling takes it (35/45 → 25/30). The result then goes through
+the same clamp, so the headroom rule holds on battery too. Both pairs are read back and verified
+after the write; the battery pair especially, since nothing on screen reflects it until the
+charger is unplugged.
 
 ### Fan — the EX model is not the model we implemented
 

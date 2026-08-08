@@ -156,7 +156,71 @@ namespace McenterLite.Shared.Model
             // letting a bad capability value raise the limit on battery.
             int maxPl1 = Math.Min(MaxPl1Dc, MaxPl1);
             int maxPl2 = Math.Min(MaxPl2Dc, MaxPl2);
+
+            // Carry the GAP down rather than capping the two independently. A coupled 35/37 pair
+            // becomes 25/27 on battery - the same relationship at a lower ceiling - where capping
+            // separately would give 25/30 and silently hand the user boost headroom they never
+            // asked for. A deliberately widened pair keeps its gap until the PL2 ceiling takes it.
+            int gap = pl2 - pl1;
+            if (gap < Pl2MinOffset) gap = Pl2MinOffset;
+
+            if (pl1 > maxPl1) pl1 = maxPl1;
+            if (pl1 < MinPl1) pl1 = MinPl1;
+
+            pl2 = pl1 + gap;
+            if (pl2 > maxPl2) pl2 = maxPl2;
+
             Clamp(ref pl1, ref pl2, maxPl1, maxPl2);
+        }
+
+        /// <summary>
+        /// Recomputes the pair after the user moved the <b>PL1</b> slider.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The two limits move together. Raising PL1 by a watt raises PL2 by a watt, holding the
+        /// firmware's minimum headroom, so the pair walks up as one from 8/10 to
+        /// <see cref="MaxPl1"/>/<see cref="MaxPl1"/>+2 - 35/37 on AC, 25/27 on battery. Past that
+        /// PL1 is pinned and only PL2 can go further, which is exactly the shape MSI's own UI
+        /// produced in the captured transcripts.
+        /// </para>
+        /// <para>
+        /// Consequence worth knowing: lowering PL1 from its ceiling pulls a widened PL2 back down
+        /// to PL1 + 2. That is what "they move together" means, and it is also the only way to
+        /// close a gap once opened.
+        /// </para>
+        /// </remarks>
+        public void CoupleFromPl1(ref int pl1, ref int pl2)
+        {
+            if (pl1 < MinPl1) pl1 = MinPl1;
+            if (pl1 > MaxPl1) pl1 = MaxPl1;
+
+            pl2 = pl1 + Pl2MinOffset;
+            if (pl2 > MaxPl2) pl2 = MaxPl2;
+
+            Clamp(ref pl1, ref pl2, MaxPl1, MaxPl2);
+        }
+
+        /// <summary>
+        /// Recomputes the pair after the user moved the <b>PL2</b> slider.
+        /// </summary>
+        /// <remarks>
+        /// The mirror of <see cref="CoupleFromPl1"/>: PL1 follows PL2 down by the same headroom
+        /// until PL1 reaches its own ceiling, after which PL2 continues alone to
+        /// <see cref="MaxPl2"/>. So PL2 is the slider that reaches the top - 45 W on AC, 30 W on
+        /// battery - and PL1 simply stops.
+        /// </remarks>
+        public void CoupleFromPl2(ref int pl1, ref int pl2)
+        {
+            int minPl2 = MinPl1 + Pl2MinOffset;
+            if (pl2 < minPl2) pl2 = minPl2;
+            if (pl2 > MaxPl2) pl2 = MaxPl2;
+
+            pl1 = pl2 - Pl2MinOffset;
+            if (pl1 > MaxPl1) pl1 = MaxPl1;
+            if (pl1 < MinPl1) pl1 = MinPl1;
+
+            Clamp(ref pl1, ref pl2, MaxPl1, MaxPl2);
         }
 
         private void Clamp(ref int pl1, ref int pl2, int maxPl1, int maxPl2)

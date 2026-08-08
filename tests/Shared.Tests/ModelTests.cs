@@ -47,6 +47,9 @@ namespace McenterLite.Shared.Tests
         [InlineData(8, 10, 8, 10)]
         [InlineData(17, 19, 17, 19)]
         [InlineData(25, 30, 25, 30)]
+        // A coupled pair keeps its gap: the AC knee 35/37 becomes the DC knee 25/27.
+        [InlineData(35, 37, 25, 27)]
+        [InlineData(30, 32, 25, 27)]
         // Over PL2 only.
         [InlineData(20, 45, 20, 30)]
         // Over both: capped to the battery ceilings.
@@ -59,6 +62,102 @@ namespace McenterLite.Shared.Tests
 
             Assert.Equal(expectedPl1, pl1);
             Assert.Equal(expectedPl2, pl2);
+        }
+
+        [Theory]
+        // Walking PL1 up drags PL2 with it, holding the 2 W headroom.
+        [InlineData(8, 10)]
+        [InlineData(9, 11)]
+        [InlineData(17, 19)]
+        [InlineData(34, 36)]
+        // The knee: PL1 tops out at 35, PL2 at 37.
+        [InlineData(35, 37)]
+        public void CoupleFromPl1_DragsPl2AlongAtTheMinimumHeadroom(int pl1, int expectedPl2)
+        {
+            var caps = Claw8Ex();
+            int actualPl1 = pl1, actualPl2 = 0;
+            caps.CoupleFromPl1(ref actualPl1, ref actualPl2);
+
+            Assert.Equal(pl1, actualPl1);
+            Assert.Equal(expectedPl2, actualPl2);
+        }
+
+        [Theory]
+        // Below the knee PL1 follows PL2 down, staying 2 W under.
+        [InlineData(10, 8)]
+        [InlineData(19, 17)]
+        [InlineData(37, 35)]
+        // Past the knee PL1 is pinned and PL2 travels alone to its own ceiling.
+        [InlineData(38, 35)]
+        [InlineData(45, 35)]
+        public void CoupleFromPl2_PinsPl1AtItsCeiling(int pl2, int expectedPl1)
+        {
+            var caps = Claw8Ex();
+            int actualPl1 = 0, actualPl2 = pl2;
+            caps.CoupleFromPl2(ref actualPl1, ref actualPl2);
+
+            Assert.Equal(pl2, actualPl2);
+            Assert.Equal(expectedPl1, actualPl1);
+        }
+
+        [Fact]
+        public void Coupling_HoldsTheHeadroomAcrossTheWholeRange()
+        {
+            // Whichever slider is driven, and wherever it lands, the pair the user ends up with
+            // must be one the firmware accepts. This is the invariant the two sliders exist to
+            // preserve, so it is checked exhaustively rather than at a few sample points.
+            var caps = Claw8Ex();
+
+            for (int v = caps.MinPl1; v <= caps.MaxPl1; v++)
+            {
+                int pl1 = v, pl2 = 0;
+                caps.CoupleFromPl1(ref pl1, ref pl2);
+                Assert.True(pl2 - pl1 >= caps.Pl2MinOffset, $"PL1={v} gave {pl1}/{pl2}");
+                Assert.InRange(pl1, caps.MinPl1, caps.MaxPl1);
+                Assert.InRange(pl2, caps.MinPl1 + caps.Pl2MinOffset, caps.MaxPl2);
+            }
+
+            for (int v = caps.MinPl1 + caps.Pl2MinOffset; v <= caps.MaxPl2; v++)
+            {
+                int pl1 = 0, pl2 = v;
+                caps.CoupleFromPl2(ref pl1, ref pl2);
+                Assert.True(pl2 - pl1 >= caps.Pl2MinOffset, $"PL2={v} gave {pl1}/{pl2}");
+                Assert.InRange(pl1, caps.MinPl1, caps.MaxPl1);
+                Assert.InRange(pl2, caps.MinPl1 + caps.Pl2MinOffset, caps.MaxPl2);
+            }
+        }
+
+        [Fact]
+        public void Coupling_IsReversibleBelowTheKnee()
+        {
+            // Drive PL1 to 20, then drive PL2 back to what it produced: PL1 must return to 20.
+            // Below the knee the two sliders are two views of one value, and a round trip that
+            // drifted would let a user walk the pair somewhere by nudging back and forth.
+            var caps = Claw8Ex();
+
+            int pl1 = 20, pl2 = 0;
+            caps.CoupleFromPl1(ref pl1, ref pl2);
+
+            int backPl1 = 0, backPl2 = pl2;
+            caps.CoupleFromPl2(ref backPl1, ref backPl2);
+
+            Assert.Equal(20, backPl1);
+            Assert.Equal(pl2, backPl2);
+        }
+
+        [Fact]
+        public void CoupleFromPl1_ClosesAGapOpenedAtTheCeiling()
+        {
+            // 35/45 is the widened pair. Stepping PL1 down to 34 pulls PL2 back to 36 - the
+            // documented consequence of "the sliders move together", and the only way to close a
+            // gap once it has been opened.
+            var caps = Claw8Ex();
+
+            int pl1 = 34, pl2 = 45;
+            caps.CoupleFromPl1(ref pl1, ref pl2);
+
+            Assert.Equal(34, pl1);
+            Assert.Equal(36, pl2);
         }
 
         [Fact]
