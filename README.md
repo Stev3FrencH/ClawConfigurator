@@ -18,9 +18,9 @@ Eight features, deliberately few:
 
 | # | Feature | Status |
 |---|---|---|
-| 1 | TDP (PL1 / PL2) — via MSI Center's registry model | needs gate G1 (key layout) |
+| 1 | TDP (PL1 / PL2) — via MSI Center's registry model | ✅ implemented, unverified on device |
 | 2 | Fan presets — 3 fixed profiles, no custom curve | blocked on gate G2 |
-| 3 | Battery charge limit | blocked on gate G3 |
+| 3 | Battery charge limit — 60 / 80 / 100 % | ✅ implemented, unverified on device |
 | 4 | RGB LED | blocked on gate G4 |
 | 5 | Desktop / gamepad mode (firmware) | blocked on gate G5 |
 | 6 | CPU Boost | ✅ implemented |

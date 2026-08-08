@@ -290,8 +290,26 @@ namespace McenterLite.Helper
             _settings.CaptureOriginal(SettingsKeys.ChargeLimitEnabled, PipeEnvelope.FromBool(enabled));
             _settings.CaptureOriginal(SettingsKeys.ChargeLimitPercent, PipeEnvelope.FromInt(percent));
 
-            if (request.Fn == Function.ChargeLimitEnabled) enabled = request.AsBool(enabled);
-            else percent = Math.Max(60, Math.Min(100, request.AsInt(percent)));
+            if (request.Fn == Function.ChargeLimitEnabled)
+            {
+                enabled = request.AsBool(enabled);
+
+                // Re-enabling restores the user's last choice. The device stores only three
+                // states and "100%" IS the off state, so it cannot remember what limit was in
+                // force before it was switched off - without this, turning the limiter back on
+                // silently lands on the default instead of the 60% someone deliberately picked.
+                if (enabled)
+                {
+                    int remembered = _settings.GetInt(SettingsKeys.ChargeLimitPercent, percent);
+                    percent = ChargeLevels.Snap(remembered);
+                }
+            }
+            else
+            {
+                // Snapped, not clamped: the device holds one of three levels, and a value between
+                // them is not a smaller mistake than one outside the range.
+                percent = ChargeLevels.Snap(request.AsInt(percent));
+            }
 
             var result = _hw.ChargeLimit.Apply(enabled, percent);
             if (!result.Ok) return PipeEnvelope.Failure(request.Id, request.Fn, result.Error);

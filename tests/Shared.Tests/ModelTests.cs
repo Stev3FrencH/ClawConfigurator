@@ -1,5 +1,6 @@
 using McenterLite.Shared.Ipc;
 using McenterLite.Shared.Model;
+using System.Collections.Generic;
 using Xunit;
 
 namespace McenterLite.Shared.Tests
@@ -472,6 +473,67 @@ namespace McenterLite.Shared.Tests
             // Walking the slider's reachable positions must never move the value.
             for (int v = 60; v <= 100; v += 20)
                 Assert.Equal(v, ChargeLevels.Snap(v));
+        }
+
+        [Theory]
+        // Measured on device 2026-08-07. The numbering is INVERTED: a higher stored level is a
+        // LOWER charge limit. Getting this backwards charges the battery to the wrong level, so
+        // both directions are pinned explicitly rather than derived from an index.
+        [InlineData(100, "0")]
+        [InlineData(80, "1")]
+        [InlineData(60, "2")]
+        public void MsiLevel_EncodesTheInvertedMapping(int percent, string expected)
+        {
+            Assert.Equal(expected, ChargeLevels.ToMsiLevel(percent));
+        }
+
+        [Theory]
+        [InlineData("0", 100)]
+        [InlineData("1", 80)]
+        [InlineData("2", 60)]
+        [InlineData(" 1 ", 80)]
+        public void MsiLevel_Decodes(string level, int expected)
+        {
+            Assert.True(ChargeLevels.TryFromMsiLevel(level, out int percent));
+            Assert.Equal(expected, percent);
+        }
+
+        [Theory]
+        [InlineData("3")]
+        [InlineData("")]
+        [InlineData("80")]
+        [InlineData("abc")]
+        [InlineData(null)]
+        public void MsiLevel_RefusesAnythingUnrecognised(string level)
+        {
+            // Never guess. A level we do not know is a level whose meaning we do not know, and the
+            // consequence of assuming is a battery charged to the wrong point.
+            Assert.False(ChargeLevels.TryFromMsiLevel(level, out _));
+        }
+
+        [Fact]
+        public void MsiLevel_RoundTripsEveryLevel()
+        {
+            foreach (int percent in ChargeLevels.All())
+            {
+                Assert.True(ChargeLevels.TryFromMsiLevel(ChargeLevels.ToMsiLevel(percent), out int back));
+                Assert.Equal(percent, back);
+            }
+        }
+
+        [Fact]
+        public void MsiLevel_IsMonotonicallyDecreasing()
+        {
+            // The property that makes the mapping easy to get wrong, asserted directly: as the
+            // percentage goes up, the stored level goes DOWN.
+            var levels = ChargeLevels.All();   // ascending percent
+            var encoded = new List<int>();
+            foreach (int percent in levels)
+                encoded.Add(int.Parse(ChargeLevels.ToMsiLevel(percent)));
+
+            for (int i = 1; i < encoded.Count; i++)
+                Assert.True(encoded[i] < encoded[i - 1],
+                    $"{levels[i]}% encoded to {encoded[i]}, not below {levels[i - 1]}% -> {encoded[i - 1]}");
         }
 
         [Fact]

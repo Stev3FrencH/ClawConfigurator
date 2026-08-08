@@ -576,12 +576,28 @@ There is no fallback for this one. Without a driver-free method it is cut, not w
 | Parameter encoding | | |
 | Accepted range | | see result — it is not a range |
 
-**Result: GREEN, but it is not a percentage.**
+**Result: GREEN, but it is not a percentage. IMPLEMENTED.**
 `HKLM\SOFTWARE\WOW6432Node\MSI\MSI Center M\Battery`, value `BatteryLevel`, **REG_SZ**, with
 exactly three states: `"0"` = 100%, `"1"` = 80%, `"2"` = 60%. Confirmed by three transitions
 (100→80, 80→60, 60→100). `MSI_ACPI.Set_MasterBattery` is the direct alternative and may accept a
-wider range, unverified. Our 60–100 slider with 5% steps offers values the device has no way to
-represent.
+wider range, unverified.
+
+Two traps worth restating, because both fail quietly:
+
+- **The numbering is inverted.** A higher stored level is a *lower* charge limit. Encoding and
+  decoding live in `ChargeLevels.ToMsiLevel` / `TryFromMsiLevel` so they can be unit tested,
+  including a test asserting the mapping is monotonically *decreasing*.
+- **REG_SZ, not REG_DWORD**, unlike the power limits in the neighbouring key. Writing a DWORD
+  would change the value's type under MSI Center rather than its content.
+
+**"Charge to 100%" is the off state** — there is no separate enable flag on the device. So the
+helper remembers the user's last chosen limit in settings and restores it when the limiter is
+switched back on; the device cannot, because turning it off overwrites the only field that held it.
+
+**Still to verify on device:** that writing the value actually stops charging. Read-back proves the
+string landed, nothing more — the same open question as the power limits, and by the same logic
+`MSI_Center_M_Server_Battery` is the presumed applier. Test: set 60% while charged above that,
+plug in, confirm charging stops, then reboot and confirm it survived.
 
 ---
 

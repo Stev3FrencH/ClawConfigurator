@@ -76,5 +76,43 @@ namespace McenterLite.Shared.Model
             var levels = All();
             return (index >= 0 && index < levels.Length) ? levels[index] : Default;
         }
+
+        // ── MSI's on-device encoding ─────────────────────────────────────────────
+        //
+        // Kept here, rather than in the Windows-only hardware layer, for one reason: it is
+        // testable here. The mapping is INVERTED - a higher stored number means a LOWER limit -
+        // and it decides how far a real battery charges. That is not a fact to leave resting on
+        // careful reading of a file no test can reach.
+        //
+        // The widget never calls these; only the registry provider does.
+
+        /// <summary>MSI's <c>BatteryLevel</c> string for a percent. Measured on device 2026-08-07.</summary>
+        public static string ToMsiLevel(int percent)
+        {
+            switch (Snap(percent))
+            {
+                case Longevity: return "2";
+                case Balanced: return "1";
+                default: return "0";
+            }
+        }
+
+        /// <summary>
+        /// Decodes MSI's <c>BatteryLevel</c> string. Returns false for anything unrecognised -
+        /// guessing here would pick a charge limit for someone's battery.
+        /// </summary>
+        public static bool TryFromMsiLevel(string level, out int percent)
+        {
+            percent = Default;
+            if (level == null) return false;
+
+            switch (level.Trim())
+            {
+                case "0": percent = Full; return true;
+                case "1": percent = Balanced; return true;
+                case "2": percent = Longevity; return true;
+                default: return false;
+            }
+        }
     }
 }

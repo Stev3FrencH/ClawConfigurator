@@ -14,8 +14,8 @@ namespace McenterLite.Hardware.Windows
     /// than offering a control that does nothing.
     /// </para>
     /// <para>
-    /// Live today: power limits (registry), CPU boost and OS power mode (plain Windows APIs).
-    /// Pending: fan, charge limit, LED, firmware mouse mode, Intel GPU.
+    /// Live today: power limits and battery charge limit (registry), CPU boost and OS power mode
+    /// (plain Windows APIs). Pending: fan, LED, firmware mouse mode, Intel GPU.
     /// </para>
     /// </remarks>
     [SupportedOSPlatform("windows")]
@@ -50,7 +50,7 @@ namespace McenterLite.Hardware.Windows
 
                 // Not implemented yet. Reported as absent rather than broken.
                 HasFan = false,
-                HasChargeLimit = false,
+                HasChargeLimit = false,   // set below, once the provider has probed
                 HasLed = false,
                 HasHwMouse = false,
                 HasIgcl = false,
@@ -63,6 +63,9 @@ namespace McenterLite.Hardware.Windows
                 ? tdp.Backend
                 : TdpBackendKind.Unavailable;
 
+            var chargeLimit = new RegistryChargeLimitProvider();
+            Caps.HasChargeLimit = identity.IsClaw8Ex && chargeLimit.Available;
+
             // A device we do not recognise gets nothing, whatever the registry contains. Every
             // value above is calibrated to one model, and a wrong power limit on a different Claw
             // is a real write to real firmware.
@@ -71,7 +74,9 @@ namespace McenterLite.Hardware.Windows
                 : new UnavailableTdp("This device is not an MSI Claw 8 EX AI+.");
 
             Fan = new UnavailableFan("Fan control is not implemented yet.", ExDutyFloor);
-            ChargeLimit = new UnavailableChargeLimit("Charge limiting is not implemented yet.");
+            ChargeLimit = identity.IsClaw8Ex
+                ? (IChargeLimitProvider)chargeLimit
+                : new UnavailableChargeLimit("This device is not an MSI Claw 8 EX AI+.");
             Led = new UnavailableLed("Lighting is not implemented yet.");
             HwMouse = new UnavailableHwMouse("Desktop mouse mode is not implemented yet.");
             Igcl = new UnavailableIgcl("Intel graphics controls are not implemented yet.");
