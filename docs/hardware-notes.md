@@ -96,8 +96,41 @@ All under `HKLM\SOFTWARE\WOW6432Node\MSI\MSI Center M`.
 | LED brightness | `OsdEditor` | `LightingBrightness` | DWORD | `0` = off, `1` = on |
 
 Other values in `Component\User Scenario`, meaning not yet established: `Intelligent`, `MSI_CH`,
-`OverBoostSup` (=1), `OverBoost` (=0), `CurrentMode` (=2), `Mode` (=4), `ShiftMode` (=6),
-`CurrentShiftType` (=2), `PowerMode` (=`"AC"`), `AutoSwitchMode` (=`"0"`).
+`OverBoostSup` (=1), `OverBoost` (=0), `CurrentMode` (=2), `CurrentShiftType`,
+`PowerMode` (=`"AC"`), `AutoSwitchMode` (=`"0"`).
+
+### Performance mode — decoded
+
+`Diagnostics/transcripts-changing-device-modes.zip` captured all three transitions of MSI's
+performance-mode selector. Three values move together and agree across every transition, so the
+mapping is solid rather than inferred from a single sample:
+
+| MSI Center mode | `Mode` | `ShiftMode` | `GamingEvent` |
+|---|---|---|---|
+| Endurance | 3 | 3 | 1 |
+| **User Scenario** | **4** | **6** | **4** |
+| AI Engine | 5 | 2 | 2 |
+
+Verified round-trip: User Scenario → AI Engine → Endurance → User Scenario returns every value to
+its starting number.
+
+**Two consequences that matter more than the mapping itself.**
+
+1. **`ManualPL*` did not change during any mode transition.** The mode selector does not overwrite
+   the manual power limits — they persist underneath it. But "User Scenario" is evidently the mode
+   in which MSI *honours* them; Endurance and AI Engine are MSI driving the limits itself. So
+   **setting `ManualPL*` while the device is in AI Engine or Endurance most likely does nothing
+   visible**, and any TDP feature has to assert `Mode = 4` first or explain why the slider had no
+   effect. Unverified, but it is the obvious reading and it is cheap to test.
+
+2. **Changing mode changes the LED.** `LightingBrightness` went 1 → 0 entering Endurance and
+   0 → 1 leaving it. So MSI couples lighting to performance mode, and our LED state can be
+   overwritten by something that has nothing to do with lighting. Any LED feature needs to re-read
+   after a mode change rather than trusting its last write.
+
+`AIModeM` also moved (5 → 2) entering AI Engine. `CurrentShiftType` moved on every transition
+(1 → 2, then 2 → 3) without matching a mode, so it is probably a sequence counter rather than a
+mode id — do not treat it as one.
 
 > `ControlModeUserSet` exists in **both** `Component\User Scenario` (empty) and `OsdEditor`
 > (populated). The `OsdEditor` one is the live value. Writing the wrong one would look correct in
@@ -585,7 +618,7 @@ any table written. The escape hatch ships **before** any EC write.
 
 | Fact | Value |
 |---|---|
-| Services present | **`ipfsvc` only** — running, Automatic. No `dptftcs`, no `esifsvc`. |
+| Services present | **`ipfsvc` and `dptftcs`**, both Running/Automatic. No `esifsvc`. (`dptftcs` was absent from the first capture and present in the second, so it starts on demand — do not assume either state.) |
 | Fan participant device id | **`ACPI\INTC10D6\TFN1`** — measured. Not `INTC106A`, which was the carried-over guess. |
 | Effect of stopping them | |
 | Does the curve take effect with IPF running? | |
@@ -604,9 +637,12 @@ Ordered by how much they block. The first one decides the architecture.
    MSI Center's UI, which may write the registry *and* call the ACPI-WMI methods. If the registry
    is only persistence, writing it does nothing until MSI Center next reads it — and the whole
    "front-end for MSI Center" plan rests on it being a control surface.
-   **Test:** with MSI Center running, write `ManualPL1AC` directly, then watch for the EC to
-   follow (sustained load, clock plateau) without touching MSI's UI. Repeat with MSI Center's
-   UI closed but its services running. This is one `reg add` and a load test.
+
+   **Run `Diagnostics/Test-TdpRegistryApply.ps1` elevated.** It loads the CPU, drives PL1 to 8 W
+   and then 35 W by registry write alone, and reports whether the sustained clock followed. It
+   backs up and restores the original values in a `finally`, so an interrupted run is recoverable
+   with `-RestoreOnly`. **Put the device in User Scenario mode first** — the script warns if
+   `Mode` is not 4, because a run in AI Engine or Endurance would produce a false negative.
 
 2. **Are the ClawTweaks duty numbers and MSI's `Default_Fan` on the same scale?** ClawTweaks says
    raw EC byte 0–150 with 75 = half fan; MSI ships `{70,74,76,78,80,84}` as a factory curve. If
@@ -618,9 +654,11 @@ Ordered by how much they block. The first one decides the architecture.
    obvious reading, but `Default_Temp` and `Default_Fan` being identical in both halves means the
    capture cannot distinguish "two zones" from "one curve written twice".
 
-4. **What are `Mode` (=4), `CurrentMode` (=2), `ShiftMode` (=6), `CurrentShiftType` (=2)?**
-   These look like MSI's performance-profile selector, which may be a cleaner target than PL1/PL2
-   for a "lite" app, and may also overwrite `ManualPL*` when changed.
+4. ~~**What are `Mode`, `ShiftMode`, `CurrentShiftType`?**~~ **Answered** — see
+   [Performance mode](#performance-mode--decoded). `Mode`/`ShiftMode`/`GamingEvent` select
+   Endurance / User Scenario / AI Engine, and mode changes do **not** overwrite `ManualPL*`.
+   What remains: confirming that `ManualPL*` is only *honoured* in User Scenario (Mode 4), which
+   `Test-TdpRegistryApply.ps1` will show as a side effect.
 
 5. **Where does MysticLight keep LED effect and colour?** Not in this hive. Either its own store
    or straight to the device.

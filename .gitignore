@@ -54,3 +54,7 @@ packages/
 
 # Logs
 *.log
+
+# Restore point written by Diagnostics/Test-TdpRegistryApply.ps1. Machine-specific, and stale
+# copies are actively dangerous - they would restore another unit's power limits.
+Diagnostics/tdp-test-backup.json
