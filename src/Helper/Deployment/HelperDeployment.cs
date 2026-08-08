@@ -27,7 +27,6 @@ namespace McenterLite.Helper.Deployment
     internal static class HelperDeployment
     {
         private const string HelperExeName = "McenterLite.Helper.exe";
-        private const string VersionFileName = ".version";
 
         /// <summary>Where the deployed copy lives.</summary>
         public static string DeployedDirectory =>
@@ -36,7 +35,17 @@ namespace McenterLite.Helper.Deployment
         public static string DeployedExecutable =>
             Path.Combine(DeployedDirectory, HelperExeName);
 
-        /// <summary>This build's version, used to decide whether the deployed copy is stale.</summary>
+        /// <summary>
+        /// This build's version, for diagnostics only - see <see cref="Evaluate"/> for what
+        /// actually decides whether the deployed copy is stale.
+        /// </summary>
+        /// <remarks>
+        /// Not usable for that decision: nothing in this project bumps <c>AssemblyVersion</c>, so
+        /// this reports the same "1.0.0.0" for every build regardless of what actually changed.
+        /// Relying on it meant the deployed copy was silently never updated past the very first
+        /// install - an app update replaced the package, but the already-deployed helper kept
+        /// running unchanged because the version string it compared against never moved.
+        /// </remarks>
         public static string CurrentVersion =>
             Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0.0";
 
@@ -63,10 +72,10 @@ namespace McenterLite.Helper.Deployment
         {
             if (!File.Exists(DeployedExecutable)) return State.NotDeployed;
 
-            var deployedVersion = ReadDeployedVersion();
-            if (!string.Equals(deployedVersion, CurrentVersion, StringComparison.Ordinal))
+            var sourceExecutable = Path.Combine(AppContext.BaseDirectory, HelperExeName);
+            if (!IsSameBuild(sourceExecutable, DeployedExecutable))
             {
-                Log.Info($"Deployed version {deployedVersion ?? "(none)"} differs from {CurrentVersion}.");
+                Log.Info("Deployed copy differs from the packaged build.");
                 return State.VersionMismatch;
             }
 
@@ -124,8 +133,6 @@ namespace McenterLite.Helper.Deployment
 
                 Directory.CreateDirectory(DeployedDirectory);
                 CopyPayload(sourceDirectory, DeployedDirectory);
-
-                File.WriteAllText(Path.Combine(DeployedDirectory, VersionFileName), CurrentVersion);
 
                 if (!ScheduledTaskRegistrar.Register(DeployedExecutable)) return false;
                 if (!ScheduledTaskRegistrar.Start())
@@ -230,16 +237,32 @@ namespace McenterLite.Helper.Deployment
             }
         }
 
-        private static string ReadDeployedVersion()
+        /// <summary>
+        /// Whether the deployed copy is byte-identical to what's in the package right now.
+        /// </summary>
+        /// <remarks>
+        /// Used to be a version-string comparison (see <see cref="CurrentVersion"/>'s remarks for
+        /// why that never actually caught an update). Size plus last-write time is enough to catch
+        /// a real change without hashing a 60+ MB self-contained executable on every single start -
+        /// <c>File.Copy</c> preserves the source timestamp, so a genuinely current deployed copy
+        /// matches exactly and a stale one does not.
+        /// </remarks>
+        private static bool IsSameBuild(string sourcePath, string deployedPath)
         {
             try
             {
-                var path = Path.Combine(DeployedDirectory, VersionFileName);
-                return File.Exists(path) ? File.ReadAllText(path).Trim() : null;
+                var source = new FileInfo(sourcePath);
+                var deployed = new FileInfo(deployedPath);
+
+                return source.Exists && deployed.Exists
+                    && source.Length == deployed.Length
+                    && source.LastWriteTimeUtc == deployed.LastWriteTimeUtc;
             }
             catch (Exception)
             {
-                return null;
+                // Cannot tell - treat as stale. A needless redeploy is cheap; running a stale
+                // build silently is not.
+                return false;
             }
         }
     }
