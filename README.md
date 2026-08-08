@@ -92,17 +92,55 @@ export PATH="$HOME/.dotnet:$PATH"
 
 ## Installing
 
-There is no pre-built release yet — the widget has to be built, packaged and signed locally
-first. The full walkthrough (Visual Studio setup, compiling the widget, creating the packaging
-project, signing) is [`docs/building-the-widget.md`](docs/building-the-widget.md). Once a signed
-`.msix` exists under `src/Package/AppPackages/`, on the target device:
+There is no pre-built release yet — the widget has to be built, packaged and signed first, on
+whatever Windows machine has Visual Studio 2022 set up (see
+[`docs/building-the-widget.md`](docs/building-the-widget.md)). That machine does **not** have to
+be the Claw. Signing happens there too, using that machine's certificate private key — the Claw
+only ever needs the *output* and a copy of the *public* certificate, never the build tooling or
+the key itself.
+
+### Building on one machine, installing on the Claw
+
+Copy this to the Claw — a USB drive or network share is fine:
+
+- `src/Package/AppPackages/McenterLite.Package_<version>_x64_Test/` — the whole folder. It already
+  contains the signed `.msix` and the `Dependencies\x64\*.appx` files (VCLibs, the .NET runtime,
+  Microsoft.UI.Xaml) that `Install.ps1` needs.
+- `src/Package/Install.ps1`
+- `src/Package/msi-mcenter-lite.cer` — the exported *public* certificate. Never the private key,
+  which stays on the build machine.
+
+One-time, on the Claw itself (a machine setting, so it does not travel with the files above):
+enable **Developer Mode** — *Settings → Privacy & security → For developers*. Required for
+sideloading.
+
+Then, in an **elevated** PowerShell on the Claw, from wherever the folder above was copied to:
+
+```powershell
+.\Install.ps1 -PackagePath ".\McenterLite.Package_<version>_x64_Test\McenterLite.Package_<version>_x64.msix" -CertificatePath ".\msi-mcenter-lite.cer"
+```
+
+No .NET SDK, Visual Studio, or any build tooling is needed on the Claw — the helper is
+self-contained and the widget's framework dependencies come from the `Dependencies` folder copied
+alongside it.
+
+For every later fix: rebuild and sign on the build machine as before, copy the new
+`AppPackages/...` folder over, and rerun `Install.ps1` on the Claw —
+`-ForceUpdateFromAnyVersion` in the script replaces whatever is already installed.
+
+### Installing on the same machine you built on
+
+If Visual Studio is already on the target device, once a signed `.msix` exists under
+`src/Package/AppPackages/`:
 
 ```powershell
 .\src\Package\Install.ps1
 ```
 
 This imports the signing certificate to `LocalMachine\TrustedPeople`, stops any running instance,
-and installs the package. Then:
+and installs the package.
+
+### After installing
 
 1. Open the Game Bar (**Win+G**) and pin **M Center Lite**.
 2. Accept the one elevation prompt on first run — the helper uses it to deploy itself and
