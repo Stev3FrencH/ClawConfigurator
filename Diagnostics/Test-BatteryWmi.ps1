@@ -16,6 +16,11 @@
     Needs no compiled tool. WMI is native to PowerShell, so this does the same job as
     McenterLite.Probe.exe --battery without transferring a 68 MB binary to the device.
 
+    THE METHOD SIGNATURES ARE NOT KNOWN AHEAD OF TIME. These methods are generated from the DSDT
+    method each one fronts, so this script dumps their declared shape first and then tries several
+    argument shapes against the READ method, reporting each attempt. Learning the shape is the
+    point; a failed attempt is data, not an error, so no single failure stops the run.
+
     WORKING HYPOTHESIS, NOT YET CONFIRMED ON THIS DEVICE: the threshold byte is
     'percent -bor 0x80', where bit 7 is an enable/commit flag and bits 0-6 are the percentage.
     That comes from the msi-ec Linux driver, which documents MSI firmware's EC layout - a property
@@ -57,9 +62,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$Namespace  = 'root/wmi'
-$AcpiClass  = 'MSI_ACPI'
-$ReadMethod = 'Get_MasterBattery'
+$Namespace   = 'root/wmi'
+$AcpiClass   = 'MSI_ACPI'
+$ReadMethod  = 'Get_MasterBattery'
 $WriteMethod = 'Set_MasterBattery'
 
 # Bit 7 marks the threshold active; bits 0-6 carry the percentage.
@@ -82,7 +87,7 @@ function Show-Bytes {
     # Indexed, because finding WHICH index carries the value is the entire point.
     for ($offset = 0; $offset -lt $Bytes.Count; $offset += 16) {
         $end = [Math]::Min($offset + 15, $Bytes.Count - 1)
-        $slice = $Bytes[$offset..$end]
+        $slice = @($Bytes[$offset..$end])
 
         $hex = ($slice | ForEach-Object { '{0:X2}' -f $_ }) -join ' '
         $dec = ($slice | ForEach-Object { '{0,3}' -f $_ }) -join ' '
@@ -93,7 +98,7 @@ function Show-Bytes {
 }
 
 function Show-CimResult {
-    param($Result, [string]$Indent = '    ')
+    param($Result, [string]$Indent = '      ')
 
     if ($null -eq $Result) {
         Write-Host "$Indent(nothing returned)"
@@ -101,13 +106,11 @@ function Show-CimResult {
     }
 
     foreach ($prop in $Result.CimInstanceProperties) {
-        if ($prop.Name -eq 'ReturnValue' -and $prop.Value -eq 0) { continue }
-
         if ($prop.Value -is [byte[]]) {
             Write-Host "$Indent$($prop.Name) = byte[$($prop.Value.Count)]"
             Show-Bytes -Bytes $prop.Value -Indent "$Indent  "
         }
-        elseif ($prop.Value -is [int] -or $prop.Value -is [uint32] -or $prop.Value -is [byte]) {
+        elseif ($null -ne $prop.Value -and $prop.Value.GetType().IsValueType) {
             Write-Host ("{0}{1} = 0x{2:X} ({2})" -f $Indent, $prop.Name, $prop.Value)
         }
         else {
@@ -131,16 +134,15 @@ Write-Host ''
 # A plain WMI class with a readable property, so it needs no method call at all. If its value
 # tracks MSI Center's setting, the encoding is decoded without invoking anything.
 
-Write-Host 'MSI_Master_Battery (property read, no method call)' -ForegroundColor Yellow
+Write-Host '[1] MSI_Master_Battery (property read, no method call)' -ForegroundColor Yellow
 try {
-    $master = Get-CimInstance -Namespace $Namespace -ClassName 'MSI_Master_Battery' -ErrorAction Stop
-    foreach ($instance in @($master)) {
-        foreach ($prop in $instance.CimInstanceProperties) {
+    foreach ($batteryInstance in @(Get-CimInstance -Namespace $Namespace -ClassName 'MSI_Master_Battery' -ErrorAction Stop)) {
+        foreach ($prop in $batteryInstance.CimInstanceProperties) {
             if ($prop.Value -is [byte[]]) {
                 Write-Host "    $($prop.Name) = byte[$($prop.Value.Count)]"
                 Show-Bytes -Bytes $prop.Value -Indent '      '
             }
-            elseif ($prop.Name -notin @('InstanceName', 'Active')) {
+            elseif ($null -ne $prop.Value -and $prop.Value.GetType().IsValueType) {
                 Write-Host ("    {0} = 0x{1:X} ({1})" -f $prop.Name, $prop.Value)
             }
             else {
@@ -156,8 +158,11 @@ catch {
 Write-Host ''
 
 # ── 2. MSI_ACPI method signatures ───────────────────────────────────────────
+#
+# Printed BEFORE anything is called, and with every qualifier, because when an invocation fails
+# this is the output that explains why.
 
-Write-Host "$AcpiClass method signatures (declared shape, nothing called)" -ForegroundColor Yellow
+Write-Host "[2] $AcpiClass declared method shapes (nothing called)" -ForegroundColor Yellow
 
 try {
     $class = Get-CimClass -Namespace $Namespace -ClassName $AcpiClass -ErrorAction Stop
@@ -174,75 +179,141 @@ foreach ($name in @($ReadMethod, $WriteMethod)) {
         continue
     }
 
-    Write-Host "    $name"
+    Write-Host "    $name  (returns $($method.ReturnType))"
+
+    if ($method.Parameters.Count -eq 0) {
+        Write-Host '      (no declared parameters)'
+        continue
+    }
+
     foreach ($p in $method.Parameters) {
-        $direction = if ($p.Qualifiers['Out']) { 'OUT' } else { 'IN ' }
-        Write-Host "      $direction $($p.Name) : $($p.CimType)"
+        $quals = ($p.Qualifiers | ForEach-Object { $_.Name }) -join ','
+        Write-Host "      $($p.Name) : $($p.CimType)   [$quals]"
     }
 }
 
 Write-Host ''
 
-# ── 3. Call Get_MasterBattery ───────────────────────────────────────────────
+# ── 3. Call the READ method, trying each plausible argument shape ───────────
 
-$instance = Get-CimInstance -Namespace $Namespace -ClassName $AcpiClass -ErrorAction Stop |
-            Select-Object -First 1
+$acpi = @(Get-CimInstance -Namespace $Namespace -ClassName $AcpiClass -ErrorAction Stop) |
+        Select-Object -First 1
 
-if (-not $instance) { throw "$AcpiClass exists but reported no instances." }
+if (-not $acpi) { throw "$AcpiClass exists but reported no instances." }
 
-function Invoke-AcpiMethod {
-    param([string]$MethodName, [byte[]]$Payload)
+function Invoke-Attempt {
+    <#
+        One invocation attempt. Returns the result, or $null with the reason printed.
+        Never throws: a failed shape is a measurement, not an error.
+    #>
+    param([string]$MethodName, $Arguments, [string]$Label)
 
-    $method = $class.CimClassMethods[$MethodName]
-    if (-not $method) { throw "$AcpiClass has no method named $MethodName." }
-
-    # Build arguments from the DECLARED input parameters rather than a guessed name - these
-    # methods are generated from the DSDT method each one fronts, so their shape is exactly
-    # what this script is trying to establish.
-    $arguments = @{}
-    foreach ($p in $method.Parameters) {
-        if ($p.Qualifiers['Out'] -and -not $p.Qualifiers['In']) { continue }
-
-        if ($p.CimType -match 'Array') {
-            # MSI's ACPI buffer methods conventionally take a 32-byte package.
-            $buffer = New-Object byte[] 32
-            for ($i = 0; $i -lt $Payload.Count -and $i -lt 32; $i++) { $buffer[$i] = $Payload[$i] }
-            $arguments[$p.Name] = $buffer
+    try {
+        $result = if ($Arguments -and $Arguments.Count -gt 0) {
+            Invoke-CimMethod -InputObject $acpi -MethodName $MethodName -Arguments $Arguments -ErrorAction Stop
         }
         else {
-            $arguments[$p.Name] = if ($Payload.Count -gt 0) { [uint32]$Payload[0] } else { [uint32]0 }
+            Invoke-CimMethod -InputObject $acpi -MethodName $MethodName -ErrorAction Stop
         }
+
+        Write-Host "    [$Label] OK" -ForegroundColor Green
+        Show-CimResult -Result $result
+        return $result
+    }
+    catch {
+        Write-Host "    [$Label] $($_.Exception.Message)" -ForegroundColor DarkYellow
+        return $null
+    }
+}
+
+function Get-InputParameters {
+    <#
+        Strictly those marked [in]. Anything not explicitly an input is left alone - assigning to
+        an output parameter is what produced the InstanceHandle cast error this replaces.
+    #>
+    param($Method)
+    return @($Method.Parameters | Where-Object { $_.Qualifiers['In'] })
+}
+
+function Get-ArgumentShapes {
+    <#
+        Candidate argument sets for a method whose shape is not yet known, most likely first.
+        Instance/Reference parameters are skipped rather than synthesised - they cannot be
+        conjured from a byte payload, and guessing produced the original failure.
+    #>
+    param($Method, [byte[]]$Payload)
+
+    $shapes = @()
+    $inputs = Get-InputParameters -Method $Method
+
+    if ($inputs.Count -eq 0) {
+        return @(, @{ Label = 'no arguments'; Arguments = $null })
     }
 
-    if ($arguments.Count -gt 0) {
-        $shown = $arguments.GetEnumerator() | ForEach-Object {
-            if ($_.Value -is [byte[]]) {
-                "$($_.Key)=[$(($_.Value[0..7] | ForEach-Object { '{0:X2}' -f $_ }) -join ' ') ...]"
-            } else {
-                "$($_.Key)=$($_.Value)"
+    $unsupported = @($inputs | Where-Object { $_.CimType -match 'Instance|Reference' })
+    if ($unsupported.Count -gt 0) {
+        Write-Host ("    note: skipping parameter(s) of type Instance/Reference: {0}" -f
+            (($unsupported | ForEach-Object { $_.Name }) -join ', ')) -ForegroundColor DarkGray
+    }
+
+    $usable = @($inputs | Where-Object { $_.CimType -notmatch 'Instance|Reference' })
+
+    foreach ($size in 32, 8, 4) {
+        # NOT $args - that is an automatic variable in PowerShell functions.
+        $argSet = @{}
+        $applies = $false
+
+        foreach ($p in $usable) {
+            if ($p.CimType -match 'Array') {
+                $buffer = New-Object byte[] $size
+                for ($i = 0; $i -lt $Payload.Count -and $i -lt $size; $i++) { $buffer[$i] = $Payload[$i] }
+                $argSet[$p.Name] = $buffer
+                $applies = $true
+            }
+            else {
+                $argSet[$p.Name] = if ($Payload.Count -gt 0) { [uint32]$Payload[0] } else { [uint32]0 }
             }
         }
-        Write-Host "    in : $($shown -join ', ')" -ForegroundColor DarkGray
+
+        if ($argSet.Count -gt 0) { $shapes += @{ Label = "buffer $size"; Arguments = $argSet } }
+        if (-not $applies) { break }   # no array parameter, so buffer size is irrelevant
     }
 
-    return Invoke-CimMethod -InputObject $instance -MethodName $MethodName -Arguments $arguments
+    # Last resort: some ACPI methods accept a bare call despite declaring inputs.
+    $shapes += @{ Label = 'no arguments'; Arguments = $null }
+
+    return $shapes
 }
 
-Write-Host "$AcpiClass.$ReadMethod" -ForegroundColor Yellow
-try {
-    $before = Invoke-AcpiMethod -MethodName $ReadMethod -Payload @()
-    Show-CimResult -Result $before
+function Invoke-AcpiMethod {
+    param([string]$MethodName, [byte[]]$Payload = @())
+
+    $method = $class.CimClassMethods[$MethodName]
+    if (-not $method) {
+        Write-Warning "$AcpiClass has no method named $MethodName."
+        return $null
+    }
+
+    foreach ($shape in Get-ArgumentShapes -Method $method -Payload $Payload) {
+        $result = Invoke-Attempt -MethodName $MethodName -Arguments $shape.Arguments -Label $shape.Label
+        if ($null -ne $result) {
+            Write-Host "    -> shape that worked: $($shape.Label)" -ForegroundColor Green
+            return $result
+        }
+    }
+
+    Write-Warning "Every argument shape tried for $MethodName failed. The declared shape is in [2] above."
+    return $null
 }
-catch {
-    Write-Warning "$ReadMethod failed: $($_.Exception.Message)"
-    $before = $null
-}
+
+Write-Host "[3] $AcpiClass.$ReadMethod" -ForegroundColor Yellow
+$before = Invoke-AcpiMethod -MethodName $ReadMethod
 
 Write-Host ''
 Write-Host 'Expected if the percent|0x80 encoding holds:' -ForegroundColor DarkGray
 foreach ($level in 100, 80, 60) {
-    $byte = $level -bor $EnableBit
-    Write-Host ("  {0,3}% -> 0x{1:X2} ({1})" -f $level, $byte) -ForegroundColor DarkGray
+    $expected = $level -bor $EnableBit
+    Write-Host ("  {0,3}% -> 0x{1:X2} ({1})" -f $level, $expected) -ForegroundColor DarkGray
 }
 
 # ── 4. Optional write ───────────────────────────────────────────────────────
@@ -259,24 +330,20 @@ if (-not $PSBoundParameters.ContainsKey('SetLimit')) {
 $payload = [byte]($SetLimit -bor $EnableBit)
 
 Write-Host ''
-Write-Host ("Writing {0}% as 0x{1:X2} ({1}) via {2}.{3}" -f $SetLimit, $payload, $AcpiClass, $WriteMethod) -ForegroundColor Yellow
+Write-Host ("[4] Writing {0}% as 0x{1:X2} ({1}) via {2}.{3}" -f
+    $SetLimit, $payload, $AcpiClass, $WriteMethod) -ForegroundColor Yellow
 
-try {
-    $result = Invoke-AcpiMethod -MethodName $WriteMethod -Payload @($payload)
-    Show-CimResult -Result $result
-}
-catch {
-    throw "$WriteMethod failed: $($_.Exception.Message)"
+$written = Invoke-AcpiMethod -MethodName $WriteMethod -Payload @($payload)
+
+if ($null -eq $written) {
+    Write-Host ''
+    Write-Warning 'The write did not go through. Nothing was changed. Report section [2] above.'
+    return
 }
 
 Write-Host ''
-Write-Host "After ($ReadMethod)" -ForegroundColor Yellow
-try {
-    Show-CimResult -Result (Invoke-AcpiMethod -MethodName $ReadMethod -Payload @())
-}
-catch {
-    Write-Warning "$ReadMethod failed: $($_.Exception.Message)"
-}
+Write-Host "    After ($ReadMethod)" -ForegroundColor Yellow
+$after = Invoke-AcpiMethod -MethodName $ReadMethod
 
 Write-Host ''
 Write-Host 'A changed read-back only proves the value landed. What matters is whether charging' -ForegroundColor Cyan
