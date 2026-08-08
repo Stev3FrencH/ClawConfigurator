@@ -33,6 +33,13 @@
     Convenience: 60, 80 or 100. 100 switches the limiter off, because "charge to full" is how the
     device represents "no limit".
 
+.PARAMETER Restore
+    Put every value back to what it was before this app first touched it. The helper captures the
+    original on the first write of each setting, so this undoes a test session in one command.
+
+    Worth running after any testing that set a charge limit. That one is invisible day to day, so
+    a forgotten 60% limit turns up weeks later as "my battery stopped charging".
+
 .NOTES
     Run elevated. The pipe grants the current user full control, and the helper itself must be
     running - either from its scheduled task or started by hand:
@@ -53,7 +60,8 @@ param(
     [string]$Set,
     [string]$Value,
     [int]$Tdp,
-    [int]$ChargeLimit
+    [int]$ChargeLimit,
+    [switch]$Restore
 )
 
 $ErrorActionPreference = 'Stop'
@@ -224,6 +232,24 @@ try {
         Write-Host ''
         Write-Host 'This proves the value was stored. It does NOT prove charging stops -' -ForegroundColor DarkGray
         Write-Host 'for that, run Watch-Battery.ps1 with the charger connected.' -ForegroundColor DarkGray
+        if ($ChargeLimit -lt 100) {
+            Write-Host ''
+            Write-Host 'REMEMBER: this limit persists in the controller, across reboots and after' -ForegroundColor Yellow
+            Write-Host 'this app is gone. Undo it with:  .\Test-Helper.ps1 -Restore' -ForegroundColor Yellow
+        }
+        return
+    }
+
+    if ($Restore) {
+        Write-Host ''
+        Write-Host '=== Restoring captured original values ===' -ForegroundColor Cyan
+        Show-Reply 'Restore' (Invoke-Helper -Cmd $CmdSet -Function $Fn.PrepareForUninstall -Val '1')
+        Show-Reply 'Pl1' (Invoke-Helper -Cmd $CmdGet -Function $Fn.Pl1)
+        Show-Reply 'Pl2' (Invoke-Helper -Cmd $CmdGet -Function $Fn.Pl2)
+        Show-Reply 'ChargeLimitEnabled' (Invoke-Helper -Cmd $CmdGet -Function $Fn.ChargeLimitEnabled)
+        Show-Reply 'ChargeLimitPercent' (Invoke-Helper -Cmd $CmdGet -Function $Fn.ChargeLimitPercent)
+        Show-TdpRegistry
+        Show-BatteryRegistry
         return
     }
 

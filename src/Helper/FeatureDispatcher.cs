@@ -416,6 +416,31 @@ namespace McenterLite.Helper
                 if (!fanResult.Ok) problems.Add($"fan: {fanResult.Error}");
             }
 
+            // Power limits. Captured on the first write, restored here - without this the device
+            // keeps whatever limit was last set forever, including after an uninstall, and the
+            // user has no way back to the value they started with.
+            var originalPl1 = _settings.GetOriginal(SettingsKeys.Pl1);
+            var originalPl2 = _settings.GetOriginal(SettingsKeys.Pl2);
+            if (originalPl1 != null && originalPl2 != null
+                && int.TryParse(originalPl1, out int pl1) && int.TryParse(originalPl2, out int pl2)
+                && _hw.Tdp.Available)
+            {
+                _hw.Caps.ClampPowerLimits(ref pl1, ref pl2);
+                var r = _hw.Tdp.Apply(pl1, pl2);
+                if (!r.Ok) problems.Add($"power limits: {r.Error}");
+            }
+
+            // Charge limit. The one most worth restoring: it is invisible day to day, so a
+            // forgotten 60% limit is discovered weeks later as "my battery stopped charging".
+            var originalChargeOn = _settings.GetOriginal(SettingsKeys.ChargeLimitEnabled);
+            var originalChargePct = _settings.GetOriginal(SettingsKeys.ChargeLimitPercent);
+            if (originalChargeOn != null && _hw.ChargeLimit.Available)
+            {
+                int percent = int.TryParse(originalChargePct, out int p) ? p : ChargeLevels.Default;
+                var r = _hw.ChargeLimit.Apply(originalChargeOn == "1", percent);
+                if (!r.Ok) problems.Add($"charge limit: {r.Error}");
+            }
+
             var originalBoost = _settings.GetOriginal(SettingsKeys.CpuBoost);
             if (originalBoost != null)
             {

@@ -467,7 +467,13 @@ writes, confirming the service is the applier. No decompilation needed for any o
 | PL1 range accepted | | plan assumes 8–35 W |
 | PL2 range accepted | | plan assumes ≥ PL1+2, ≤ 45 W |
 
-**Result: GREEN, and the mechanism is confirmed working.**
+**Result: GREEN, and verified end to end through the helper (2026-08-07).**
+`Diagnostics/Test-Helper.ps1 -Tdp 25` over the named pipe: the helper wrote MSI's model, the
+values read back correctly, and `Test-TdpRegistryApply.ps1` independently confirmed the registry
+still moves the sustained clock. That closes the whole chain — widget protocol → helper →
+registry → MSI Center service → EC — with only the UWP layer untested.
+
+
 `HKLM\SOFTWARE\WOW6432Node\MSI\MSI Center M\Component\User Scenario`, values
 `ManualPL1AC` / `ManualPL2AC` / `ManualPL1DC` / `ManualPL2DC`, REG_DWORD, **watts 1:1**, confirmed
 at four points. Ranges and `Pl2MinOffset = 2` match `DeviceCaps` exactly.
