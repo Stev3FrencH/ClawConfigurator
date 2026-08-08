@@ -419,14 +419,95 @@ function Invoke-AcpiMethod {
 Write-Host "[3] $AcpiClass.$ReadMethod" -ForegroundColor Yellow
 $before = Invoke-AcpiMethod -MethodName $ReadMethod
 
+# ── 3b/4. Read-only survey ──────────────────────────────────────────────────
+#
+# The shape is known now (one EmbeddedInstance parameter carrying a 32-byte Package_32), so these
+# can call directly instead of re-searching shapes. Everything below is a Get_, and every round
+# trip to the device is expensive, so one run gathers as much as possible.
+
+function Invoke-Package32 {
+    <#
+        Calls a method with the now-known shape and returns the returned Bytes array, or $null.
+        Never throws - a rejected sub-function is a measurement.
+    #>
+    param([string]$MethodName, [byte[]]$Payload)
+
+    if (-not $EmbeddedClassName) { return $null }
+
+    $method = $class.CimClassMethods[$MethodName]
+    if (-not $method) { return $null }
+
+    $parameterName = (Get-InputParameters -Method $method |
+                      Where-Object { $_.Qualifiers['EmbeddedInstance'] } |
+                      Select-Object -First 1).Name
+    if (-not $parameterName) { return $null }
+
+    $buffer = New-Object byte[] 32
+    for ($i = 0; $i -lt $Payload.Count -and $i -lt 32; $i++) { $buffer[$i] = $Payload[$i] }
+
+    try {
+        $payloadInstance = New-CimInstance -Namespace $Namespace -ClassName $EmbeddedClassName `
+                               -Property @{ Bytes = $buffer } -ClientOnly -ErrorAction Stop
+
+        $result = Invoke-CimMethod -InputObject $acpi -MethodName $MethodName `
+                      -Arguments @{ $parameterName = $payloadInstance } -ErrorAction Stop
+
+        $embeddedOut = $result.PSObject.Properties |
+                       Where-Object { $_.Value -is [Microsoft.Management.Infrastructure.CimInstance] } |
+                       Select-Object -First 1
+
+        if ($embeddedOut) { return $embeddedOut.Value.Bytes }
+        return $null
+    }
+    catch {
+        return $null
+    }
+}
+
+function Format-BytesInline {
+    param([byte[]]$Bytes, [int]$Count = 16)
+    if (-not $Bytes) { return '(no data)' }
+    $take = @($Bytes[0..([Math]::Min($Count, $Bytes.Count) - 1)])
+    return (($take | ForEach-Object { '{0:X2}' -f $_ }) -join ' ')
+}
+
+Write-Host ''
+Write-Host "[3b] $ReadMethod sub-function probe (input byte 0 varied, read-only)" -ForegroundColor Yellow
+Write-Host '     A zeroed input returned 01 09, which is not a percentage - so byte 0 may select' -ForegroundColor DarkGray
+Write-Host '     what is being asked for. Watch for a row containing BC / D0 / E4.' -ForegroundColor DarkGray
+
+foreach ($selector in 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0xEF, 0xD7) {
+    $bytes = Invoke-Package32 -MethodName $ReadMethod -Payload @([byte]$selector)
+    $rendered = if ($bytes) { Format-BytesInline -Bytes $bytes } else { '(rejected)' }
+    Write-Host ("     in[0]=0x{0:X2} -> {1}" -f $selector, $rendered)
+}
+
+Write-Host ''
+Write-Host '[4] Get_EC block reads (read-only, address in input byte 0)' -ForegroundColor Yellow
+Write-Host '    Tests the msi-ec hypothesis directly: the charge threshold is reported to live at' -ForegroundColor DarkGray
+Write-Host '    EC 0xD7 (gen 2) or 0xEF (gen 1), holding percent|0x80. The input convention here is' -ForegroundColor DarkGray
+Write-Host '    itself a guess, so a rejected row means the guess was wrong, not that the EC is.' -ForegroundColor DarkGray
+
+if ($class.CimClassMethods['Get_EC']) {
+    foreach ($base in 0x00, 0xC0, 0xD0, 0xE0, 0xF0) {
+        $bytes = Invoke-Package32 -MethodName 'Get_EC' -Payload @([byte]$base)
+        $rendered = if ($bytes) { Format-BytesInline -Bytes $bytes } else { '(rejected)' }
+        Write-Host ("    base 0x{0:X2} -> {1}" -f $base, $rendered)
+    }
+}
+else {
+    Write-Host '    (Get_EC not present on this class)' -ForegroundColor DarkGray
+}
+
 Write-Host ''
 Write-Host 'Expected if the percent|0x80 encoding holds:' -ForegroundColor DarkGray
 foreach ($level in 100, 80, 60) {
     $expected = $level -bor $EnableBit
     Write-Host ("  {0,3}% -> 0x{1:X2} ({1})" -f $level, $expected) -ForegroundColor DarkGray
 }
+Write-Host 'If nothing shows those, the plain percentages 64 / 50 / 3C are worth looking for too.' -ForegroundColor DarkGray
 
-# ── 4. Optional write ───────────────────────────────────────────────────────
+# ── 5. Optional write ───────────────────────────────────────────────────────
 
 if (-not $PSBoundParameters.ContainsKey('SetLimit')) {
     Write-Host ''
@@ -440,7 +521,7 @@ if (-not $PSBoundParameters.ContainsKey('SetLimit')) {
 $payload = [byte]($SetLimit -bor $EnableBit)
 
 Write-Host ''
-Write-Host ("[4] Writing {0}% as 0x{1:X2} ({1}) via {2}.{3}" -f
+Write-Host ("[5] Writing {0}% as 0x{1:X2} ({1}) via {2}.{3}" -f
     $SetLimit, $payload, $AcpiClass, $WriteMethod) -ForegroundColor Yellow
 
 $written = Invoke-AcpiMethod -MethodName $WriteMethod -Payload @($payload)
