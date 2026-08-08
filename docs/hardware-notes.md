@@ -726,6 +726,53 @@ limit, and this is not — 100% → `9E`, 80% → `A0`, 60% → `9F`.
 > handed the wrong one. The EC hypothesis is **untested**, not refuted. Fixed by resolving the
 > package class per method.
 
+#### FOUND: the charge limit is `MSI_ACPI.Get_AP` / `Set_AP`, sub-function 0, byte 5
+
+**Measured on device 2026-08-08.** Method: a read-only sweep of every `Get_*` method across
+sub-functions 0–7, snapshotted at MSI Center's 100 / 80 / 60 settings and diffed
+(`Diagnostics/Sweep-MsiAcpi.ps1`, raw data in `Diagnostics/acpi-snapshots-plus-diff.zip`). Each
+sub-function was read twice per snapshot so that any byte which could not hold still within a
+snapshot was excluded as telemetry.
+
+| Fact | Value |
+|---|---|
+| Method pair | **`MSI_ACPI.Get_AP` / `Set_AP`** |
+| Parameter | one `[EmbeddedInstance, in, out]` `Data`, class `Package_32`, property `Bytes` |
+| Sub-function | **input byte 0 = `0x00`** |
+| Threshold location | **output byte 5** |
+| Encoding | **`percent \| 0x80`** — bit 7 set, bits 0–6 the percentage |
+| Confirmed values | 100% → `0xE4`, 80% → `0xD0`, 60% → `0xBC` |
+
+Full response package, constant except byte 5:
+
+```
+byte:  0  1  2  3  4  5   6..31
+      01 00 00 C6 80 XX   00 …
+```
+
+Bytes 3 and 4 (`0xC6`, `0x80`) are constant across all three settings and are presumed to identify
+the register being reported; byte 0 (`0x01`) is presumed a success flag. **None of that is
+verified** — only byte 5 is.
+
+**This confirms the `msi-ec` encoding on this device**, which had been carried as a hypothesis
+since 2026-08-08. Note the carrier is a WMI method, not a raw EC address we reach directly, so the
+`0xEF` / `0xD7` addresses from that driver remain irrelevant here — the encoding transferred, the
+addressing did not.
+
+**Why the earlier attempts missed it.** `Get_MasterBattery` is the obviously-named method and does
+not carry the limit at all. `Get_AP` is not a name anyone would guess for a battery setting, which
+is the argument for sweeping every method and diffing rather than reasoning about names.
+
+The other nine bytes the diff flagged are the device warming during the capture — `Get_Temperature`
+sub-function 0 byte 1 moved 52 → 54 → 55 and `Get_Thermal` sub-function 3 byte 7 moved 47 → 48 → 50,
+monotonic with elapsed time rather than with the setting. Do not re-chase them.
+
+**Still to establish: the WRITE format.** `Set_AP` takes the same `Package_32`, but whether the
+request mirrors the response layout is unverified. The response's byte 0 = `0x01` reads like a
+status flag, and a status flag on the way out need not mean the same thing on the way in. The
+defensible first attempt is read-modify-write: read sub-function 0, change byte 5 alone, send it
+back — never a hand-built buffer, which would risk zeroing bytes 3 and 4 whose meaning is unknown.
+
 ---
 
 ## Gate G4 — RGB LED
