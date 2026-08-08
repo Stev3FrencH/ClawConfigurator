@@ -91,6 +91,100 @@ namespace McenterLite.Probe.Commands
             return 0;
         }
 
+        /// <summary>
+        /// Dumps one method's declared parameter schema, WITHOUT calling it.
+        /// </summary>
+        /// <remarks>
+        /// <c>--wmi-classes</c> only lists method names; it says nothing about what a method takes
+        /// or returns. ACPI-WMI wrapper classes (like <c>MSI_ACPI</c>) generate their in/out
+        /// parameter shape from the DSDT method they front, so it has to be read off the class
+        /// metadata rather than guessed - a guessed argument count or type is a guess about what
+        /// gets written to the embedded controller.
+        /// </remarks>
+        public static int DescribeMethod(string[] args)
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                Console.Error.WriteLine("This command needs Windows.");
+                return 1;
+            }
+
+            if (args.Length < 2)
+            {
+                Console.Error.WriteLine("Usage: --wmi-method <ClassName> <MethodName>");
+                return 64;
+            }
+
+            var className = args[0];
+            var methodName = args[1];
+
+            var scope = new ManagementScope(@"\\.\root\wmi");
+            scope.Connect();
+
+            using var cls = new ManagementClass(scope, new ManagementPath(className), null);
+            try
+            {
+                cls.Get();
+            }
+            catch (ManagementException ex)
+            {
+                Console.Error.WriteLine($"Could not read class {className}: {ex.Message}");
+                return 1;
+            }
+
+            MethodData method = null;
+            foreach (MethodData m in cls.Methods)
+            {
+                if (string.Equals(m.Name, methodName, StringComparison.OrdinalIgnoreCase))
+                {
+                    method = m;
+                    break;
+                }
+            }
+
+            if (method == null)
+            {
+                Console.Error.WriteLine($"{className} has no method named {methodName}.");
+                return 1;
+            }
+
+            Console.WriteLine($"{className}.{method.Name}");
+            DumpParameters("IN ", method.InParameters);
+            DumpParameters("OUT", method.OutParameters);
+
+            return 0;
+        }
+
+        private static void DumpParameters(string label, ManagementBaseObject parameters)
+        {
+            if (parameters == null)
+            {
+                Console.WriteLine($"  {label}: (none)");
+                return;
+            }
+
+            bool any = false;
+            foreach (PropertyData p in parameters.Properties)
+            {
+                any = true;
+                string quals;
+                try
+                {
+                    quals = string.Join(",", p.Qualifiers.Cast<QualifierData>()
+                        .Select(q => $"{q.Name}={q.Value}"));
+                }
+                catch (Exception)
+                {
+                    quals = "";
+                }
+
+                Console.WriteLine($"  {label}: {p.Name} : {p.Type}"
+                    + (quals.Length > 0 ? $"  [{quals}]" : ""));
+            }
+
+            if (!any) Console.WriteLine($"  {label}: (none)");
+        }
+
         public static int DumpInstances(string[] args)
         {
             if (!OperatingSystem.IsWindows())

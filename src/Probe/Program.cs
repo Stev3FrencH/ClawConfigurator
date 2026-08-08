@@ -47,6 +47,7 @@ namespace McenterLite.Probe
                 case "set-cpu-boost": return Commands.PowerInfo.SetBoost(rest);
                 case "wmi-classes": return Commands.WmiExplorer.ListClasses(rest);
                 case "wmi-instances": return Commands.WmiExplorer.DumpInstances(rest);
+                case "wmi-method": return Commands.WmiExplorer.DescribeMethod(rest);
                 case "dump-acpi": return Commands.AcpiDump.Run(rest);
                 case "hid-list": return Commands.HidExplorer.List(rest);
 
@@ -70,6 +71,10 @@ READ
   --wmi-classes [filter]    List root\WMI classes with their ACPI GUID qualifier and methods.
                             The GUID is what links a class to a _WDG entry in the ACPI tables.
   --wmi-instances <class>   Dump every property of every instance of one class.
+  --wmi-method <class> <method>
+                            Dump one method's declared in/out parameter names and types,
+                            WITHOUT calling it. Use this before writing any code that calls a
+                            Set_* method - the argument shape has to be read, not guessed.
   --dump-acpi <dir>         Write DSDT and all SSDT tables as .aml for offline disassembly.
                             Then, on any machine:  iasl -d DSDT.aml
   --hid-list [vid]          Enumerate HID interfaces (default VID 0x0DB0) with report

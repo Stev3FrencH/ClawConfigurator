@@ -10,6 +10,10 @@
 > the ClawTweaks source and describes a **different model** (the Lunar Lake A2VM) wherever the two
 > disagree. Where they disagree, the disagreement is called out.
 >
+> **Update 2026-08-08:** an on-device A/B test overturned part of G3 — the registry write that
+> looked sufficient for the charge limit does not reliably apply. G3 moved from green to amber; see
+> its section below.
+>
 > This file is the single most important artifact in the repository. Everything the app does to
 > the hardware is implemented against what is written here, so an unverified guess recorded as a
 > fact becomes a wrong byte sent to a real embedded controller.
@@ -596,11 +600,10 @@ There is no fallback for this one. Without a driver-free method it is cut, not w
 | Parameter encoding | | |
 | Accepted range | | see result — it is not a range |
 
-**Result: GREEN, but it is not a percentage. IMPLEMENTED.**
+**Result: AMBER — the registry value is real and round-trips, but does not reliably drive the EC.**
 `HKLM\SOFTWARE\WOW6432Node\MSI\MSI Center M\Battery`, value `BatteryLevel`, **REG_SZ**, with
 exactly three states: `"0"` = 100%, `"1"` = 80%, `"2"` = 60%. Confirmed by three transitions
-(100→80, 80→60, 60→100). `MSI_ACPI.Set_MasterBattery` is the direct alternative and may accept a
-wider range, unverified.
+(100→80, 80→60, 60→100).
 
 Two traps worth restating, because both fail quietly:
 
@@ -614,10 +617,28 @@ Two traps worth restating, because both fail quietly:
 helper remembers the user's last chosen limit in settings and restores it when the limiter is
 switched back on; the device cannot, because turning it off overwrites the only field that held it.
 
-**Still to verify on device:** that writing the value actually stops charging. Read-back proves the
-string landed, nothing more — the same open question as the power limits, and by the same logic
-`MSI_Center_M_Server_Battery` is the presumed applier. Test: set 60% while charged above that,
-plug in, confirm charging stops, then reboot and confirm it survived.
+> **Answered 2026-08-08, and it overturns the assumption below: the registry write alone does NOT
+> reliably apply.** A/B tested on device: `BatteryLevel` set to the identical value two ways —
+> through the helper's registry write, and through MSI Center's own UI — read back identical
+> either way, but only the MSI-Center-driven change actually changed charging behaviour. The
+> helper's own write left the previous charging state in effect regardless of what the registry
+> now said. Most visible at `"0"` (100%, the "off" state): setting it through the widget did not
+> resume charging, while setting the same "0" through MSI Center did.
+>
+> This directly contradicts the "by the same logic `MSI_Center_M_Server_Battery` is the presumed
+> applier" assumption previously recorded here. That assumption was carried over from TDP by
+> analogy, not independently measured the way `Test-TdpRegistryApply.ps1` measured TDP — and unlike
+> TDP, it does not hold. Whatever MSI Center's own UI does beyond writing the registry value (most
+> likely a direct call through `MSI_ACPI.Set_MasterBattery`, the ACPI-WMI path the original
+> [desk-research table](#relationship-to-msi-center-m) always expected this feature to need) is
+> necessary, and the helper does not currently do it. `RegistryChargeLimitProvider` should be
+> treated as read/persistence-only until this is resolved, not as a working apply path.
+>
+> **Next step:** `MSI_ACPI.Set_MasterBattery` / `Get_MasterBattery`'s parameter schema is unknown -
+> the class and method names are known from desk research, but not their argument shape. Use the
+> new `--wmi-method MSI_ACPI Set_MasterBattery` Probe command (read-only — it dumps the method's
+> declared in/out parameters without calling it) to find that out before writing any code that
+> calls it.
 
 ---
 
@@ -645,12 +666,23 @@ The byte layout inside report `0x0F` is still unknown and is the actual work her
 | Zone ids | | |
 | Mode ids | | |
 
-**Result: AMBER.** Brightness on/off is at `OsdEditor\LightingBrightness` (DWORD, `0`/`1` only).
-**Effect and colour are not in this registry hive at all** — switching RGB profile produced no
-delta, so `MSI_Center_M_Server_MysticLight` keeps them elsewhere or writes the device directly.
-The vendor HID collection is present as `HID\VID_0DB0&PID_1901&MI_01`
-("HID-compliant vendor-defined device"), so the HID path from the desk research remains the plan.
-Report `0x0F` (64 bytes) is still unverified on this device.
+**Result: AMBER for mode/colour/effect, GREEN for on/off.** Brightness on/off is at
+`OsdEditor\LightingBrightness` (DWORD, `0`/`1` only). **Effect and colour are not in this registry
+hive at all** — switching RGB profile produced no delta, so `MSI_Center_M_Server_MysticLight` keeps
+them elsewhere or writes the device directly. The vendor HID collection is present as
+`HID\VID_0DB0&PID_1901&MI_01` ("HID-compliant vendor-defined device"), so the HID path from the
+desk research remains the plan for mode/colour/effect. Report `0x0F` (64 bytes) is still unverified
+on this device, and that work has not started.
+
+**Decided 2026-08-08: ship on/off now, scope mode/colour/effect out until report `0x0F` is
+decoded.** `RegistryLedProvider` (`src/Hardware/Windows/RegistryLedProvider.cs`) reads and writes
+`LightingBrightness` through the same mirror-and-read-back model already verified for TDP, fan mode
+and charge limit — no new mechanism, just the one lighting fact this hive actually holds. The
+widget's Lighting card is a single toggle rather than the mode/brightness controls it exposed
+before. Same caveat as the [performance mode](#performance-mode--decoded) section: MSI's own mode
+selector writes this same value (Endurance turns it off, leaving it turns it back on), so a read
+here can legitimately disagree with the toggle's last write — the widget re-syncs the whole
+snapshot after a `PerfMode` change rather than trusting a stale local value.
 
 ---
 
