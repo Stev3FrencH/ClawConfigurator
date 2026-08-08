@@ -1,8 +1,14 @@
 # Hardware notes — MSI Claw 8 EX AI+
 
-> **Status: on-device Phase 0 has NOT been run.** What exists below is desk research from the
-> ClawTweaks public repository — see [Desk research](#desk-research-clawtweaks-public-repo-2026-08-07).
-> Those facts narrow the search; they do not replace measurement on this device.
+> **Status: Phase 0 ran on the device on 2026-08-07.** `Diagnostics/device-report.txt` and
+> `Diagnostics/watch-msicenter-transcripts.zip` are the raw evidence, captured on a **fresh Windows
+> install with only MSI Center M present** — no ClawTweaks, so every change observed was made by
+> MSI's own software. **G1 is green. G3, G5 and G6 are green. G2 and G4 are partly answered.**
+>
+> Measured facts live in [Measured on device](#measured-on-device-2026-08-07) and **supersede**
+> the [desk research](#desk-research-clawtweaks-public-repo-2026-08-07) below, which was taken from
+> the ClawTweaks source and describes a **different model** (the Lunar Lake A2VM) wherever the two
+> disagree. Where they disagree, the disagreement is called out.
 >
 > This file is the single most important artifact in the repository. Everything the app does to
 > the hardware is implemented against what is written here, so an unverified guess recorded as a
@@ -19,20 +25,133 @@
    in an EC write.
 4. **Re-check after a BIOS update.** Record the BIOS version every fact was established against.
 
-## Device baseline
+## Measured on device (2026-08-07)
 
-Fill in from `Diagnostics\Get-DeviceReport.ps1`.
+Source: `Diagnostics/device-report.txt` (baseline sweep) and
+`Diagnostics/watch-msicenter-transcripts.zip` (before/after `HKLM\SOFTWARE\WOW6432Node\MSI`
+exports around one deliberate change each, made in MSI Center M's own UI).
 
-| Field | Value | Source |
+**Why this evidence is unusually strong.** The capture was taken on a clean Windows install with
+no ClawTweaks and no third-party tooling. Every delta below is MSI's own software changing MSI's
+own model — not a reimplementation's guess at it.
+
+### Baseline
+
+| Field | Value |
+|---|---|
+| Model / board | `Claw 8 EX AI+ CG3EM` / `MS-1T91` |
+| BIOS | `E1T91IMS.10A`, 2026-07-28 |
+| EC firmware | `1T91EMS1.10` (from `ECversion`) |
+| CPU | Intel Arc G3 Extreme, 14C/14T, 1.9 GHz |
+| GPU | Intel Arc B390, driver `32.0.101.8801` |
+| OS | Windows 11 build 26200 |
+| `ControlLib.dll` | **present**, `C:\Windows\System32`, v1.2.288.0 |
+| MSI Center M | running, with per-feature server processes |
+| Intel thermal | `ipfsvc` running; fan participant `ACPI\INTC10D6\TFN1` |
+
+### Two independent control surfaces
+
+The device exposes **both** of the paths this project was weighing, and they are not exclusive:
+
+**1. MSI Center M's registry model** — what its UI writes, and what its services then apply.
+Requires MSI Center M installed and running.
+
+**2. `MSI_ACPI`, a direct ACPI-WMI class** in `root\WMI`, GUID
+`{ABBC0F6E-8EA1-11d1-00A0-C90629100000}`, exposing paired get/set methods:
+
+```
+GetPackage/SetPackage  Get_EC/Set_EC        Get_BIOS/Set_BIOS      Get_SMBUS/Set_SMBUS
+Get_MasterBattery/Set_MasterBattery         Get_SlaveBattery/Set_SlaveBattery
+Get_Temperature/Set_Temperature             Get_Thermal/Set_Thermal
+Get_Fan/Set_Fan        Get_Device/Set_Device Get_Power/Set_Power   Get_Debug/Set_Debug
+Get_AP/Set_AP          Get_Data/Set_Data     Get_WMI               Get_PE/Set_PE
+Get_EC2                Get_BIOS_64/Set_BIOS_64                     Get_SMBUS_64/Set_SMBUS_64
+Get_Thermal_64/Set_Thermal_64
+```
+
+This is the driver-free EC path the project was designed around, and it is **present and
+enumerable without MSI Center**. Sibling classes: `MSI_AP`, `MSI_CPU`, `MSI_Device`, `MSI_Event`,
+`MSI_Master_Battery`, `MSI_Power`, `MSI_Slave_Battery`, `MSI_Software`, `MSI_System`, `MSI_VGA`.
+
+> **Not yet established: whether writing the registry alone applies anything.** MSI Center's UI
+> may write the registry *and separately* call the ACPI-WMI methods, in which case the registry is
+> persistence, not a control surface, and writing it by itself does nothing until MSI Center next
+> reads it. Every transcript captured a UI-driven change, so it cannot distinguish the two. **This
+> is the single most important remaining experiment** — see [Open questions](#open-questions).
+
+### Registry map
+
+All under `HKLM\SOFTWARE\WOW6432Node\MSI\MSI Center M`.
+
+| Setting | Subkey | Value | Type | Observed |
+|---|---|---|---|---|
+| PL1 on AC | `Component\User Scenario` | `ManualPL1AC` | DWORD | watts, 1:1 |
+| PL2 on AC | `Component\User Scenario` | `ManualPL2AC` | DWORD | watts, 1:1 |
+| PL1 on DC | `Component\User Scenario` | `ManualPL1DC` | DWORD | watts, 1:1 |
+| PL2 on DC | `Component\User Scenario` | `ManualPL2DC` | DWORD | watts, 1:1 |
+| Fan mode | `Component\User Scenario` | `Fan` | DWORD | `1` = Auto, `3` = Advanced |
+| Fan curve | `Component\User Scenario` | `Default_Temp`, `Default_Fan`, `High_Fan` | SZ | see below |
+| Charge limit | `Battery` | `BatteryLevel` | **SZ** | `"0"`=100%, `"1"`=80%, `"2"`=60% |
+| Controller mode | `OsdEditor` | `ControlModeUserSet` | SZ | `"XInput"` / `"Desktop"` |
+| LED brightness | `OsdEditor` | `LightingBrightness` | DWORD | `0` = off, `1` = on |
+
+Other values in `Component\User Scenario`, meaning not yet established: `Intelligent`, `MSI_CH`,
+`OverBoostSup` (=1), `OverBoost` (=0), `CurrentMode` (=2), `Mode` (=4), `ShiftMode` (=6),
+`CurrentShiftType` (=2), `PowerMode` (=`"AC"`), `AutoSwitchMode` (=`"0"`).
+
+> `ControlModeUserSet` exists in **both** `Component\User Scenario` (empty) and `OsdEditor`
+> (populated). The `OsdEditor` one is the live value. Writing the wrong one would look correct in
+> a registry diff and do nothing.
+
+### Units and ranges — confirmed at four points
+
+`ManualPL*` are **watts, one-to-one, no scaling**. Four independent captures agree:
+
+| Capture | PL1 | PL2 |
 |---|---|---|
-| `Win32_ComputerSystemProduct.Vendor` | | |
-| `Win32_ComputerSystemProduct.Name` | | |
-| `Win32_BaseBoard.Product` | | expected `1T91` |
-| BIOS version / date | | |
-| CPU | | |
-| GPU + driver version | | |
-| `ControlLib.dll` present | | gate G6 |
-| MSI Center M version | | |
+| minimum | `0x08` = 8 | `0x0A` = 10 |
+| mid | `0x11` = 17 | `0x13` = 19 |
+| max TDP | `0x23` = 35 | `0x25` = 37 |
+| max TDP + max PL2 | `0x23` = 35 | `0x2D` = 45 |
+
+**This confirms the clamps already in `DeviceCaps` exactly**: PL1 ∈ [8, 35], PL2 ≤ 45, and
+`Pl2MinOffset = 2` holds at every point (8→10, 17→19, 35→37). Nothing to change.
+
+AC and DC are **separate values**; MSI Center wrote both identically in every capture, so whether
+it ever diverges them is unknown.
+
+### Fan — the EX model is not the model we implemented
+
+```
+Default_Temp = "47;50;57;64;71;78;47;50;57;64;71;78;"
+Default_Fan  = "70;74;76;78;80;84;70;74;76;78;80;84;"
+High_Fan     = "70;74;76;78;80;84;70;74;76;78;80;84;"
+```
+
+**Six points, not five.** Twelve values per string, i.e. the six-point curve stated twice —
+almost certainly two zones (CPU and GPU), unverified.
+
+This contradicts the ClawTweaks-derived model now in `src/Shared/Fan/FanProfiles.cs` on nearly
+every axis, and the explanation is simply that **that model describes the A2VM**:
+
+| | Implemented (from ClawTweaks, A2VM) | Measured (MSI Center, EX) |
+|---|---|---|
+| Points | 5 | **6** |
+| Temp axis | `{44, 54, 64, 74, 82}` | `{47, 50, 57, 64, 71, 78}` |
+| Duty curve | `{40, 49, 58, 67, 75}` | `{70, 74, 76, 78, 80, 84}` |
+| Duty ceiling | 75 (`DutyCap`) | **84 observed, above our cap** |
+| Transport | 8-byte EC table, indices 1..6 | registry string, or `Set_Fan`/`Set_Thermal` |
+
+Whether the two describe the same duty scale is **unknown**. If they do, the EX's factory curve
+starts at 70 — comfortably above the duty floor of 58 — which would mean Quiet Idle is genuinely
+quieter and the earlier worry was unfounded. If they are different scales, none of the ClawTweaks
+duty numbers transfer at all. **Do not write a fan table until this is resolved.**
+
+### Answered by omission
+
+Switching RGB profile 1 → 2 produced **no change in this registry hive**. LED effect and colour
+therefore live somewhere else — `MSI_Center_M_Server_MysticLight` has its own store, or writes the
+device directly. Only brightness on/off is here, so **the registry is not a usable LED path**.
 
 ---
 
@@ -258,7 +377,13 @@ writes, confirming the service is the applier. No decompilation needed for any o
 | PL1 range accepted | | plan assumes 8–35 W |
 | PL2 range accepted | | plan assumes ≥ PL1+2, ≤ 45 W |
 
-**Result:** _not yet determined_
+**Result: GREEN.** `HKLM\SOFTWARE\WOW6432Node\MSI\MSI Center M\Component\User Scenario`,
+values `ManualPL1AC` / `ManualPL2AC` / `ManualPL1DC` / `ManualPL2DC`, REG_DWORD, **watts 1:1**,
+confirmed at four points. Ranges and `Pl2MinOffset = 2` match `DeviceCaps` exactly. A second,
+MSI-Center-independent path exists via `MSI_ACPI.Set_Power`. See
+[Measured on device](#measured-on-device-2026-08-07).
+
+Still open: whether a registry write **alone** applies, or only persists.
 
 ---
 
@@ -331,7 +456,12 @@ shipping a preset that does nothing.
 | Quiet Idle | | | | |
 | Cooling · Early Ramp | | | | |
 
-**Result:** _not yet determined_
+**Result: AMBER — the transport is found, the model we implemented is wrong.**
+MSI's own curve on this device is **six** points (`Default_Temp` / `Default_Fan` / `High_Fan` in
+`Component\User Scenario`), not the five-point 8-byte EC table taken from ClawTweaks, and its
+duties reach 84 against our cap of 75. `MSI_ACPI` also exposes `Get_Fan`/`Set_Fan` and
+`Get_Thermal`/`Set_Thermal` directly. **`src/Shared/Fan/FanProfiles.cs` describes the A2VM, not
+this device** — do not write a fan table until the duty scales are reconciled.
 
 ---
 
@@ -348,9 +478,14 @@ There is no fallback for this one. Without a driver-free method it is cut, not w
 |---|---|---|
 | WMI class / method | | |
 | Parameter encoding | | |
-| Accepted range | | reference project accepts **20–100**; our UI offers 60–100 by choice |
+| Accepted range | | see result — it is not a range |
 
-**Result:** _not yet determined_
+**Result: GREEN, but it is not a percentage.**
+`HKLM\SOFTWARE\WOW6432Node\MSI\MSI Center M\Battery`, value `BatteryLevel`, **REG_SZ**, with
+exactly three states: `"0"` = 100%, `"1"` = 80%, `"2"` = 60%. Confirmed by three transitions
+(100→80, 80→60, 60→100). `MSI_ACPI.Set_MasterBattery` is the direct alternative and may accept a
+wider range, unverified. Our 60–100 slider with 5% steps offers values the device has no way to
+represent.
 
 ---
 
@@ -378,7 +513,12 @@ The byte layout inside report `0x0F` is still unknown and is the actual work her
 | Zone ids | | |
 | Mode ids | | |
 
-**Result:** _not yet determined_
+**Result: AMBER.** Brightness on/off is at `OsdEditor\LightingBrightness` (DWORD, `0`/`1` only).
+**Effect and colour are not in this registry hive at all** — switching RGB profile produced no
+delta, so `MSI_Center_M_Server_MysticLight` keeps them elsewhere or writes the device directly.
+The vendor HID collection is present as `HID\VID_0DB0&PID_1901&MI_01`
+("HID-compliant vendor-defined device"), so the HID path from the desk research remains the plan.
+Report `0x0F` (64 bytes) is still unverified on this device.
 
 ---
 
@@ -404,7 +544,13 @@ read-back path and the physical-button interaction.
 | How to read current mode | | opcode `0x04` is the read; framing unknown |
 | Physical button behaviour | | the MSI button changes mode behind our back |
 
-**Result:** _not yet determined_
+**Result: GREEN via registry.** `HKLM\SOFTWARE\WOW6432Node\MSI\MSI Center M\OsdEditor`,
+value `ControlModeUserSet`, REG_SZ, `"XInput"` ↔ `"Desktop"`, confirmed in both directions.
+Note the same value name also exists (empty) under `Component\User Scenario` — writing that one
+would diff convincingly and do nothing.
+
+The firmware HID route (`0x24` SwitchMode, `0x04` desktop / `0x02` DInput) remains the fallback,
+and is still the only route that works when MSI Center is not running.
 
 ---
 
@@ -426,7 +572,9 @@ be written before the device is available — only `ctlGetSupported*` needs the 
 | Adaptive sharpness | | 0 = off, 1..100 |
 | Colour (saturation / contrast / gamma) | | 0..100 (50 neutral) · 0..100 (50) · ×100, 30..280 (100 = 1.0) |
 
-**Result:** _not yet determined_
+**Result: GREEN on the prerequisite.** `C:\Windows\System32\ControlLib.dll` is present at
+v1.2.288.0, on an Intel Arc B390 with driver `32.0.101.8801`. `ctlInit` and per-feature
+`ctlGetSupported*` still have to be exercised, but nothing blocks writing the interop.
 
 ---
 
@@ -437,13 +585,49 @@ any table written. The escape hatch ships **before** any EC write.
 
 | Fact | Value |
 |---|---|
-| Services present | expected `ipfsvc`, `dptftcs` |
-| Fan participant device id | expected `ACPI\INTC106A\TFN1` |
+| Services present | **`ipfsvc` only** — running, Automatic. No `dptftcs`, no `esifsvc`. |
+| Fan participant device id | **`ACPI\INTC10D6\TFN1`** — measured. Not `INTC106A`, which was the carried-over guess. |
 | Effect of stopping them | |
 | Does the curve take effect with IPF running? | |
+
+The panic action therefore has a smaller job than planned: one service and one PnP device, not
+three services. `Diagnostics/Get-DeviceReport.ps1` still filters on the old `INTC106A` string and
+only found this by also matching `TFN1` — worth correcting before it misses something.
 
 ---
 
 ## Open questions
 
-_Anything discovered that does not fit above. Unknowns are worth writing down._
+Ordered by how much they block. The first one decides the architecture.
+
+1. **Does writing the registry alone apply anything?** Every transcript captured a change made in
+   MSI Center's UI, which may write the registry *and* call the ACPI-WMI methods. If the registry
+   is only persistence, writing it does nothing until MSI Center next reads it — and the whole
+   "front-end for MSI Center" plan rests on it being a control surface.
+   **Test:** with MSI Center running, write `ManualPL1AC` directly, then watch for the EC to
+   follow (sustained load, clock plateau) without touching MSI's UI. Repeat with MSI Center's
+   UI closed but its services running. This is one `reg add` and a load test.
+
+2. **Are the ClawTweaks duty numbers and MSI's `Default_Fan` on the same scale?** ClawTweaks says
+   raw EC byte 0–150 with 75 = half fan; MSI ships `{70,74,76,78,80,84}` as a factory curve. If
+   the same scale, the EX idles around 70 and every duty-floor conclusion in the desk-research
+   section needs revisiting. If not, none of the ClawTweaks duty values transfer.
+   **Test:** `MSI_ACPI.Get_Fan` and compare the bytes it returns against the registry string.
+
+3. **What do the six values mean?** Six points doubled to twelve — CPU and GPU zones is the
+   obvious reading, but `Default_Temp` and `Default_Fan` being identical in both halves means the
+   capture cannot distinguish "two zones" from "one curve written twice".
+
+4. **What are `Mode` (=4), `CurrentMode` (=2), `ShiftMode` (=6), `CurrentShiftType` (=2)?**
+   These look like MSI's performance-profile selector, which may be a cleaner target than PL1/PL2
+   for a "lite" app, and may also overwrite `ManualPL*` when changed.
+
+5. **Where does MysticLight keep LED effect and colour?** Not in this hive. Either its own store
+   or straight to the device.
+
+6. **Does `MSI_ACPI` work with MSI Center stopped?** If yes, the standalone mode ruled out earlier
+   becomes available again, and the MSI Center dependency becomes a choice rather than a
+   constraint.
+
+7. **What is `MSI Foundation Service` / `MSIAPService`?** Suspected to be the SDK layer the
+   per-feature servers call. Worth identifying, because it may be the documented-ish seam.

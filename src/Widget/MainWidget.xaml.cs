@@ -254,13 +254,17 @@ namespace McenterLite.Widget
 
                 case Function.ChargeLimitEnabled:
                     ChargeLimitToggle.IsOn = _connection.GetBool(Function.ChargeLimitEnabled);
-                    ChargeLimitSlider.IsEnabled = ChargeLimitToggle.IsOn;
+                    ChargeLimitCombo.IsEnabled = ChargeLimitToggle.IsOn;
                     break;
 
                 case Function.ChargeLimitPercent:
-                    ChargeLimitSlider.Value = _connection.GetInt(Function.ChargeLimitPercent, 80);
-                    ChargeLimitValueText.Text = $"{(int)ChargeLimitSlider.Value}%";
+                {
+                    int percent = ChargeLevels.Snap(
+                        _connection.GetInt(Function.ChargeLimitPercent, ChargeLevels.Default));
+                    ChargeLimitCombo.SelectedIndex = ChargeLevels.ToIndex(percent);
+                    ChargeLimitValueText.Text = $"{percent}%";
                     break;
+                }
 
                 case Function.LedSpec:
                     ApplyLedSpec(_connection.Get(Function.LedSpec));
@@ -366,15 +370,16 @@ namespace McenterLite.Widget
         private async void ChargeLimitToggle_Toggled(object sender, RoutedEventArgs e)
         {
             if (_applyingFromHelper) return;
-            ChargeLimitSlider.IsEnabled = ChargeLimitToggle.IsOn;
+            ChargeLimitCombo.IsEnabled = ChargeLimitToggle.IsOn;
             await SendAsync(Function.ChargeLimitEnabled, ChargeLimitToggle.IsOn);
         }
 
-        private async void ChargeLimitSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+        private async void ChargeLimitCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_applyingFromHelper) return;
-            ChargeLimitValueText.Text = $"{(int)e.NewValue}%";
-            await SendAsync(Function.ChargeLimitPercent, (int)e.NewValue);
+            int percent = ChargeLevels.FromIndex(ChargeLimitCombo.SelectedIndex);
+            ChargeLimitValueText.Text = $"{percent}%";
+            await SendAsync(Function.ChargeLimitPercent, percent);
         }
 
         private async void LedModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)

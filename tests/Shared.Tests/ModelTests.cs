@@ -175,6 +175,67 @@ namespace McenterLite.Shared.Tests
         }
     }
 
+    public class ChargeLevelsTests
+    {
+        [Theory]
+        [InlineData(100, 100)]
+        [InlineData(80, 80)]
+        [InlineData(60, 60)]
+        [InlineData(95, 100)]
+        [InlineData(75, 80)]
+        [InlineData(65, 60)]
+        [InlineData(0, 60)]
+        [InlineData(999, 100)]
+        [InlineData(-40, 60)]
+        public void Snap_RoundsToALevelTheDeviceCanHold(int input, int expected)
+        {
+            Assert.Equal(expected, ChargeLevels.Snap(input));
+        }
+
+        [Fact]
+        public void Snap_BreaksATieTowardsTheLowerLevel()
+        {
+            // 70 and 90 are equidistant between two levels. The lower limit is the safer default
+            // for the battery, so a tie must never round up.
+            Assert.Equal(60, ChargeLevels.Snap(70));
+            Assert.Equal(80, ChargeLevels.Snap(90));
+        }
+
+        [Fact]
+        public void Snap_AlwaysReturnsASelectableLevel()
+        {
+            var levels = ChargeLevels.All();
+            for (int i = -10; i <= 130; i++)
+                Assert.Contains(ChargeLevels.Snap(i), levels);
+        }
+
+        [Fact]
+        public void IndexRoundTripsForEveryLevel()
+        {
+            var levels = ChargeLevels.All();
+            for (int i = 0; i < levels.Length; i++)
+            {
+                Assert.Equal(levels[i], ChargeLevels.FromIndex(i));
+                Assert.Equal(i, ChargeLevels.ToIndex(levels[i]));
+            }
+        }
+
+        [Fact]
+        public void FromIndex_FallsBackToTheDefaultOutOfRange()
+        {
+            Assert.Equal(ChargeLevels.Default, ChargeLevels.FromIndex(-1));
+            Assert.Equal(ChargeLevels.Default, ChargeLevels.FromIndex(7));
+        }
+
+        [Fact]
+        public void AllIsAscendingSoTheDropdownOrderIsStable()
+        {
+            var levels = ChargeLevels.All();
+            for (int i = 1; i < levels.Length; i++)
+                Assert.True(levels[i] > levels[i - 1]);
+        }
+    }
+
     public class FanStateTests
     {
         [Fact]

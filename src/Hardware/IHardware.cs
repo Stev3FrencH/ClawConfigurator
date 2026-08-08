@@ -107,7 +107,11 @@ namespace McenterLite.Hardware
     {
         bool TryRead(out bool enabled, out int percent);
 
-        /// <summary>Percent must be within [60, 100]; the caller clamps.</summary>
+        /// <summary>
+        /// Applies a charge limit. <paramref name="percent"/> is snapped to one of
+        /// <see cref="Model.ChargeLevels"/> - the device stores a three-state selector, not a
+        /// percentage, so arbitrary values cannot be honoured.
+        /// </summary>
         OpResult Apply(bool enabled, int percent);
     }
 

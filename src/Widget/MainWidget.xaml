@@ -192,14 +192,18 @@
                             <TextBlock Text="Stop charging at" Style="{StaticResource RowLabelStyle}" />
                             <TextBlock x:Name="ChargeLimitValueText" Grid.Column="1" Style="{StaticResource ValueStyle}" />
                         </Grid>
-                        <!-- The controller accepts 20-100. 60 is our floor by choice, not a hardware
-                             limit: below it the limiter stops being a longevity setting and starts
-                             being a way to strand yourself on a handheld. -->
-                        <Slider x:Name="ChargeLimitSlider"
-                                Style="{StaticResource CardSliderStyle}"
-                                Minimum="60" Maximum="100" StepFrequency="5"
-                                TickFrequency="5"
-                                ValueChanged="ChargeLimitSlider_ValueChanged" />
+
+                        <!-- Three fixed choices, not a slider. MSI stores a three-state selector
+                             (BatteryLevel "0"/"1"/"2"), not a percentage - measured 2026-08-07.
+                             A 60-100 slider would offer values the device cannot hold and snap
+                             back on almost every drag. Order matches ChargeLevels.All(). -->
+                        <ComboBox x:Name="ChargeLimitCombo"
+                                  Style="{StaticResource CardComboStyle}"
+                                  SelectionChanged="ChargeLimitCombo_SelectionChanged">
+                            <ComboBoxItem Content="60%  ·  best for longevity" />
+                            <ComboBoxItem Content="80%  ·  balanced" />
+                            <ComboBoxItem Content="100%  ·  full capacity" />
+                        </ComboBox>
 
                         <TextBlock Style="{StaticResource HintStyle}"
                                    Text="Stored in the controller, so it survives a reboot." />

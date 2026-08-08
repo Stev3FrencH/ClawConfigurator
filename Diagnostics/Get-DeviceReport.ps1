@@ -72,8 +72,11 @@ Write-Section 'Intel thermal stack (IPF / DTT)'
 Get-Service -Name 'ipfsvc', 'dptftcs', 'esifsvc' -ErrorAction SilentlyContinue |
     Select-Object Name, DisplayName, Status, StartType | Format-Table -AutoSize
 
+# Measured on this device 2026-08-07: the participant is ACPI\INTC10D6\TFN1. INTC106A was a
+# carried-over guess from another model and matches nothing here - it is kept in the pattern only
+# so a differently-stepped unit still reports.
 Get-PnpDevice -ErrorAction SilentlyContinue |
-    Where-Object { $_.InstanceId -match 'INTC106A|TFN1' } |
+    Where-Object { $_.InstanceId -match 'INTC10D6|INTC106A|TFN1' } |
     Select-Object Status, Class, FriendlyName, InstanceId | Format-List
 
 Write-Section 'MSI HID interfaces (VID_0DB0)'

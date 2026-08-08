@@ -208,7 +208,7 @@ namespace McenterLite.Hardware.Fake
     internal sealed class FakeChargeLimit : IChargeLimitProvider
     {
         private bool _enabled;
-        private int _percent = 80;
+        private int _percent = ChargeLevels.Default;
 
         public FakeChargeLimit(bool available) => Available = available;
 
@@ -226,7 +226,8 @@ namespace McenterLite.Hardware.Fake
         {
             if (!Available) return OpResult.Unavailable(UnavailableReason);
             _enabled = enabled;
-            _percent = Math.Max(60, Math.Min(100, percent));
+            // Snap, do not clamp: the device holds one of three levels, not a range.
+            _percent = ChargeLevels.Snap(percent);
             return OpResult.Success();
         }
     }
