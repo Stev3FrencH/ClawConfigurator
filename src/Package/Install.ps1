@@ -131,9 +131,24 @@ if ($stopped) {
 # ── Install ───────────────────────────────────────────────────────────────────
 Write-Host "Installing..." -ForegroundColor Cyan
 
+# The "Create App Packages" build lays framework dependencies (VCLibs, the .NET Native/CoreCLR
+# runtime, Microsoft.UI.Xaml) beside the package under Dependencies\<arch>\*.appx. Add-AppxPackage
+# does not resolve these on its own - without -DependencyPath, install fails on any machine that
+# does not already happen to have them registered (e.g. from a prior VS deploy), with an error
+# naming the missing framework.
+$dependencyDirectory = Join-Path (Split-Path -Parent $PackagePath) 'Dependencies\x64'
+$dependencyPaths = @()
+if (Test-Path $dependencyDirectory) {
+    $dependencyPaths = (Get-ChildItem -Path $dependencyDirectory -Filter '*.appx' -ErrorAction SilentlyContinue).FullName
+}
+
 # -ForceUpdateFromAnyVersion permits downgrades, which matters when bisecting a regression on the
 # device. -ForceApplicationShutdown closes anything still holding the old package.
-Add-AppxPackage -Path $PackagePath -ForceApplicationShutdown -ForceUpdateFromAnyVersion
+if ($dependencyPaths) {
+    Add-AppxPackage -Path $PackagePath -DependencyPath $dependencyPaths -ForceApplicationShutdown -ForceUpdateFromAnyVersion
+} else {
+    Add-AppxPackage -Path $PackagePath -ForceApplicationShutdown -ForceUpdateFromAnyVersion
+}
 
 Write-Host ""
 Write-Host "Installed." -ForegroundColor Green

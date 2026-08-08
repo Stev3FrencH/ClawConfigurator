@@ -30,6 +30,7 @@ namespace McenterLite.Widget.Ipc
         private const uint GenericRead = 0x80000000;
         private const uint GenericWrite = 0x40000000;
         private const uint OpenExisting = 3;
+        private const uint FileFlagOverlapped = 0x40000000;
         private const int ErrorPipeBusy = 231;
         private const int ErrorFileNotFound = 2;
 
@@ -82,6 +83,7 @@ namespace McenterLite.Widget.Ipc
 
                 if (TryOpen())
                 {
+                    McenterLite.Widget.App.Log("NamedPipeClient: TryOpen succeeded, starting reader");
                     StartReading();
                     SetConnected(true);
                     return true;
@@ -99,8 +101,17 @@ namespace McenterLite.Widget.Ipc
         {
             try
             {
+                // FILE_FLAG_OVERLAPPED: opened synchronously, the FileStream wrapping this handle
+                // hung forever on the very first write, discovered by tracing an install that got
+                // stuck on "Connecting..." with every card unresponsive. The helper's own pipe
+                // server (and everything else that talks .NET pipes, including
+                // NamedPipeClientStream/NamedPipeServerStream internally) uses overlapped I/O; a
+                // synchronous handle on this end was the asymmetry. Overlapped does not reintroduce
+                // the AppContainer problem this raw CreateFileW call exists to route around - that
+                // was NamedPipeClientStream's own name-resolution/permission path, unrelated to
+                // FILE_FLAG_OVERLAPPED.
                 var handle = CreateFileW(PipePath, GenericRead | GenericWrite, 0, IntPtr.Zero,
-                    OpenExisting, 0, IntPtr.Zero);
+                    OpenExisting, FileFlagOverlapped, IntPtr.Zero);
 
                 if (handle.IsInvalid)
                 {
@@ -125,7 +136,7 @@ namespace McenterLite.Widget.Ipc
                 }
 
                 _handle = handle;
-                _stream = new FileStream(handle, FileAccess.ReadWrite, 4096, isAsync: false);
+                _stream = new FileStream(handle, FileAccess.ReadWrite, 4096, isAsync: true);
                 _writer = new StreamWriter(_stream, new UTF8Encoding(false)) { AutoFlush = true, NewLine = "\n" };
                 return true;
             }
@@ -142,18 +153,13 @@ namespace McenterLite.Widget.Ipc
             var token = _cts.Token;
             var stream = _stream;
 
-            // A dedicated thread rather than async: the handle is opened without
-            // FILE_FLAG_OVERLAPPED, so reads block. Doing that on the thread pool would tie up a
-            // worker permanently.
-            var thread = new Thread(() => ReadLoop(stream, token))
-            {
-                IsBackground = true,
-                Name = "McenterLite pipe reader",
-            };
-            thread.Start();
+            // The handle is opened with FILE_FLAG_OVERLAPPED now, so the stream is genuinely
+            // async - no dedicated thread needed to avoid tying up a thread-pool worker on a
+            // blocking read.
+            _ = ReadLoopAsync(stream, token);
         }
 
-        private void ReadLoop(FileStream stream, CancellationToken token)
+        private async Task ReadLoopAsync(FileStream stream, CancellationToken token)
         {
             try
             {
@@ -161,7 +167,7 @@ namespace McenterLite.Widget.Ipc
                 {
                     while (!token.IsCancellationRequested)
                     {
-                        var line = reader.ReadLine();
+                        var line = await reader.ReadLineAsync().ConfigureAwait(false);
                         if (line == null) break; // helper closed or exited
 
                         if (line.Length == 0) continue;
@@ -253,7 +259,7 @@ namespace McenterLite.Widget.Ipc
             await _writeGate.WaitAsync().ConfigureAwait(false);
             try
             {
-                _writer.WriteLine(envelope.Serialize());
+                await _writer.WriteLineAsync(envelope.Serialize()).ConfigureAwait(false);
                 return true;
             }
             catch (Exception ex)

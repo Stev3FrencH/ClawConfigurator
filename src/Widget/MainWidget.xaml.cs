@@ -47,7 +47,17 @@ namespace McenterLite.Widget
         /// project carries three separate hand-written flags to patch instances of it.
         /// </para>
         /// </remarks>
-        private bool _applyingFromHelper;
+        /// <remarks>
+        /// Starts true, not false. XAML applies markup defaults - and can raise synthetic
+        /// ValueChanged events doing it - during InitializeComponent(), before the constructor
+        /// body even runs and before any snapshot has arrived to flip this the "normal" way via
+        /// OnSnapshotApplied's try/finally. A field initializer runs ahead of InitializeComponent(),
+        /// so starting true closes that gap; the first real snapshot still flips it false once
+        /// state has genuinely arrived. Without this, a synthetic construction-time event can reach
+        /// a handler that touches a XAML element declared later in the same document and not yet
+        /// wired up, e.g. Pl1Slider_ValueChanged writing to Pl1ValueText before it exists.
+        /// </remarks>
+        private bool _applyingFromHelper = true;
 
         /// <summary>
         /// Drives a <see cref="Button"/> as a cycling selector over a fixed list of options.
@@ -109,30 +119,46 @@ namespace McenterLite.Widget
 
         public MainWidget()
         {
-            InitializeComponent();
+            try
+            {
+                InitializeComponent();
+            }
+            catch (Exception ex)
+            {
+                App.LogCrash("ctor/InitializeComponent", ex);
+                throw;
+            }
 
-            // Order is the contract: every index below is cast directly to the enum it names.
-            _perfMode = new OptionCycler(PerfModeButton,
-                "Endurance", "User Scenario", "AI Engine");
+            try
+            {
+                // Order is the contract: every index below is cast directly to the enum it names.
+                _perfMode = new OptionCycler(PerfModeButton,
+                    "Endurance", "User Scenario", "AI Engine");
 
-            _fanPreset = new OptionCycler(FanPresetButton,
-                "MSI Default", "Quiet Idle", "Cooling \u00B7 Early Ramp");
+                _fanPreset = new OptionCycler(FanPresetButton,
+                    "MSI Default", "Quiet Idle", "Cooling \u00B7 Early Ramp");
 
-            _ledMode = new OptionCycler(LedModeButton,
-                "Off", "Static", "Breathing", "Colour cycle", "Wave");
+                _ledMode = new OptionCycler(LedModeButton,
+                    "Off", "Static", "Breathing", "Colour cycle", "Wave");
 
-            _powerMode = new OptionCycler(PowerModeButton,
-                "Best power efficiency", "Balanced", "Best performance");
+                _powerMode = new OptionCycler(PowerModeButton,
+                    "Best power efficiency", "Balanced", "Best performance");
 
-            _intelFpsTier = new OptionCycler(IntelFpsTierButton,
-                "Off", "Performance (60 fps)", "Balanced (40 fps)", "Efficiency (30 fps)");
+                _intelFpsTier = new OptionCycler(IntelFpsTierButton,
+                    "Off", "Performance (60 fps)", "Balanced (40 fps)", "Efficiency (30 fps)");
 
-            _intelLowLatency = new OptionCycler(IntelLowLatencyButton,
-                "Off", "On", "On + boost");
+                _intelLowLatency = new OptionCycler(IntelLowLatencyButton,
+                    "Off", "On", "On + boost");
 
-            _connection.SnapshotApplied += OnSnapshotApplied;
-            _connection.ValueChanged += OnValueChanged;
-            _connection.ConnectionChanged += OnConnectionChanged;
+                _connection.SnapshotApplied += OnSnapshotApplied;
+                _connection.ValueChanged += OnValueChanged;
+                _connection.ConnectionChanged += OnConnectionChanged;
+            }
+            catch (Exception ex)
+            {
+                App.LogCrash("ctor", ex);
+                throw;
+            }
         }
 
         protected override async void OnNavigatedTo(NavigationEventArgs e)
@@ -154,7 +180,15 @@ namespace McenterLite.Widget
             if (_widget != null)
                 _widget.VisibleChanged += OnWidgetVisibleChanged;
 
-            await StartAsync();
+            try
+            {
+                await StartAsync();
+            }
+            catch (Exception ex)
+            {
+                App.LogCrash("OnNavigatedTo/StartAsync", ex);
+                throw;
+            }
         }
 
         protected override void OnNavigatedFrom(NavigationEventArgs e)
@@ -194,7 +228,11 @@ namespace McenterLite.Widget
                 _widget.HorizontalResizeSupported = true;
                 _widget.VerticalResizeSupported = true;
             }
-            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[widget] sizing: {ex.Message}"); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[widget] sizing: {ex.Message}");
+                App.LogCrash("ConfigureWidget/sizing", ex);
+            }
 
             try
             {
@@ -205,14 +243,34 @@ namespace McenterLite.Widget
                 // that does nothing when pressed.
                 _widget.SettingsSupported = false;
             }
-            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[widget] flags: {ex.Message}"); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[widget] flags: {ex.Message}");
+                App.LogCrash("ConfigureWidget/flags", ex);
+            }
 
             try
             {
-                ApplyRequestedOpacity();
+                // Deliberately does NOT read _widget.RequestedOpacity here. That getter throws an
+                // E_POINTER (a raw COM error, not a managed exception - see LogCrash's HResult
+                // output) when called this early: the native widget object's opacity state is not
+                // yet set up immediately after construction, and the failure surfaces
+                // asynchronously, past any try/catch wrapped around the call itself, straight to
+                // Application.UnhandledException with no stack trace. Every card ends up hidden
+                // (ApplyCaps never gets a chance to run) because the process survives but the
+                // exception fires close enough to activation to abort the rest of it in practice.
+                //
+                // Subscribing is safe - only reading the property up front is not. Defaulting to
+                // full opacity until Game Bar actually tells us otherwise is a fine trade for
+                // avoiding a call proven to crash.
+                RootContent.Opacity = 1.0;
                 _widget.RequestedOpacityChanged += OnRequestedOpacityChanged;
             }
-            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[widget] opacity: {ex.Message}"); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[widget] opacity: {ex.Message}");
+                App.LogCrash("ConfigureWidget/opacity", ex);
+            }
         }
 
         private async void OnWidgetVisibleChanged(XboxGameBarWidget sender, object args)
@@ -222,13 +280,21 @@ namespace McenterLite.Widget
                 bool visible = sender.Visible;
                 await _connection.SetVisibleAsync(visible);
             }
-            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[widget] {ex.Message}"); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[widget] {ex.Message}");
+                App.LogCrash("OnWidgetVisibleChanged", ex);
+            }
         }
 
         private async void OnRequestedOpacityChanged(XboxGameBarWidget sender, object args)
         {
             try { await RunOnUiAsync(ApplyRequestedOpacity); }
-            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[widget] {ex.Message}"); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[widget] {ex.Message}");
+                App.LogCrash("OnRequestedOpacityChanged", ex);
+            }
         }
 
         /// <summary>
@@ -253,19 +319,25 @@ namespace McenterLite.Widget
 
         private async Task StartAsync()
         {
+            App.Log("StartAsync: begin");
             ShowStatus("Starting the helper...", showRetry: false);
 
             // Launching the full-trust process is what triggers first-run setup, including its
             // single elevation prompt. It is safe to call when the helper is already running:
             // that instance sees the deployment is current and exits without serving.
             await LaunchHelperAsync();
+            App.Log("StartAsync: LaunchHelperAsync returned");
 
             ShowStatus("Connecting...", showRetry: false);
 
-            if (await _connection.ConnectAsync())
+            bool connected = await _connection.ConnectAsync();
+            App.Log($"StartAsync: ConnectAsync returned {connected}");
+
+            if (connected)
             {
                 HideStatus();
                 await _connection.SetVisibleAsync(true);
+                App.Log("StartAsync: SetVisibleAsync done, HideStatus called");
                 return;
             }
 
@@ -295,6 +367,7 @@ namespace McenterLite.Widget
 
         private async void OnSnapshotApplied()
         {
+            App.Log("OnSnapshotApplied: fired");
             await RunOnUiAsync(() =>
             {
                 _applyingFromHelper = true;
@@ -308,6 +381,7 @@ namespace McenterLite.Widget
                     _applyingFromHelper = false;
                 }
 
+                App.Log("OnSnapshotApplied: _applyingFromHelper set false");
                 SetInitialFocus();
             });
         }
@@ -835,18 +909,33 @@ namespace McenterLite.Widget
             ConnectionDot.Fill = (Brush)Application.Current.Resources[
                 connected ? "SuccessBrush" : "TextSecondaryBrush"];
 
-        private async Task RunOnUiAsync(Action action)
+        private async Task RunOnUiAsync(Action action, [System.Runtime.CompilerServices.CallerMemberName] string caller = null)
         {
             if (Dispatcher.HasThreadAccess)
             {
-                action();
+                try { action(); }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[widget] {ex.Message}");
+                    App.LogCrash($"RunOnUiAsync/sync/{caller}", ex);
+                    throw;
+                }
                 return;
             }
 
             await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
             {
                 try { action(); }
-                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[widget] {ex.Message}"); }
+                catch (Exception ex)
+                {
+                    // This is the branch the pipe reader's background thread actually takes -
+                    // without the LogCrash call, an exception here (e.g. from ApplyCaps or
+                    // ApplyAllValues while applying the helper's first snapshot) was previously
+                    // swallowed with no trace anywhere, leaving every capability-gated card stuck
+                    // hidden and the widget looking permanently blank.
+                    System.Diagnostics.Debug.WriteLine($"[widget] {ex.Message}");
+                    App.LogCrash($"RunOnUiAsync/dispatched/{caller}", ex);
+                }
             });
         }
 

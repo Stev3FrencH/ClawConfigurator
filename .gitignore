@@ -51,6 +51,11 @@ _ReSharper*/
 *.nupkg
 packages/
 !**/packages.config
+*.assets.cache
+
+# Helper, published self-contained into the packaging project per
+# docs/building-the-widget.md - regenerate with `dotnet publish`, don't commit.
+/src/Package/Helper/
 
 # Logs
 *.log
