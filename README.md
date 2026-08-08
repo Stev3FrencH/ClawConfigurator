@@ -90,9 +90,37 @@ curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 8.0 --ins
 export PATH="$HOME/.dotnet:$PATH"
 ```
 
+## Installing
+
+There is no pre-built release yet — the widget has to be built, packaged and signed locally
+first. The full walkthrough (Visual Studio setup, compiling the widget, creating the packaging
+project, signing) is [`docs/building-the-widget.md`](docs/building-the-widget.md). Once a signed
+`.msix` exists under `src/Package/AppPackages/`, on the target device:
+
+```powershell
+.\src\Package\Install.ps1
+```
+
+This imports the signing certificate to `LocalMachine\TrustedPeople`, stops any running instance,
+and installs the package. Then:
+
+1. Open the Game Bar (**Win+G**) and pin **M Center Lite**.
+2. Accept the one elevation prompt on first run — the helper uses it to deploy itself and
+   register a scheduled task. Hardware controls do not work until this is accepted.
+3. The widget reconnects on its own a few seconds after the prompt.
+
+Logs land at `%LOCALAPPDATA%\Packages\<package family>\LocalCache\McenterLite\helper.log`.
+
+To uninstall: remove the app from *Settings > Apps*, then run the deployed helper once with
+`--uninstall` to remove its scheduled task and restore any captured original values.
+
+This only applies to the MSI Claw 8 EX AI+ (see [Scope](#scope)) — on any other device the
+hardware-specific cards stay hidden, and only CPU Boost and OS Power Mode do anything.
+
 ## Running
 
-Against simulated hardware, on any Windows machine:
+For development and discovery, without installing the packaged app — against simulated hardware,
+on any Windows machine:
 
 ```
 McenterLite.Helper.exe --fake-hardware
