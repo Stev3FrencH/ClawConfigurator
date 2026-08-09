@@ -59,7 +59,6 @@ namespace McenterLite.Shared.Model
 
         // ── Feature availability ─────────────────────────────────────────────────
         public bool HasFan { get; set; }
-        public bool HasLed { get; set; }
         public bool HasHwMouse { get; set; }
         public bool HasIgcl { get; set; }
 
@@ -82,7 +81,6 @@ namespace McenterLite.Shared.Model
             Append(sb, "pl2Off", Pl2MinOffset);
             Append(sb, "tdpBackend", (int)TdpBackend);
             Append(sb, "fan", HasFan ? "1" : "0");
-            Append(sb, "led", HasLed ? "1" : "0");
             Append(sb, "hwMouse", HasHwMouse ? "1" : "0");
             Append(sb, "igcl", HasIgcl ? "1" : "0");
             Append(sb, "dutyFloor", FanDutyFloor);
@@ -122,7 +120,6 @@ namespace McenterLite.Shared.Model
                     case "fan": caps.HasFan = value == "1"; break;
                     // "charge" retired with the charge-limit feature; an older helper may still
                     // send it, and the default branch below drops it harmlessly.
-                    case "led": caps.HasLed = value == "1"; break;
                     case "hwMouse": caps.HasHwMouse = value == "1"; break;
                     case "igcl": caps.HasIgcl = value == "1"; break;
                     case "dutyFloor": caps.FanDutyFloor = ToInt(value, caps.FanDutyFloor); break;

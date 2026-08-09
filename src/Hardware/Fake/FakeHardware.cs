@@ -38,7 +38,6 @@ namespace McenterLite.Hardware.Fake
                 MaxPl2Dc = 30,
                 TdpBackend = simulateClaw8Ex ? TdpBackendKind.Wmi : TdpBackendKind.Unavailable,
                 HasFan = simulateClaw8Ex,
-                HasLed = simulateClaw8Ex,
                 HasHwMouse = simulateClaw8Ex,
                 HasIgcl = simulateClaw8Ex,
                 FanDutyFloor = 58,
@@ -46,7 +45,6 @@ namespace McenterLite.Hardware.Fake
 
             Tdp = new FakeTdp(Caps);
             Fan = new FakeFan(simulateClaw8Ex);
-            Led = new FakeLed(simulateClaw8Ex);
             HwMouse = new FakeHwMouse(simulateClaw8Ex);
             Igcl = new FakeIgcl(simulateClaw8Ex);
 
@@ -59,7 +57,6 @@ namespace McenterLite.Hardware.Fake
         public DeviceCaps Caps { get; }
         public ITdpProvider Tdp { get; }
         public IFanProvider Fan { get; }
-        public ILedProvider Led { get; }
         public IHwMouseProvider HwMouse { get; }
         public IPowerProvider Power { get; }
         public IIgclProvider Igcl { get; }
@@ -228,29 +225,6 @@ namespace McenterLite.Hardware.Fake
             }
 
             return rpm + _rng.Next(-40, 41);
-        }
-    }
-
-    internal sealed class FakeLed : ILedProvider
-    {
-        private bool _enabled;
-
-        public FakeLed(bool available) => Available = available;
-
-        public bool Available { get; }
-        public string UnavailableReason => Available ? null : "LED control is not available on this device.";
-
-        public bool TryRead(out bool enabled)
-        {
-            enabled = _enabled;
-            return Available;
-        }
-
-        public OpResult Apply(bool enabled)
-        {
-            if (!Available) return OpResult.Unavailable(UnavailableReason);
-            _enabled = enabled;
-            return OpResult.Success();
         }
     }
 

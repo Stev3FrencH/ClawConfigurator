@@ -450,11 +450,6 @@ namespace McenterLite.Helper
                     : $"Could not re-apply the fan preset: {result.Error}");
             }
 
-            // Lighting is deliberately NOT re-applied here, for the same reason as the power-mode
-            // overlay below: MSI's own performance-mode selector writes this same registry value
-            // (Endurance turns it off), so it is shared state, not ours alone, and reasserting our
-            // last write on every start would fight whatever mode MSI last left it in.
-
             // CPU boost is only re-applied once the user has actually chosen a value. Writing a
             // default here would silently overwrite a system-wide setting we do not own and were
             // never asked to change.

@@ -34,7 +34,7 @@ namespace McenterLite.Shared.Tests
         [Fact]
         public void RoundTrips_ErrorMessage()
         {
-            var parsed = RoundTrip(PipeEnvelope.Failure(7, Function.LedEnabled, "not present"));
+            var parsed = RoundTrip(PipeEnvelope.Failure(7, Function.HwMouseMode, "not present"));
 
             Assert.Equal(Command.Error, parsed.Cmd);
             Assert.Equal("not present", parsed.Error);
@@ -60,7 +60,7 @@ namespace McenterLite.Shared.Tests
         [InlineData("")]
         public void RoundTrips_HostilePayloads(string payload)
         {
-            var parsed = RoundTrip(new PipeEnvelope(3, Command.Set, Function.LedEnabled, payload));
+            var parsed = RoundTrip(new PipeEnvelope(3, Command.Set, Function.HwMouseMode, payload));
             Assert.Equal(payload, parsed.Value);
         }
 
@@ -77,7 +77,7 @@ namespace McenterLite.Shared.Tests
         public void Serialize_EscapesControlCharacters()
         {
             var payload = "a\u0001b\u001fc";
-            var wire = new PipeEnvelope(1, Command.Set, Function.LedEnabled, payload).Serialize();
+            var wire = new PipeEnvelope(1, Command.Set, Function.HwMouseMode, payload).Serialize();
 
             // A raw control character inside a JSON string is malformed JSON, so the widget's
             // platform parser would reject the whole message.
@@ -141,7 +141,7 @@ namespace McenterLite.Shared.Tests
         {
             // The transport is newline-delimited, so an embedded newline would split one message
             // into two unparseable halves.
-            var wire = new PipeEnvelope(1, Command.Set, Function.LedEnabled, "a\nb\r\nc").Serialize();
+            var wire = new PipeEnvelope(1, Command.Set, Function.HwMouseMode, "a\nb\r\nc").Serialize();
             Assert.Equal(-1, wire.IndexOf('\n'));
             Assert.Equal(-1, wire.IndexOf('\r'));
         }

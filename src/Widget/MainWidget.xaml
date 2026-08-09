@@ -176,30 +176,10 @@
                      Center, changes rarely, and the registry path this app could reach did not
                      enforce it. See docs/hardware-notes.md Gate G3. -->
 
-                <!-- 4. Lighting -->
-                <!-- On/off only. The vendor HID report that would carry mode/colour/effect is
-                     still undecoded (Gate G4 in hardware-notes.md) - the registry only holds an
-                     on/off switch, so that is all this card offers. -->
-                <Border x:Name="LedCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
-                    <StackPanel>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <FontIcon Grid.Column="0" Glyph="&#xE790;" Style="{StaticResource CardIconStyle}" />
-                            <TextBlock Grid.Column="1" Text="Lighting" Style="{StaticResource CardTitleStyle}" />
-                            <ToggleSwitch x:Name="LedToggle"
-                                          Grid.Column="2"
-                                          Style="{StaticResource CompactToggleStyle}"
-                                          Toggled="LedToggle_Toggled" />
-                        </Grid>
-
-                        <TextBlock Style="{StaticResource HintStyle}"
-                                   Text="MSI's performance mode also controls this - Endurance turns lighting off, leaving it turns it back on." />
-                    </StackPanel>
-                </Border>
+                <!-- 4. Lighting was here. Removed 2026-08-08: MSI Center's own lighting control
+                     is far more capable than the on/off switch this app could offer, since
+                     mode, colour and effect ride a vendor HID report that was never decoded
+                     (Gate G4). -->
 
                 <!-- 5. Controller -->
                 <Border x:Name="HwMouseCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">

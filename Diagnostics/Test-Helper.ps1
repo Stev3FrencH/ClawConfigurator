@@ -70,12 +70,14 @@ $PipeName = 'McenterLiteHelper'
 
 # Must match src/Shared/Ipc/Function.cs. Ordinals there are explicit and never reused, so this
 # map only ever grows.
+#
+# RETIRED, deliberately absent: 30/31 (charge limit) and 40 (lighting). Both features were removed
+# 2026-08-08 and their ordinals must never be reused - listing them here would invite exactly that.
 $Fn = @{
     Hello = 1; Snapshot = 2; DeviceCaps = 3; WidgetVisible = 4; PrepareForUninstall = 5
     Pl1 = 10; Pl2 = 11; TdpBackend = 12; PerfMode = 13
     FanEnabled = 20; FanPreset = 21; FanState = 22; FanFullSpeed = 23
-    ChargeLimitEnabled = 30; ChargeLimitPercent = 31
-    LedEnabled = 40; HwMouseMode = 50
+    HwMouseMode = 50
     CpuBoost = 60; OsPowerMode = 61
     IntelFpsTier = 70; IntelLowLatency = 71; IntelFrameSync = 72
     IntelAdaptiveSharpness = 73; IntelSaturation = 74; IntelContrast = 75; IntelGamma = 76

@@ -119,21 +119,6 @@ namespace McenterLite.Hardware
     }
 
     /// <summary>
-    /// Lighting, reduced to on/off.
-    /// </summary>
-    /// <remarks>
-    /// The vendor HID report that would carry mode/colour/effect (report <c>0x0F</c>) is still
-    /// undecoded - see Gate G4 in <c>docs/hardware-notes.md</c>. On/off is the one lighting fact
-    /// that IS established: MSI's own switch lives in the registry, the same mirror-and-apply
-    /// model already working for TDP/fan/charge limit.
-    /// </remarks>
-    public interface ILedProvider : IFeatureProvider
-    {
-        bool TryRead(out bool enabled);
-        OpResult Apply(bool enabled);
-    }
-
-    /// <summary>
     /// The controller's firmware desktop-mouse mode.
     /// </summary>
     /// <remarks>
@@ -184,7 +169,6 @@ namespace McenterLite.Hardware
 
         ITdpProvider Tdp { get; }
         IFanProvider Fan { get; }
-        ILedProvider Led { get; }
         IHwMouseProvider HwMouse { get; }
         IPowerProvider Power { get; }
         IIgclProvider Igcl { get; }

@@ -19,7 +19,6 @@ namespace McenterLite.Shared.Tests
             Pl2MinOffset = 2,
             TdpBackend = TdpBackendKind.Wmi,
             HasFan = true,
-            HasLed = true,
             HasHwMouse = true,
             HasIgcl = true,
             FanDutyFloor = 58,

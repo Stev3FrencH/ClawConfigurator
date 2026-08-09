@@ -14,8 +14,9 @@ namespace McenterLite.Hardware.Windows
     /// than offering a control that does nothing.
     /// </para>
     /// <para>
-    /// Live today: power limits, battery charge limit and lighting on/off (registry), CPU boost
-    /// and OS power mode (plain Windows APIs). Pending: fan, firmware mouse mode, Intel GPU.
+    /// Live today: power limits (registry), CPU boost and OS power mode (plain Windows APIs).
+    /// Pending: fan, firmware mouse mode, Intel GPU. Battery charge limit and lighting were
+    /// removed - both are better handled in MSI Center itself.
     /// </para>
     /// </remarks>
     [SupportedOSPlatform("windows")]
@@ -50,7 +51,6 @@ namespace McenterLite.Hardware.Windows
 
                 // Not implemented yet. Reported as absent rather than broken.
                 HasFan = false,
-                HasLed = false,           // set below, once the provider has probed
                 HasHwMouse = false,
                 HasIgcl = false,
 
@@ -62,9 +62,6 @@ namespace McenterLite.Hardware.Windows
                 ? tdp.Backend
                 : TdpBackendKind.Unavailable;
 
-            var led = new RegistryLedProvider();
-            Caps.HasLed = identity.IsClaw8Ex && led.Available;
-
             // A device we do not recognise gets nothing, whatever the registry contains. Every
             // value above is calibrated to one model, and a wrong power limit on a different Claw
             // is a real write to real firmware.
@@ -73,9 +70,6 @@ namespace McenterLite.Hardware.Windows
                 : new UnavailableTdp("This device is not an MSI Claw 8 EX AI+.");
 
             Fan = new UnavailableFan("Fan control is not implemented yet.", ExDutyFloor);
-            Led = identity.IsClaw8Ex
-                ? (ILedProvider)led
-                : new UnavailableLed("This device is not an MSI Claw 8 EX AI+.");
             HwMouse = new UnavailableHwMouse("Desktop mouse mode is not implemented yet.");
             Igcl = new UnavailableIgcl("Intel graphics controls are not implemented yet.");
 
@@ -85,7 +79,6 @@ namespace McenterLite.Hardware.Windows
         public DeviceCaps Caps { get; }
         public ITdpProvider Tdp { get; }
         public IFanProvider Fan { get; }
-        public ILedProvider Led { get; }
         public IHwMouseProvider HwMouse { get; }
         public IPowerProvider Power { get; }
         public IIgclProvider Igcl { get; }
@@ -152,22 +145,6 @@ namespace McenterLite.Hardware.Windows
         public OpResult SetEnabled(bool enabled) => OpResult.Unavailable(UnavailableReason);
         public OpResult SetFullSpeed(bool on) => OpResult.Unavailable(UnavailableReason);
         public OpResult RestoreFactory() => OpResult.Unavailable(UnavailableReason);
-    }
-
-    internal sealed class UnavailableLed : ILedProvider
-    {
-        public UnavailableLed(string reason) => UnavailableReason = reason;
-
-        public bool Available => false;
-        public string UnavailableReason { get; }
-
-        public bool TryRead(out bool enabled)
-        {
-            enabled = false;
-            return false;
-        }
-
-        public OpResult Apply(bool enabled) => OpResult.Unavailable(UnavailableReason);
     }
 
     internal sealed class UnavailableHwMouse : IHwMouseProvider

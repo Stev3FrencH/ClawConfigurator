@@ -77,8 +77,8 @@ namespace McenterLite.Widget.Ipc
         /// Re-fetches the whole snapshot, for when something changed more than it was asked to.
         /// </summary>
         /// <remarks>
-        /// Used after a performance-mode switch. MSI couples unrelated settings to the mode -
-        /// entering Endurance switches the LEDs off - so re-reading only the value that was
+        /// Used after a performance-mode switch. MSI couples other settings to the mode - the
+        /// power limits it reports can move with it - so re-reading only the value that was
         /// written would leave the widget showing state the device no longer holds. Cheaper to
         /// re-sync everything than to model the blast radius of someone else's state machine.
         /// </remarks>

@@ -25,8 +25,8 @@ namespace McenterLite.Shared.Ipc
     /// </para>
     ///
     /// <para>
-    /// Structured payloads (fan state, LED spec, device caps) are carried as strings using their
-    /// own compact encodings rather than nested JSON, which keeps this parser flat and total.
+    /// Structured payloads (fan state, device caps) are carried as strings using their own compact
+    /// encodings rather than nested JSON, which keeps this parser flat and total.
     /// </para>
     /// </summary>
     public sealed class PipeEnvelope

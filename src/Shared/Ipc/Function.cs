@@ -83,15 +83,15 @@ namespace McenterLite.Shared.Ipc
         // path this app could reach did not enforce it. The hardware findings are kept in
         // docs/hardware-notes.md Gate G3 rather than thrown away.
 
-        // ── 4. Lighting ──────────────────────────────────────────────────────────
-        /// <summary>
-        /// True = lighting on. The vendor HID report that carries mode/colour/effect is still
-        /// undecoded, so this is the one lighting fact we can act on: MSI's own on/off switch,
-        /// <c>OsdEditor\LightingBrightness</c>. Note MSI's performance-mode selector also writes
-        /// this value (Endurance turns it off), so a read after a <see cref="PerfMode"/> change can
-        /// legitimately disagree with the last value sent here.
-        /// </summary>
-        LedEnabled = 40,
+        // ── 4. Lighting — REMOVED ────────────────────────────────────────────────
+        //
+        // Ordinal 40 (LedEnabled) is RETIRED and must never be reused, for the same reason as
+        // 30/31 above.
+        //
+        // Descoped 2026-08-08. MSI Center's own lighting control is far more capable than the
+        // on/off switch this app could offer - mode, colour and effect all ride a vendor HID
+        // report that was never decoded (Gate G4). A toggle next to that is not worth the
+        // surface. Findings kept in docs/hardware-notes.md.
 
         // ── 5. Controller mode ───────────────────────────────────────────────────
         /// <summary>

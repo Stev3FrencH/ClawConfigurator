@@ -107,9 +107,6 @@ namespace McenterLite.Helper
                         ? PipeEnvelope.FromBool(fullSpeedState.FullSpeed)
                         : null;
 
-                case Function.LedEnabled:
-                    return _hw.Led.TryRead(out bool ledOn) ? PipeEnvelope.FromBool(ledOn) : null;
-
                 case Function.HwMouseMode:
                     return _hw.HwMouse.TryRead(out bool desktopMode)
                         ? PipeEnvelope.FromBool(desktopMode)
@@ -161,9 +158,9 @@ namespace McenterLite.Helper
                     return SetTdp(request);
 
                 case Function.PerfMode:
-                    // Switching mode changes what MSI honours, and it also moves settings that
-                    // have nothing to do with power - entering Endurance switches the LEDs off.
-                    // The widget re-reads from the snapshot rather than assuming only this changed.
+                    // Switching mode changes what MSI honours, and it moves settings beyond the
+                    // one asked for - the power limits it reports can change with it. The widget
+                    // re-reads the whole snapshot rather than assuming only this changed.
                     return Apply(request, _hw.Tdp.ApplyMode(request.AsEnum(PerfMode.UserScenario)),
                         () => ReadValue(Function.PerfMode));
 
@@ -180,9 +177,6 @@ namespace McenterLite.Helper
                 case Function.FanFullSpeed:
                     return Apply(request, _hw.Fan.SetFullSpeed(request.AsBool()),
                         () => ReadValue(Function.FanFullSpeed));
-
-                case Function.LedEnabled:
-                    return SetLed(request);
 
                 case Function.HwMouseMode:
                     return Apply(request, _hw.HwMouse.Apply(request.AsBool()),
@@ -266,23 +260,6 @@ namespace McenterLite.Helper
             Log.Info($"Applied the {preset} fan preset.");
 
             return Ok(request, PipeEnvelope.FromEnum(preset));
-        }
-
-        private PipeEnvelope SetLed(PipeEnvelope request)
-        {
-            if (!_hw.Led.Available)
-                return PipeEnvelope.Failure(request.Id, request.Fn, _hw.Led.UnavailableReason);
-
-            if (_hw.Led.TryRead(out bool current))
-                _settings.CaptureOriginal(SettingsKeys.LedEnabled, PipeEnvelope.FromBool(current));
-
-            bool enabled = request.AsBool();
-
-            var result = _hw.Led.Apply(enabled);
-            if (!result.Ok) return PipeEnvelope.Failure(request.Id, request.Fn, result.Error);
-
-            return Ok(request, PipeEnvelope.FromBool(
-                _hw.Led.TryRead(out bool actual) ? actual : enabled));
         }
 
         private PipeEnvelope SetCpuBoost(PipeEnvelope request)
@@ -386,13 +363,6 @@ namespace McenterLite.Helper
                 if (!r.Ok) problems.Add($"power mode: {r.Error}");
             }
 
-            var originalLed = _settings.GetOriginal(SettingsKeys.LedEnabled);
-            if (originalLed != null && _hw.Led.Available)
-            {
-                var r = _hw.Led.Apply(originalLed == "1");
-                if (!r.Ok) problems.Add($"lighting: {r.Error}");
-            }
-
             if (problems.Count > 0)
             {
                 var message = "Some values could not be restored: " + string.Join("; ", problems);
@@ -449,7 +419,6 @@ namespace McenterLite.Helper
             Function.FanPreset,
             Function.FanState,
             Function.FanFullSpeed,
-            Function.LedEnabled,
             Function.HwMouseMode,
             Function.CpuBoost,
             Function.OsPowerMode,

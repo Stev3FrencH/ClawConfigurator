@@ -159,7 +159,6 @@ namespace McenterLite.Helper.Settings
         public const string FanPreset = "FanPreset";
 
 
-        public const string LedEnabled = "LedEnabled";
 
         public const string CpuBoost = "CpuBoost";
         public const string OsPowerMode = "OsPowerMode";

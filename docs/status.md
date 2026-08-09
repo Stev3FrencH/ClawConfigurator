@@ -28,43 +28,33 @@ fresh package.
 - Fan percentage: confirmed settable 0–100% via MSI Center's own UI (not yet via this app — fan
   control is still unimplemented, Gate G2)
 
-## Removed: battery charge limit
+## Removed features
 
-**Descoped 2026-08-08.** It is set in MSI Center, changes rarely, and the registry path this app
-could reach did not enforce it. Removed from the widget, the helper, the IPC contract and the
-hardware layer; `Function` ordinals 30 and 31 are retired and must never be reused.
+Both removed 2026-08-08, for the same reason: MSI Center already does them, and does them better
+than this widget could. Narrowing scope, not abandoning work.
 
-The research is kept rather than thrown away — the limit was eventually traced to
-`MSI_ACPI.Get_AP` / `Set_AP`, sub-function 0, byte 5, encoded `percent | 0x80`. See
-[`hardware-notes.md` Gate G3](hardware-notes.md#gate-g3--battery-charge-limit) if it is ever
-revisited. `Diagnostics/Sweep-MsiAcpi.ps1` is worth keeping regardless: the same sweep-and-diff
-approach should locate the fan table for Gate G2.
+**Battery charge limit.** Set in MSI Center, changes rarely, and the registry path this app could
+reach did not enforce it. `Function` ordinals 30 and 31 are retired.
 
-## One open bug
+**RGB LED.** Mode, colour and effect ride a vendor HID report that was never decoded (Gate G4), so
+the most this widget could offer was an on/off toggle sitting next to MSI Center's far richer
+control. `Function` ordinal 40 is retired.
 
-### Lighting card does not appear at all
+Both sets of findings are kept in [`hardware-notes.md`](hardware-notes.md) as a device record
+rather than deleted — the charge limit in particular was eventually traced to
+`MSI_ACPI.Get_AP` / `Set_AP`, sub-function 0, byte 5, encoded `percent | 0x80`, which took several
+rounds of on-device measurement to find.
 
-Expected `HasLed` to be true — `LightingBrightness` was captured directly on this same device
-during Phase 0's mode-switch testing, so the value should exist. Needs a direct registry check to
-tell apart "value doesn't exist yet" (a bootstrap issue — MSI Center may have to write it once)
-from "value exists but isn't the type the provider expects" (an actual code bug in
-`RegistryLedProvider`).
+## No open bugs
 
-**Next step — needs to run on the Claw:**
+The Lighting card not appearing was the last one, and removing the feature closes it.
 
-```powershell
-Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\MSI\MSI Center M\OsdEditor' -Name LightingBrightness
-```
+## Outstanding work
 
-- Errors "property does not exist" → open MSI Center's own app, toggle its lighting control once,
-  then recheck.
-- Prints a value → report what type/data it shows, so the type check in `RegistryLedProvider` can
-  be corrected if it's wrong.
-
-## Also still outstanding (lower priority, not blocking)
-
-- Uninstall/restore flow, end-to-end on the Claw (uninstall should put back every captured
-  original value, including the new Lighting on/off state).
-- Gate G2, fan control: still needs the byte layout resolved before anything is written.
-  `Diagnostics/Sweep-MsiAcpi.ps1` is the tool to try — snapshot across MSI Center's fan settings
-  and diff, the same way the charge limit was eventually located.
+- **Gate G2, fan control** — the largest remaining feature. Still needs the byte layout resolved
+  before anything is written. `Diagnostics/Sweep-MsiAcpi.ps1` is the tool to try: snapshot across
+  MSI Center's fan settings and diff, exactly how the charge limit was eventually located. Note
+  `Get_Fan` / `Set_Fan` both take a `Package_32`, same shape as everything else on that class.
+- **Uninstall/restore flow**, end-to-end on the Claw — should put back every captured original
+  value. Less to restore now that two features are gone.
+- Desktop/gamepad mode (G5) and Intel GPU controls (G6) remain unimplemented stubs.

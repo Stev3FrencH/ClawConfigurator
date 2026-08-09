@@ -480,7 +480,6 @@ namespace McenterLite.Widget
             {
                 Pl1Slider,
                 FanEnabledToggle,
-                LedToggle,
                 HwMouseToggle,
                 CpuBoostToggle,
             };
@@ -554,7 +553,6 @@ namespace McenterLite.Widget
             // by any app on the machine and the helper is the only real gate.
             TdpCard.Visibility = Visible(_connection.IsAvailable(Function.Pl1));
             FanCard.Visibility = Visible(caps.HasFan && _connection.IsAvailable(Function.FanPreset));
-            LedCard.Visibility = Visible(caps.HasLed);
             HwMouseCard.Visibility = Visible(caps.HasHwMouse);
             IntelCard.Visibility = Visible(caps.HasIgcl && _connection.IsAvailable(Function.IntelFpsTier));
 
@@ -584,7 +582,6 @@ namespace McenterLite.Widget
             ApplyValue(Function.FanEnabled);
             ApplyValue(Function.FanPreset);
             ApplyValue(Function.FanState);
-            ApplyValue(Function.LedEnabled);
             ApplyValue(Function.HwMouseMode);
             ApplyValue(Function.CpuBoost);
             ApplyValue(Function.OsPowerMode);
@@ -626,10 +623,6 @@ namespace McenterLite.Widget
 
                 case Function.FanState:
                     ApplyFanState(_connection.Get(Function.FanState));
-                    break;
-
-                case Function.LedEnabled:
-                    LedToggle.IsOn = _connection.GetBool(Function.LedEnabled);
                     break;
 
                 case Function.HwMouseMode:
@@ -805,12 +798,6 @@ namespace McenterLite.Widget
         {
             if (_applyingFromHelper) return;
             await SendAsync(Function.FanPreset, _fanPreset.Advance());
-        }
-
-        private async void LedToggle_Toggled(object sender, RoutedEventArgs e)
-        {
-            if (_applyingFromHelper) return;
-            await SendAsync(Function.LedEnabled, LedToggle.IsOn);
         }
 
         private async void HwMouseToggle_Toggled(object sender, RoutedEventArgs e)

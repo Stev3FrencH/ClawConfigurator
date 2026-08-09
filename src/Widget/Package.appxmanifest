@@ -18,7 +18,7 @@
   <Identity
     Name="McenterLite"
     Publisher="CN=msi-mcenter-lite"
-    Version="0.1.0.27" />
+    Version="0.1.0.28" />
 
   <Properties>
     <DisplayName>M Center Lite</DisplayName>

@@ -787,6 +787,13 @@ back — never a hand-built buffer, which would risk zeroing bytes 3 and 4 whose
 
 ## Gate G4 — RGB LED
 
+> **FEATURE REMOVED 2026-08-08.** Lighting is no longer part of this app. Mode, colour and effect
+> ride a vendor HID report that was never decoded, so the most the widget could offer was an on/off
+> toggle sitting next to MSI Center's far more capable control — not worth the surface. The code is
+> gone from every layer and `Function` ordinal 40 is retired.
+>
+> **Everything below is kept as a device record, not as live work.**
+
 Partly pre-answered by desk research: LED rides on **report ID `0x0F`, 64 bytes**, on the vendor
 collection, shared with mode-switch and the M1/M2 buttons. The interfaces are PID `0x1901`
 (usage page `0xFFA0`/usage `0x0001`) and PID `0x1902` (`0xFFF0`/`0x0040`) — **enumerate both**.
