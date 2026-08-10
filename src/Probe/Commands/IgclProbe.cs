@@ -70,8 +70,66 @@ namespace McenterLite.Probe.Commands
         [DllImport(ControlLib, CallingConvention = CallingConvention.Cdecl)]
         private static extern int ctlEnumerateDevices(IntPtr hAPIHandle, ref uint pCount, IntPtr phDevices);
 
-        public static int Run()
+        /// <summary>
+        /// The union behind <c>ctl_property_t</c>, sized to its widest member.
+        /// </summary>
+        /// <remarks>
+        /// Members are bool(1), {bool,float}(8), {bool,int32}(8), uint32(4), {bool,uint32}(8), so
+        /// eight bytes at four-byte alignment covers all of them. Declared explicitly rather than
+        /// as a real union because every member this probe reads is either the enum's uint32 or
+        /// the int32 value, both of which sit at the same offsets.
+        /// </remarks>
+        [StructLayout(LayoutKind.Sequential)]
+        private struct CtlPropertyValue
         {
+            public uint EnableOrType;   // bool Enable, or uint32 EnableType for the enum form
+            public int Value;           // int32/uint32/float payload where the type has one
+        }
+
+        /// <remarks>
+        /// Mirrors <c>ctl_3d_feature_getset_t</c>. Like <see cref="CtlInitArgs"/> this leads with a
+        /// <c>Size</c> the driver validates, which is what makes it safe to try: a layout mistake
+        /// is rejected as UNSUPPORTED_SIZE rather than silently misread.
+        /// </remarks>
+        [StructLayout(LayoutKind.Sequential)]
+        private struct Ctl3DFeatureGetSet
+        {
+            public uint Size;
+            public byte Version;
+            public int FeatureType;
+            public IntPtr ApplicationName;   // NULL = global rather than per-application
+            public int ValueType;
+            public CtlPropertyValue Value;
+            public int CustomValueSize;
+            public IntPtr pCustomValue;
+        }
+
+        [DllImport(ControlLib, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int ctlGetSet3DFeature(IntPtr hDAhandle, ref Ctl3DFeatureGetSet pFeature);
+
+        /// <summary>Every ctl_3d_feature_t, from igcl_api.h.</summary>
+        private static readonly (int Id, string Name)[] Features =
+        {
+            (0, "FRAME_PACING"), (1, "ENDURANCE_GAMING"), (2, "FRAME_LIMIT"),
+            (3, "ANISOTROPIC"), (4, "CMAA"), (5, "TEXTURE_FILTERING_QUALITY"),
+            (6, "ADAPTIVE_TESSELLATION"), (7, "SHARPENING_FILTER"), (8, "MSAA"),
+            (9, "GAMING_FLIP_MODES"), (10, "ADAPTIVE_SYNC_PLUS"), (11, "APP_PROFILES"),
+            (12, "APP_PROFILE_DETAILS"), (13, "EMULATED_TYPED_64BIT_ATOMICS"),
+            (14, "VRR_WINDOWED_BLT"), (15, "GLOBAL_OR_PER_APP"), (16, "LOW_LATENCY"),
+            (17, "FRAME_GENERATION"), (18, "PREBUILT_SHADER_DOWNLOAD"), (19, "LIVE_STATE"),
+        };
+
+        private static readonly string[] ValueTypeNames =
+        {
+            "bool", "float", "int32", "uint32", "enum", "custom",
+        };
+
+        public static int Run(string[] commandArgs = null)
+        {
+            // Optional executable name. NULL means query the GLOBAL scope, which is what a
+            // per-application-only feature reports DATA_NOT_FOUND for.
+            _applicationName = commandArgs != null && commandArgs.Length > 0 ? commandArgs[0] : null;
+
             Console.WriteLine("Intel Graphics Control Library probe");
             Console.WriteLine("====================================");
             Console.WriteLine();
@@ -189,12 +247,8 @@ namespace McenterLite.Probe.Commands
                 {
                     IntPtr handle = Marshal.ReadIntPtr(buffer, i * IntPtr.Size);
                     Console.WriteLine($"  [{i}] adapter handle 0x{handle.ToInt64():X}");
+                    Query3DFeatures(handle);
                 }
-
-                Console.WriteLine();
-                Console.WriteLine("G6 checkboxes 1-3 are answered: library present, ctlInit succeeds,");
-                Console.WriteLine("adapters enumerate. Per-feature support (ctlGetSupported3DCapabilities)");
-                Console.WriteLine("is NOT probed here - see the class remarks for why.");
             }
             finally
             {
@@ -202,24 +256,150 @@ namespace McenterLite.Probe.Commands
             }
         }
 
+        /// <summary>
+        /// Asks the driver about each 3D feature individually.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// One GET per feature rather than <c>ctlGetSupported3DCapabilities</c>, which is the
+        /// documented way to enumerate them. That call hands back a driver-allocated
+        /// <c>ctl_3d_feature_details_t</c> ARRAY, and stepping through it needs the element size
+        /// exactly right - it depends on nested property-info unions and their range structs, none
+        /// of which this has verified. Wrong stride, and the pointer walks off the end.
+        /// </para>
+        /// <para>
+        /// This route has no array to index, and <c>ctl_3d_feature_getset_t</c> leads with a
+        /// <c>Size</c> the driver checks - so a layout error surfaces as UNSUPPORTED_SIZE on the
+        /// first call rather than as garbage or a fault. Strictly less information (no ranges, no
+        /// per-app support flags) in exchange for being safe to run against a live driver.
+        /// </para>
+        /// <para>
+        /// A feature the driver does not implement answers NOT_SUPPORTED, which is exactly the
+        /// question being asked.
+        /// </para>
+        /// </remarks>
+        private static string _applicationName;
+
+        private static void Query3DFeatures(IntPtr adapter)
+        {
+            string scope = _applicationName == null
+                ? "global scope (ApplicationName = NULL)"
+                : $"per-application scope (\"{_applicationName}\")";
+
+            Console.WriteLine();
+            Console.WriteLine($"      3D features (one GET each, {scope}):");
+            Console.WriteLine($"      ctl_3d_feature_getset_t size: {Marshal.SizeOf<Ctl3DFeatureGetSet>()} bytes");
+            Console.WriteLine();
+
+            // Marshalled once and freed once, rather than per call: the driver only reads it.
+            IntPtr appName = _applicationName == null
+                ? IntPtr.Zero
+                : Marshal.StringToHGlobalAnsi(_applicationName);
+
+            try
+            {
+                int supported = 0;
+
+                foreach (var feature in Features)
+                {
+                    var request = new Ctl3DFeatureGetSet
+                    {
+                        Size = (uint)Marshal.SizeOf<Ctl3DFeatureGetSet>(),
+                        Version = 0,
+                        FeatureType = feature.Id,
+                        ApplicationName = appName,
+                        ValueType = 0,
+                        Value = default,
+                        CustomValueSize = 0,
+                        pCustomValue = IntPtr.Zero,
+                    };
+
+                    int result;
+                    try
+                    {
+                        result = ctlGetSet3DFeature(adapter, ref request);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"        {feature.Name,-30} THREW: {ex.GetType().Name}");
+                        continue;
+                    }
+
+                    if (result == 0)
+                    {
+                        supported++;
+                        string type = request.ValueType >= 0 && request.ValueType < ValueTypeNames.Length
+                            ? ValueTypeNames[request.ValueType]
+                            : $"type {request.ValueType}";
+
+                        Console.WriteLine(
+                            $"        {feature.Name,-30} SUPPORTED  ({type}, " +
+                            $"enable/type={request.Value.EnableOrType}, value={request.Value.Value})");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"        {feature.Name,-30} {Describe(result)}");
+                    }
+                }
+
+                Console.WriteLine();
+                Console.WriteLine($"      {supported} of {Features.Length} features readable at this scope.");
+
+                if (_applicationName == null)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("      DATA_NOT_FOUND is not the same as UNSUPPORTED_FEATURE. It means the");
+                    Console.WriteLine("      driver knows the feature but has nothing at GLOBAL scope - which is");
+                    Console.WriteLine("      what a per-application feature looks like from here. Re-run with an");
+                    Console.WriteLine("      executable name to test that:   probe igcl game.exe");
+                }
+            }
+            finally
+            {
+                if (appName != IntPtr.Zero) Marshal.FreeHGlobal(appName);
+            }
+        }
+
         private static string Version(uint packed) => $"{packed >> 16}.{packed & 0xFFFF}";
 
-        /// <summary>The handful of ctl_result_t values worth naming; anything else prints raw.</summary>
+        /// <summary>
+        /// ctl_result_t, taken from igcl_api.h.
+        /// </summary>
+        /// <remarks>
+        /// The two that matter when reading the feature sweep say DIFFERENT things, and conflating
+        /// them would lead the UI design astray:
+        ///
+        ///   UNSUPPORTED_FEATURE  the driver does not implement it here at all.
+        ///   DATA_NOT_FOUND       the driver knows the feature, but has nothing for the scope that
+        ///                        was asked - which for a NULL ApplicationName means global.
+        /// </remarks>
         private static string Describe(int result)
         {
             switch (result)
             {
                 case 0x00000000: return "SUCCESS";
-                case 0x40000000: return "NOT_SUPPORTED (0x40000000)";
-                case 0x40000001: return "NOT_IMPLEMENTED";
-                case 0x4000FFFF: return "UNKNOWN";
-                case 0x7800000B: return "INVALID_NULL_POINTER";
-                case 0x7800000C: return "INVALID_SIZE";
-                case 0x7800000D: return "UNSUPPORTED_SIZE (struct layout mismatch)";
-                case 0x7800000E: return "UNSUPPORTED_VERSION";
-                case 0x78000012: return "INVALID_ARGUMENT";
-                case 0x78000013: return "INVALID_API_HANDLE";
-                case 0x7800001A: return "CORE_OVERCLOCK_NOT_SUPPORTED";
+                case 0x40000001: return "NOT_INITIALIZED";
+                case 0x40000003: return "DEVICE_LOST";
+                case 0x40000006: return "INSUFFICIENT_PERMISSIONS";
+                case 0x40000007: return "NOT_AVAILABLE";
+                case 0x40000008: return "UNINITIALIZED";
+                case 0x40000009: return "UNSUPPORTED_VERSION";
+                case 0x4000000A: return "UNSUPPORTED_FEATURE  (driver does not implement it)";
+                case 0x4000000B: return "INVALID_ARGUMENT";
+                case 0x4000000C: return "INVALID_API_HANDLE";
+                case 0x4000000D: return "INVALID_NULL_HANDLE";
+                case 0x4000000E: return "INVALID_NULL_POINTER";
+                case 0x4000000F: return "INVALID_SIZE";
+                case 0x40000010: return "UNSUPPORTED_SIZE  (struct layout mismatch)";
+                case 0x40000012: return "DATA_READ";
+                case 0x40000013: return "DATA_WRITE";
+                case 0x40000014: return "DATA_NOT_FOUND  (known, but nothing at this scope)";
+                case 0x40000015: return "NOT_IMPLEMENTED";
+                case 0x40000016: return "OS_CALL";
+                case 0x40000017: return "KMD_CALL";
+                case 0x4000001A: return "INVALID_OPERATION_TYPE";
+                case 0x4000001F: return "PERSISTANCE_NOT_SUPPORTED";
+                case 0x40000020: return "PLATFORM_NOT_SUPPORTED";
                 default: return $"0x{result:X8}";
             }
         }
