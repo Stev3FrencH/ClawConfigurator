@@ -6,18 +6,26 @@ gate-by-gate detail.
 
 ## Current build
 
-**0.1.0.26, Release configuration.**
+**0.1.0.31, Release configuration.**
 
 ```
-src/Package/AppPackages/McenterLite.Package_0.1.0.26_x64_Test/
+src/Package/AppPackages/McenterLite.Package_0.1.0.31_x64_Test/
 ```
+
+Install from the repo, in any PowerShell — the script elevates and re-launches under 5.1 itself:
 
 ```powershell
-.\Install.ps1 -PackagePath ".\McenterLite.Package_0.1.0.26_x64_Test\McenterLite.Package_0.1.0.26_x64.msix" -CertificatePath ".\msi-mcenter-lite.cer"
+powershell -ExecutionPolicy Bypass -File .\src\Package\Install.ps1
 ```
 
-Note this predates the charge-limit removal — the next build will need a version bump and a
-fresh package.
+It picks the newest package under `src/Package/AppPackages/` on its own.
+
+To see the whole UI on a machine that is not a Claw (the device gate otherwise hides every
+hardware card):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Diagnostics\Start-FakeHelper.ps1
+```
 
 ## Confirmed working on the Claw
 

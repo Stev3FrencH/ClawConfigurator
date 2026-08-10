@@ -68,14 +68,30 @@ $scriptDirectory = Split-Path -Parent $PSCommandPath
 
 # ── Locate the package and certificate ────────────────────────────────────────
 if (-not $PackagePath) {
-    $candidate = Get-ChildItem -Path $scriptDirectory -Filter '*.msixbundle' -ErrorAction SilentlyContinue |
+    # Search RECURSIVELY. The build drops packages into AppPackages\<name>_<version>_x64_Test\,
+    # never beside this script, so a flat search finds nothing and the documented no-argument
+    # invocation could not work. Recursion also covers the copied-to-the-Claw layout, where this
+    # script sits next to the package FOLDER rather than the .msix itself.
+    #
+    # Newest by LastWriteTime, not by name: version strings sort as text, so 0.1.0.9 would beat
+    # 0.1.0.31 and quietly install a months-old build.
+    $candidate =
+        Get-ChildItem -Path $scriptDirectory -Filter '*.msixbundle' -Recurse -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
     if (-not $candidate) {
-        $candidate = Get-ChildItem -Path $scriptDirectory -Filter '*.msix' -ErrorAction SilentlyContinue |
+        $candidate =
+            Get-ChildItem -Path $scriptDirectory -Filter '*.msix' -Recurse -ErrorAction SilentlyContinue |
             Sort-Object LastWriteTime -Descending | Select-Object -First 1
     }
-    if (-not $candidate) { throw "No .msixbundle or .msix found in $scriptDirectory." }
+
+    if (-not $candidate) {
+        throw ("No .msixbundle or .msix found under $scriptDirectory. Build one with the " +
+               'McenterLite.Package wapproj, or pass -PackagePath explicitly.')
+    }
+
     $PackagePath = $candidate.FullName
+    Write-Host "Found package: $($candidate.Name) ($($candidate.LastWriteTime.ToString('yyyy-MM-dd HH:mm')))" -ForegroundColor DarkGray
 }
 
 if (-not $CertificatePath) {

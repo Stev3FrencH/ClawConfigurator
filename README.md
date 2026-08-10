@@ -122,8 +122,13 @@ sideloading.
 Then, in an **elevated** PowerShell on the Claw, from wherever the folder above was copied to:
 
 ```powershell
-.\Install.ps1 -PackagePath ".\McenterLite.Package_<version>_x64_Test\McenterLite.Package_<version>_x64.msix" -CertificatePath ".\msi-mcenter-lite.cer"
+powershell -ExecutionPolicy Bypass -File .\Install.ps1
 ```
+
+It finds the newest `.msix` beneath its own folder and the `.cer` beside it, so no paths are
+needed. Pass `-PackagePath` / `-CertificatePath` to override. The `-ExecutionPolicy Bypass` prefix
+matters: a script copied from another machine is blocked by default, and the error
+("running scripts is disabled on this system") does not mention the file's origin.
 
 No .NET SDK, Visual Studio, or any build tooling is needed on the Claw — the helper is
 self-contained and the widget's framework dependencies come from the `Dependencies` folder copied
@@ -139,11 +144,26 @@ If Visual Studio is already on the target device, once a signed `.msix` exists u
 `src/Package/AppPackages/`:
 
 ```powershell
-.\src\Package\Install.ps1
+powershell -ExecutionPolicy Bypass -File .\src\Package\Install.ps1
 ```
 
 This imports the signing certificate to `LocalMachine\TrustedPeople`, stops any running instance,
-and installs the package.
+and installs the newest package it finds under `src/Package/AppPackages/`. It re-launches itself
+under Windows PowerShell 5.1 and elevates on its own, so a plain prompt is fine — but it still has
+to be *loadable*, hence `-ExecutionPolicy Bypass`.
+
+### Seeing the UI on a machine that is not a Claw
+
+The device gate hides every hardware card on anything that is not a Claw 8 EX, leaving only the
+Windows power card. To exercise the whole UI on a development machine:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Diagnostics\Start-FakeHelper.ps1
+```
+
+That runs the helper against simulated hardware so all four cards appear. CPU boost and OS power
+mode stay real — the fake layer keeps the Win32 provider deliberately. See the script's help for
+what it does to the scheduled task and how it puts it back.
 
 ### After installing
 
