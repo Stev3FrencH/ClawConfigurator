@@ -150,63 +150,23 @@
                 <Setter Property="IsThumbToolTipEnabled" Value="False" />
             </Style>
 
-            <!--
-                A button that cycles through a fixed list of options, used everywhere a ComboBox
-                would otherwise be.
-
-                This is a gamepad-first decision, not a stylistic one. The Claw is driven with a
-                controller: a ComboBox costs a press to open the flyout, D-pad travel through a
-                popup that steals focus, and a second press to commit - and the popup can render
-                outside the widget's bounds in the Game Bar. A cycle button is one A press per
-                step, with focus never leaving the card.
-
-                It also deletes a bug class. A ComboBox raises SelectionChanged while XAML applies
-                its markup defaults during construction, which is why every helper-driven update
-                has to be wrapped in a guard. A Button raises Click only when something clicks it.
-
-                The trade is that reaching the last option takes one press per step. That is
-                acceptable at these list lengths - the longest here is the four Endurance Gaming
-                tiers - and would not be if any list grew much beyond that.
-            -->
-            <Style x:Key="CycleButtonStyle" TargetType="Button">
-                <Setter Property="HorizontalAlignment" Value="Stretch" />
-                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                <Setter Property="MinHeight" Value="{StaticResource ControlHeight}" />
-                <Setter Property="CornerRadius" Value="6" />
-                <Setter Property="Padding" Value="12,6" />
-                <Setter Property="Margin" Value="0,2,0,0" />
-                <Setter Property="FontSize" Value="{StaticResource BodySize}" />
-                <Setter Property="ContentTemplate">
-                    <Setter.Value>
-                        <DataTemplate>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="{Binding}"
-                                           VerticalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis" />
-                                <!-- Says "there is another option this way" rather than "this
-                                     opens something", which a dropdown chevron would imply. -->
-                                <FontIcon Grid.Column="1"
-                                          Glyph="&#xE76C;"
-                                          FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                          FontSize="14"
-                                          Margin="10,0,0,0"
-                                          VerticalAlignment="Center"
-                                          Opacity="0.6" />
-                            </Grid>
-                        </DataTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Style>
 
             <!--
-                A fixed row of individually-clickable options, the active one highlighted. Used
-                where CycleButtonStyle's single button read as a dropdown despite being clickable -
-                right for a short, always-visible option set like the three power modes, where
-                showing every choice at once is clearer than requiring a press to discover them.
+                A fixed row of individually-clickable options, the active one highlighted. The only
+                selector this widget uses.
+
+                It replaced a ComboBox first, then a cycle-button that showed one option at a time.
+                This is a gamepad-first decision rather than a stylistic one: the Claw is driven
+                with a controller, and a ComboBox costs a press to open the flyout, D-pad travel
+                through a popup that steals focus from the card, and a second press to commit - and
+                the popup can render outside the widget's bounds in the Game Bar. The cycle-button
+                fixed all that but still read as a dropdown and hid the other choices until pressed.
+
+                Showing every option at once costs vertical space and wins it back elsewhere: no
+                option list here exceeds four, and the widest row (four FPS tiers) is still short
+                labels. It also deletes a bug class - a ComboBox raises SelectionChanged while XAML
+                applies its markup defaults during construction, which is why every helper-driven
+                update needs a guard. A Button raises Click only when something clicks it.
             -->
             <Style x:Key="SegmentButtonStyle" TargetType="Button">
                 <Setter Property="HorizontalAlignment" Value="Stretch" />

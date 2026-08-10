@@ -60,69 +60,29 @@ namespace McenterLite.Widget
         private bool _applyingFromHelper = true;
 
         /// <summary>
-        /// Drives a <see cref="Button"/> as a cycling selector over a fixed list of options.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// Replaces the ComboBox everywhere in this widget. The device is a handheld driven with a
-        /// game controller: a dropdown costs a press to open, D-pad travel through a popup that
-        /// takes focus out of the card, and a second press to commit. This is one press per step.
-        /// </para>
-        /// <para>
-        /// The option strings live here rather than in XAML because the index IS the wire value -
-        /// it is cast straight to the enum it names. Keeping the list next to the code that casts
-        /// it makes that coupling visible; in XAML it was three files apart.
-        /// </para>
-        /// </remarks>
-        private sealed class OptionCycler
-        {
-            private readonly Button _button;
-            private readonly string[] _options;
-
-            public OptionCycler(Button button, params string[] options)
-            {
-                _button = button;
-                _options = options;
-                _button.Content = options[0];
-            }
-
-            public int Index { get; private set; }
-
-            /// <summary>Displays an option WITHOUT treating it as user input.</summary>
-            public void Show(int index)
-            {
-                if (index < 0 || index >= _options.Length) return;
-                Index = index;
-                _button.Content = _options[index];
-            }
-
-            /// <summary>Advances one step, wrapping past the end. Returns the new index.</summary>
-            public int Advance()
-            {
-                Show((Index + 1) % _options.Length);
-                return Index;
-            }
-
-            public bool IsEnabled
-            {
-                set => _button.IsEnabled = value;
-            }
-        }
-
-        /// <summary>
         /// A fixed row of individually-clickable options, the active one highlighted.
         /// </summary>
         /// <remarks>
         /// <para>
-        /// <see cref="OptionCycler"/>'s single button read as a dropdown despite being clickable -
-        /// right for the longer option lists elsewhere in this widget, wrong for a short, always-
-        /// relevant set like the three power modes, where showing every choice up front removes any
-        /// doubt about what pressing it does.
+        /// The only selector this widget uses. It replaced a ComboBox first, then a cycle-button
+        /// that showed one option at a time: the device is a handheld driven with a game
+        /// controller, and a dropdown costs a press to open, D-pad travel through a popup that
+        /// steals focus, and a second press to commit. A cycle-button fixed that but still read as
+        /// a dropdown and hid the choices. Showing every option up front removes both problems -
+        /// one press, and no doubt about what pressing it does.
         /// </para>
         /// <para>
-        /// Same index-is-the-wire-value contract as <see cref="OptionCycler"/>, and the same
-        /// "Show never counts as user input" split between display and the <see cref="Selected"/>
-        /// event, which only fires from a genuine click.
+        /// <b>The index is NOT automatically the wire value.</b> It was, when every list happened
+        /// to be ordered like its enum, and two selectors now deliberately are not - see
+        /// <see cref="PerfModeSegmentOrder"/> and <see cref="IntelFpsTierSegmentOrder"/>. Those
+        /// pair label to value in one table so display order can be chosen for the user without
+        /// changing what gets sent. Where the two orders genuinely coincide the index is passed
+        /// straight through, and that is stated at the call site.
+        /// </para>
+        /// <para>
+        /// <see cref="Show"/> never counts as user input; only a genuine click raises
+        /// <see cref="Selected"/>. That split is what keeps helper-driven updates from echoing
+        /// back as writes.
         /// </para>
         /// </remarks>
         private sealed class SegmentedControl
@@ -253,12 +213,37 @@ namespace McenterLite.Widget
             (true, "On"),
         };
 
+        /// <summary>
+        /// The FPS-limit segments, left to right: the label and the IGCL tier it sends.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>The tiers run backwards.</b> IGCL numbers Endurance Gaming 0 = off, 1 = performance
+        /// (60 fps), 2 = balanced (40), 3 = efficiency (30) - so ascending frame rate is
+        /// DESCENDING wire value. Reading Off, 30, 40, 60 left to right is the order a frame-rate
+        /// cap should read in; it is not the order the driver numbers them, and casting the index
+        /// would send 30 fps when 60 was pressed.
+        /// </para>
+        /// <para>
+        /// Shown as the frame rates rather than IGCL's "performance / balanced / efficiency", which
+        /// name the intent instead of the effect - and the effect is a number the user can see in
+        /// their game.
+        /// </para>
+        /// </remarks>
+        private static readonly (int Tier, string Label)[] IntelFpsTierSegmentOrder =
+        {
+            (0, "Off"),
+            (3, "30"),
+            (2, "40"),
+            (1, "60"),
+        };
+
         private SegmentedControl _perfMode;
         private SegmentedControl _hwMouse;
         private SegmentedControl _cpuBoost;
         private SegmentedControl _powerMode;
-        private OptionCycler _intelFpsTier;
-        private OptionCycler _intelLowLatency;
+        private SegmentedControl _intelFpsTier;
+        private SegmentedControl _intelLowLatency;
 
         public MainWidget()
         {
@@ -293,11 +278,15 @@ namespace McenterLite.Widget
                     "Efficiency", "Balanced", "Performance");
                 _powerMode.Selected += OnPowerModeSelected;
 
-                _intelFpsTier = new OptionCycler(IntelFpsTierButton,
-                    "Off", "Performance (60 fps)", "Balanced (40 fps)", "Efficiency (30 fps)");
+                _intelFpsTier = new SegmentedControl(IntelFpsTierSegments,
+                    Array.ConvertAll(IntelFpsTierSegmentOrder, segment => segment.Label));
+                _intelFpsTier.Selected += OnIntelFpsTierSelected;
 
-                _intelLowLatency = new OptionCycler(IntelLowLatencyButton,
+                // Low latency needs no mapping table: IGCL numbers it 0 = Off, 1 = On,
+                // 2 = On+Boost, which is already the order it reads in.
+                _intelLowLatency = new SegmentedControl(IntelLowLatencySegments,
                     "Off", "On", "On + boost");
+                _intelLowLatency.Selected += OnIntelLowLatencySelected;
 
                 _connection.SnapshotApplied += OnSnapshotApplied;
                 _connection.ValueChanged += OnValueChanged;
@@ -717,8 +706,12 @@ namespace McenterLite.Widget
                     break;
 
                 case Function.IntelFpsTier:
-                    _intelFpsTier.Show(Clamp(_connection.GetInt(Function.IntelFpsTier, 0), 0, 3));
+                {
+                    int tier = _connection.GetInt(Function.IntelFpsTier, 0);
+                    int segment = Array.FindIndex(IntelFpsTierSegmentOrder, s => s.Tier == tier);
+                    if (segment >= 0) _intelFpsTier.Show(segment);
                     break;
+                }
 
                 case Function.IntelLowLatency:
                     _intelLowLatency.Show(Clamp(_connection.GetInt(Function.IntelLowLatency, 0), 0, 2));
@@ -863,16 +856,21 @@ namespace McenterLite.Widget
             await SendAsync(Function.OsPowerMode, index);
         }
 
-        private async void IntelFpsTierButton_Click(object sender, RoutedEventArgs e)
+        private async void OnIntelFpsTierSelected(int segment)
         {
             if (_applyingFromHelper) return;
-            await SendAsync(Function.IntelFpsTier, _intelFpsTier.Advance());
+            if (segment < 0 || segment >= IntelFpsTierSegmentOrder.Length) return;
+
+            _intelFpsTier.Show(segment);
+            await SendAsync(Function.IntelFpsTier, IntelFpsTierSegmentOrder[segment].Tier);
         }
 
-        private async void IntelLowLatencyButton_Click(object sender, RoutedEventArgs e)
+        private async void OnIntelLowLatencySelected(int segment)
         {
             if (_applyingFromHelper) return;
-            await SendAsync(Function.IntelLowLatency, _intelLowLatency.Advance());
+
+            _intelLowLatency.Show(segment);
+            await SendAsync(Function.IntelLowLatency, segment);
         }
 
         private async void StatusActionButton_Click(object sender, RoutedEventArgs e) => await StartAsync();

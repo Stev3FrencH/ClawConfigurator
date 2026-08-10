@@ -137,39 +137,7 @@
                     </StackPanel>
                 </Border>
 
-                <!-- 2. Fan was here. Removed 2026-08-08: fan control stays in MSI Center. Gate G2
-                     never resolved the byte layout, so nothing was ever written to the EC. -->
-
-                <!-- 3. Battery charge limit was here. Removed 2026-08-08: it is set in MSI
-                     Center, changes rarely, and the registry path this app could reach did not
-                     enforce it. See docs/hardware-notes.md Gate G3. -->
-
-                <!-- 4. Lighting was here. Removed 2026-08-08: MSI Center's own lighting control
-                     is far more capable than the on/off switch this app could offer, since
-                     mode, colour and effect ride a vendor HID report that was never decoded
-                     (Gate G4). -->
-
-                <!-- 5. Controller -->
-                <Border x:Name="HwMouseCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
-                    <StackPanel>
-                        <Grid Margin="0,0,0,4">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <FontIcon Grid.Column="0" Glyph="&#xE7FC;" Style="{StaticResource CardIconStyle}" />
-                            <TextBlock Grid.Column="1" Text="Controller" Style="{StaticResource CardTitleStyle}" />
-                        </Grid>
-
-                        <!-- Two named buttons rather than a toggle. A switch labelled "desktop
-                             mouse mode" leaves the off state unnamed, and "off" here is not
-                             nothing - it is gamepad mode. Segment order is set in code by
-                             HwMouseSegmentOrder. -->
-                        <Grid x:Name="HwMouseSegments" Margin="0,12,0,0" />
-                    </StackPanel>
-                </Border>
-
-                <!-- 6 and 7. Windows power -->
+                <!-- 2. Windows power -->
                 <Border Style="{StaticResource CardStyle}">
                     <StackPanel>
                         <Grid>
@@ -199,7 +167,7 @@
                     </StackPanel>
                 </Border>
 
-                <!-- 8. Graphics -->
+                <!-- 3. Graphics -->
                 <Border x:Name="IntelCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
                     <StackPanel>
                         <Grid Margin="0,0,0,4">
@@ -211,15 +179,16 @@
                             <TextBlock Grid.Column="1" Text="Graphics" Style="{StaticResource CardTitleStyle}" />
                         </Grid>
 
-                        <TextBlock Text="Endurance gaming" Style="{StaticResource RowLabelStyle}" Margin="0,12,0,0" />
-                        <Button x:Name="IntelFpsTierButton"
-                                Style="{StaticResource CycleButtonStyle}"
-                                Click="IntelFpsTierButton_Click" />
+                        <!-- "FPS limit" rather than IGCL's own "Endurance Gaming", and the tiers
+                             shown as the frame rates they actually cap at. Segment order is set in
+                             code by IntelFpsTierSegmentOrder and is deliberately NOT the wire
+                             order - the driver numbers these 0/1/2/3 as off/60/40/30, so the
+                             numeric tiers run backwards from how they read here. -->
+                        <TextBlock Text="FPS limit" Style="{StaticResource RowLabelStyle}" Margin="0,12,0,0" />
+                        <Grid x:Name="IntelFpsTierSegments" Margin="0,6,0,0" />
 
                         <TextBlock Text="Low latency" Style="{StaticResource RowLabelStyle}" Margin="0,12,0,0" />
-                        <Button x:Name="IntelLowLatencyButton"
-                                Style="{StaticResource CycleButtonStyle}"
-                                Click="IntelLowLatencyButton_Click" />
+                        <Grid x:Name="IntelLowLatencySegments" Margin="0,6,0,0" />
 
                         <!-- Honest wording: the driver applies this per executable, so a global
                              switch would be a lie. -->
@@ -227,6 +196,31 @@
                                    Text="Applies to the game currently in focus, not system-wide." />
                     </StackPanel>
                 </Border>
+
+                <!-- 4. Controller -->
+                <Border x:Name="HwMouseCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Grid.Column="0" Glyph="&#xE7FC;" Style="{StaticResource CardIconStyle}" />
+                            <TextBlock Grid.Column="1" Text="Controller" Style="{StaticResource CardTitleStyle}" />
+                        </Grid>
+
+                        <!-- Two named buttons rather than a toggle. A switch labelled "desktop
+                             mouse mode" leaves the off state unnamed, and "off" here is not
+                             nothing - it is gamepad mode. Segment order is set in code by
+                             HwMouseSegmentOrder. -->
+                        <Grid x:Name="HwMouseSegments" Margin="0,12,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Fan, battery charge limit and RGB lighting all had cards here. All three were
+                     removed 2026-08-08 - each is set in MSI Center, and MSI's own controls are
+                     better than anything this widget could offer. See docs/hardware-notes.md
+                     gates G2, G3 and G4 for the findings, which are kept as a device record. -->
 
                 <!-- Dependency notice.
                      This warns when MSI Center M is NOT running, which reads backwards until you
