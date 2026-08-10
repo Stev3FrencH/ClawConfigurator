@@ -1,0 +1,117 @@
+PS C:\Users\jdurh\OneDrive\Documents\McenterLite.Package_0.1.0.49_Test> powershell -ExecutionPolicy Bypass -File .\Get-GameBarWidgets.ps1
+
+=== Game Bar widget manifests (4 found) ===
+
+--- 9426MICRO-STARINTERNATION.MSIQuickSettings  2.0.65.0
+<GameBarWidget Type="Standard">
+                <HomeMenuVisible>true</HomeMenuVisible>
+                <PinningSupported>false</PinningSupported>
+                <FavoriteAfterInstall>true</FavoriteAfterInstall>
+                <ActivateAfterInstall>true</ActivateAfterInstall>
+                <ResizeSupported>true</ResizeSupported>
+                <SettingsSupported AppExtensionId="SettingEditor" />
+                <IsDeviceWidget>true</IsDeviceWidget>
+                <Window>
+                  <AllowForegroundTransparency>true</AllowForegroundTransparency>
+                  <Size>
+                    <Width>610</Width>
+                    <Height>640</Height>
+                  </Size>
+                  <ResizeSupported>
+                    <Horizontal>true</Horizontal>
+                    <Vertical>true</Vertical>
+                  </ResizeSupported>
+                </Window>
+              </GameBarWidget>
+
+--- Microsoft.XboxGamingOverlay  7.326.7271.0
+  (declares gameBarUIExtension but has no <GameBarWidget> block)
+
+--- Microsoft.GamingApp  2608.1001.17.0
+<GameBarWidget Type="Standard">
+                <ActivateAfterInstall>true</ActivateAfterInstall>
+                <FavoriteAfterInstall>true</FavoriteAfterInstall>
+                <HomeMenuVisible>true</HomeMenuVisible>
+                <PinningSupported>false</PinningSupported>
+                <SettingsSupported AppExtensionId="XboxSettingsWidget" />
+                <Window>
+                  <AllowForegroundTransparency>false</AllowForegroundTransparency>
+                  <Size>
+                    <Height>464</Height>
+                    <Width>320</Width>
+                    <MinHeight>464</MinHeight>
+                    <MinWidth>304</MinWidth>
+                    <MaxHeight>864</MaxHeight>
+                    <MaxWidth>902</MaxWidth>
+                  </Size>
+                  <ResizeSupported>
+                    <Horizontal>true</Horizontal>
+                    <Vertical>true</Vertical>
+                  </ResizeSupported>
+                </Window>
+              </GameBarWidget>
+
+--- McenterLite  0.1.0.36
+<GameBarWidget Type="Standard">
+                <HomeMenuVisible>true</HomeMenuVisible>
+                <PinningSupported>true</PinningSupported>
+                <ActivateAfterInstall>true</ActivateAfterInstall>
+                <FavoriteAfterInstall>true</FavoriteAfterInstall>
+
+                <IsDeviceWidget>true</IsDeviceWidget>
+                <Window>
+                  <Size>
+                    <Height>760</Height>
+                    <Width>420</Width>
+                    <MinHeight>420</MinHeight>
+                    <MinWidth>380</MinWidth>
+                    <MaxHeight>1080</MaxHeight>
+                    <MaxWidth>640</MaxWidth>
+                  </Size>
+                  <ResizeSupported>
+                    <Horizontal>true</Horizontal>
+                    <Vertical>true</Vertical>
+                  </ResizeSupported>
+                </Window>
+              </GameBarWidget>
+
+=== Placement properties, side by side ===
+Blank = not declared. This is the comparison that matters.
+
+
+Widget                                     IsDeviceWidget CompactModePriorityPlacement HomeMenuVisible FavoriteAfterInstall ActivateAfterInstall
+------                                     -------------- ---------------------------- --------------- -------------------- --------------------
+9426MICRO-STARINTERNATION.MSIQuickSettings true                                        true            true                 true
+Microsoft.XboxGamingOverlay
+Microsoft.GamingApp                                                                    true            true                 true
+McenterLite                                true                                        true            true                 true
+
+
+=== Game Bar runtime state ===
+What Game Bar RECORDED, which is not the same as what a manifest DECLARES.
+
+GraphicsWidget                                 fav=      pinned=      compactPlacement=
+SettingsWidget                                 fav=      pinned=False compactPlacement=
+ResourcesSettingsWidget                        fav=      pinned=False compactPlacement=
+CaptureWidget                                  fav=True  pinned=False compactPlacement=
+package_Microsoft.GamingApp_8wekyb3d8bbwe      fav=      pinned=      compactPlacement=
+9426MICRO-STARINTERNATION.MSIQuickSettings_k   fav=      pinned=False compactPlacement=False
+AudioWidget                                    fav=True  pinned=False compactPlacement=
+StoreWidget                                    fav=      pinned=False compactPlacement=
+Microsoft.GamingApp_8wekyb3d8bbwe_Microsoft.   fav=False pinned=      compactPlacement=
+9426MICRO-STARINTERNATION.MSIQuickSettings_k   fav=      pinned=False compactPlacement=False
+GalleryWidget                                  fav=      pinned=False compactPlacement=
+CaptureStatusWidget                            fav=      pinned=False compactPlacement=
+AudioStatusWidget                              fav=      pinned=      compactPlacement=
+9426MICRO-STARINTERNATION.MSIQuickSettings_k   fav=True  pinned=False compactPlacement=                                                          AutoHdrWidget                                  fav=      pinned=False compactPlacement=                                                          ChartSettingsWidget                            fav=      pinned=False compactPlacement=                                                          ResourcesWidget                                fav=True  pinned=False compactPlacement=                                                          Microsoft.GamingApp_8wekyb3d8bbwe_Microsoft.   fav=      pinned=False compactPlacement=False                                                     Microsoft.GamingApp_8wekyb3d8bbwe_Microsoft.   fav=False pinned=      compactPlacement=                                                          Microsoft.GamingApp_8wekyb3d8bbwe_Microsoft.   fav=False pinned=False compactPlacement=False                                                     Microsoft.GamingApp_8wekyb3d8bbwe_Microsoft.   fav=      pinned=      compactPlacement=                                                          Microsoft.GamingApp_8wekyb3d8bbwe_Microsoft.   fav=False pinned=      compactPlacement=
+McenterLite_xq4frxrkckec6_App_McenterLiteWid   fav=True  pinned=False compactPlacement=
+Microsoft.GamingApp_8wekyb3d8bbwe_Microsoft.   fav=      pinned=      compactPlacement=
+ChartWidget                                    fav=True  pinned=False compactPlacement=
+package_9426MICRO-STARINTERNATION.MSIQuickSe   fav=      pinned=      compactPlacement=
+package_McenterLite_xq4frxrkckec6              fav=      pinned=      compactPlacement=
+
+What to look for:
+  An OEM widget (MSI Quick Settings, ASUS Armoury) declaring CompactModePriorityPlacement
+  or IsDeviceWidget. Copy its exact value form into src/Package/Package.appxmanifest.
+  If NOTHING declares CompactModePriorityPlacement, the far-left slot is won some other
+  way and the manifest is the wrong place to keep looking.

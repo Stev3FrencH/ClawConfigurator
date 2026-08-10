@@ -1,0 +1,41 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{3BDBDD6A-AA60-45A4-9F04-44B2ACCCDEB0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "McenterLite.Widget", "src\Widget\McenterLite.Widget.csproj", "{7B2C4E10-9A55-4E3B-9C1D-2F8A6D4B7E90}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "McenterLite.Helper", "src\Helper\McenterLite.Helper.csproj", "{2FC1DC52-45E8-4981-B9D2-B069C597332C}"
+EndProject
+Project("{C7167F0D-BC9F-4E6E-AFE1-012C56B48DB5}") = "McenterLite.Package", "src\Package\McenterLite.Package.wapproj", "{DC27A487-8BE7-4140-8E84-0962D9D1AF2A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7B2C4E10-9A55-4E3B-9C1D-2F8A6D4B7E90}.Debug|x64.ActiveCfg = Debug|x64
+		{7B2C4E10-9A55-4E3B-9C1D-2F8A6D4B7E90}.Debug|x64.Build.0 = Debug|x64
+		{7B2C4E10-9A55-4E3B-9C1D-2F8A6D4B7E90}.Release|x64.ActiveCfg = Release|x64
+		{7B2C4E10-9A55-4E3B-9C1D-2F8A6D4B7E90}.Release|x64.Build.0 = Release|x64
+		{2FC1DC52-45E8-4981-B9D2-B069C597332C}.Debug|x64.ActiveCfg = Debug|x64
+		{2FC1DC52-45E8-4981-B9D2-B069C597332C}.Debug|x64.Build.0 = Debug|x64
+		{2FC1DC52-45E8-4981-B9D2-B069C597332C}.Release|x64.ActiveCfg = Release|x64
+		{2FC1DC52-45E8-4981-B9D2-B069C597332C}.Release|x64.Build.0 = Release|x64
+		{DC27A487-8BE7-4140-8E84-0962D9D1AF2A}.Debug|x64.ActiveCfg = Debug|x64
+		{DC27A487-8BE7-4140-8E84-0962D9D1AF2A}.Debug|x64.Build.0 = Debug|x64
+		{DC27A487-8BE7-4140-8E84-0962D9D1AF2A}.Release|x64.ActiveCfg = Release|x64
+		{DC27A487-8BE7-4140-8E84-0962D9D1AF2A}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{7B2C4E10-9A55-4E3B-9C1D-2F8A6D4B7E90} = {3BDBDD6A-AA60-45A4-9F04-44B2ACCCDEB0}
+		{2FC1DC52-45E8-4981-B9D2-B069C597332C} = {3BDBDD6A-AA60-45A4-9F04-44B2ACCCDEB0}
+		{DC27A487-8BE7-4140-8E84-0962D9D1AF2A} = {3BDBDD6A-AA60-45A4-9F04-44B2ACCCDEB0}
+	EndGlobalSection
+EndGlobal

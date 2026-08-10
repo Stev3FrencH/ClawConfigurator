@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    net8.0-windows with no SDK-version suffix, so this builds on macOS. See the note in
+    McenterLite.Hardware.csproj.
+
+    The reference implementation's helper targets .NET Framework 4.8. That is not necessary here:
+      - pipe ACLs        -> System.IO.Pipes.AccessControl (NamedPipeServerStreamAcl.Create)
+      - WMI              -> System.Management package
+      - package identity -> kernel32!GetCurrentPackageFamilyName, not WinRT ApplicationData
+    Avoiding WinRT keeps the TFM unversioned and the build cross-platform.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Platforms>x64</Platforms>
+
+    <!--
+      WinExe, not Exe: this process is started by a logon-triggered scheduled task. A console
+      subsystem binary would flash a window on every sign-in. All output goes to the log file.
+    -->
+    <OutputType>WinExe</OutputType>
+
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>McenterLite.Helper</RootNamespace>
+    <AssemblyName>McenterLite.Helper</AssemblyName>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+
+    <!--
+      Self-contained so the device never needs a .NET runtime installed. Costs ~70 MB in the
+      package; buys the elimination of an entire class of support problem.
+      PublishTrimmed is deliberately OFF - System.Management uses COM and reflection and does
+      not survive trimming.
+    -->
+    <RuntimeIdentifier Condition="'$(Configuration)' == 'Release'">win-x64</RuntimeIdentifier>
+    <SelfContained Condition="'$(Configuration)' == 'Release'">true</SelfContained>
+    <PublishSingleFile Condition="'$(Configuration)' == 'Release'">true</PublishSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.IO.Pipes.AccessControl" Version="5.0.0" />
+
+    <!--
+      Registers the logon task through the Task Scheduler COM API.
+
+      Deliberately NOT schtasks.exe or powershell.exe: an elevated, self-signed binary spawning
+      PowerShell to create a HIGHEST-privilege ONLOGON task is a textbook persistence pattern and
+      is exactly what gets flagged by behavioural AV heuristics. This registers the task with zero
+      child processes.
+    -->
+    <PackageReference Include="TaskScheduler" Version="2.11.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Shared/McenterLite.Shared.csproj" />
+    <ProjectReference Include="../Hardware/McenterLite.Hardware.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+  MSIX manifest for the Game Bar widget.
+
+  Capability policy: this declares the MINIMUM that makes the widget work. Two capabilities the
+  reference project carries are deliberately absent, because each is both an attack surface and an
+  AV heuristic signal that has to be justified:
+
+    internetClient          - nothing here talks to the network. There is no update checker and
+                              no telemetry, so the app never needs to reach outside the machine.
+    broadFileSystemAccess   - nothing here reads the user's files.
+
+  If a future feature needs one of these, add it deliberately and say why here.
+
+  windows.activatableClass.proxyStub WAS on that list, described as "needed only for programmatic
+  widget-bar navigation, which is out of scope". That was our own inference and it does not match
+  the SDK, which documents it as a required step for every widget. It is now present at package
+  level below.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap3 desktop rescap">
+
+  <Identity
+    Name="McenterLite"
+    Publisher="CN=msi-mcenter-lite"
+    Version="0.2.0.0" />
+
+  <Properties>
+    <DisplayName>M Center Lite</DisplayName>
+    <PublisherDisplayName>msi-mcenter-lite</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <!--
+      Windows 11 only. The reference project supports back to 18362 for older handhelds; this
+      targets exactly one device that ships with Windows 11, so there is nothing to gain from a
+      lower floor and there are APIs to lose.
+    -->
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22000.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-US" />
+  </Resources>
+
+  <Applications>
+    <Application Id="App"
+      Executable="$targetnametoken$.exe"
+      EntryPoint="McenterLite.Widget.App">
+
+      <!--
+        AppListEntry="none": the widget is only ever launched by the Game Bar, so it does not
+        belong in the Start menu or in app search.
+      -->
+      <uap:VisualElements
+        DisplayName="M Center Lite"
+        Description="Power controls for the MSI Claw 8 EX AI+"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png"
+        AppListEntry="none">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+        <uap:SplashScreen Image="Assets\SplashScreen.png" />
+      </uap:VisualElements>
+
+      <Extensions>
+
+        <!--
+          The Game Bar widget registration.
+        -->
+        <uap3:Extension Category="windows.appExtension">
+          <uap3:AppExtension
+            Name="microsoft.gameBarUIExtension"
+            Id="McenterLiteWidget"
+            PublicFolder="Public"
+            DisplayName="M Center Lite">
+            <uap3:Properties>
+              <GameBarWidget Type="Standard">
+                <HomeMenuVisible>true</HomeMenuVisible>
+                <PinningSupported>true</PinningSupported>
+                <ActivateAfterInstall>true</ActivateAfterInstall>
+                <FavoriteAfterInstall>true</FavoriteAfterInstall>
+
+                <!--
+                  Marks this as a device-control widget: the slot at the far left of the compact
+                  nav bar, ahead of Home and separated by a divider.
+
+                  MEASURED ON THE CLAW 2026-08-10, which settles the question this comment used to
+                  ask. MSI Quick Settings declares IsDeviceWidget too, and **MSI wins**: it takes
+                  the divider slot and we land immediately after it, ahead of everything except
+                  Home and Settings. So there is evidently ONE device slot and the tiebreak is not
+                  ours to influence from the manifest - we declare exactly the same placement
+                  properties MSI does (see Diagnostics/widget-export.txt for its verbatim block).
+
+                  If that slot is wanted, the way to get it is to remove MSI Quick Settings, not to
+                  add manifest properties.
+
+                  CompactModePriorityPlacement was tried here and REMOVED. It is a real property -
+                  it appears in GameBar.exe's manifest-parser string table alongside these - but
+                  MSI does not declare it, so it is demonstrably not the mechanism, and its value
+                  form was never more than a guess. Shipping an unverified guess that provably is
+                  not the answer is worse than shipping nothing.
+                -->
+                <IsDeviceWidget>true</IsDeviceWidget>
+
+                <Window>
+                  <Size>
+                    <Height>760</Height>
+                    <Width>420</Width>
+                    <MinHeight>420</MinHeight>
+                    <MinWidth>380</MinWidth>
+                    <MaxHeight>1080</MaxHeight>
+                    <MaxWidth>640</MaxWidth>
+                  </Size>
+                  <ResizeSupported>
+                    <Horizontal>true</Horizontal>
+                    <Vertical>true</Vertical>
+                  </ResizeSupported>
+                </Window>
+              </GameBarWidget>
+            </uap3:Properties>
+          </uap3:AppExtension>
+        </uap3:Extension>
+
+        <!--
+          The elevated helper.
+
+          The widget is a UWP AppContainer and cannot touch WMI, the EC or vendor HID at all, so
+          every hardware operation is proxied to this process over a named pipe. The widget
+          launches it via FullTrustProcessLauncher; the helper then deploys itself out of this
+          read-only package directory and registers a scheduled task, because the package folder
+          is replaced wholesale on update.
+        -->
+        <desktop:Extension
+          Category="windows.fullTrustProcess"
+          Executable="Helper\McenterLite.Helper.exe" />
+
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <!--
+    PACKAGE-level extension, required by the Game Bar SDK. Note this is NOT the App-level
+    <Extensions> above where the AppExtension lives - the SDK readme is explicit that they are
+    different, and putting it in the wrong one silently does nothing.
+
+    It registers Metadata Based Marshaling for Game Bar's PRIVATE interfaces, so COM can marshal
+    calls between Game Bar and this widget. The ClassId 00000355-... is the MBM marshaler; <Path>
+    is required by the tooling but unused for that ClassId, which is why it just points at the
+    winmd.
+
+    This was previously omitted on the reasoning that it was "needed only for programmatic
+    widget-bar navigation, which is out of scope". That was an inference, not something the SDK
+    says - its readme calls this an IMPORTANT required step for every widget - and the interface
+    list includes IXboxGameBarNavigationKeyCombo along with IXboxGameBarWidgetHost1-9 and
+    IXboxGameBarWidgetPrivate1-6, which are how Game Bar talks to a widget at all.
+
+    Copied VERBATIM from the SDK readme rather than transcribed, because 28 hand-typed IIDs is 28
+    chances to silently register the wrong interface. Re-copy it when the NuGet package is updated;
+    the readme says it can change between versions.
+  -->
+  <Extensions>
+    <Extension Category="windows.activatableClass.proxyStub">
+      <ProxyStub ClassId="00000355-0000-0000-C000-000000000046">
+        <Path>Microsoft.Gaming.XboxGameBar.winmd</Path>
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarAppTargetHost" InterfaceId="38CDC43C-0A0E-4B3B-BBD3-A581AE220D53" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarAppTargetInfo" InterfaceId="D7689E93-5587-47D1-A42E-78D16B2FA807" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarAppTargetInfo2" InterfaceId="68930F3C-2FDF-44D3-A052-A417EA54CD98" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarActivityHost" InterfaceId="2B113C9B-E370-49B2-A20B-83E0F5737577" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarHotkeyManagerHost" InterfaceId="F6225A53-B34C-4833-9511-AA377B43316F" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetAuthHost" InterfaceId="DC263529-B12F-469E-BB35-B94069F5B15A" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetControlHost" InterfaceId="C309CAC7-8435-4082-8F37-784523747047" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetForegroundWorkerHost" InterfaceId="DDB52B57-FA83-420C-AFDE-6FA556E18B83" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetForegroundWorkerPrivate" InterfaceId="42BACDFC-BB28-4E71-99B4-24C034C7B7E0" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarNavigationKeyCombo" InterfaceId="5EEA3DBF-09BB-42A5-B491-CF561E33C172" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetActivatedEventArgsPrivate" InterfaceId="782535A7-9407-4572-BFCB-316B4086F102" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetHost" InterfaceId="5D12BC93-212B-4B9F-9091-76B73BF56525" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetHost2" InterfaceId="28717C8B-D8E8-47A8-AF47-A1D5263BAE9B" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetHost3" InterfaceId="3F5A3F12-C1E4-4942-B80D-3117BC948E29" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetHost4" InterfaceId="FA696D9E-2501-4B01-B26F-4BB85344740F" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetHost5" InterfaceId="A6C878CC-2B08-4B94-B1C3-222C6A913F3C" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetHost6" InterfaceId="CE6F0D73-C44F-4BBD-9652-A0FC52C37A34" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetHost7" InterfaceId="B7D246E1-F61B-43A2-9120-25D9AC31BB17" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetHost8" InterfaceId="0E4A1F7C-3D5B-4E8C-8F2A-6D9A0B2E5F7C"/>
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetHost9" InterfaceId="BC40A15A-6961-4D04-A9CD-34680A0F5ACD"/>
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetNotificationHost" InterfaceId="6F68D392-E4A9-46F7-A024-5275BC2FE7BA" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetNotificationPrivate" InterfaceId="C94C8DC8-C8B5-4560-AF6E-A588B558213A" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetPrivate" InterfaceId="22ABA97F-FB0F-4439-9BDD-2C67B2D5AA8F" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetPrivate2" InterfaceId="B2F7DB8C-7540-48DA-9B46-4E60CE0D9DEB" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetPrivate3" InterfaceId="4FB89FB6-7CB8-489D-8408-2269E6C733A1" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetPrivate4" InterfaceId="5638D65A-3733-48CC-90E5-984688D62786" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetPrivate5" InterfaceId="73B9289B-812C-4FA4-979B-180770DC92B3" />
+        <Interface Name="Microsoft.Gaming.XboxGameBar.Private.IXboxGameBarWidgetPrivate6" InterfaceId="687766A8-6A24-4691-ADDC-88AA57582B47" />
+      </ProxyStub>
+    </Extension>
+  </Extensions>
+
+  <Capabilities>
+    <!-- Required to launch the full-trust helper at all. -->
+    <rescap:Capability Name="runFullTrust" />
+
+    <!-- Required for the helper's one-time elevation prompt during setup. -->
+    <rescap:Capability Name="allowElevation" />
+  </Capabilities>
+
+</Package>

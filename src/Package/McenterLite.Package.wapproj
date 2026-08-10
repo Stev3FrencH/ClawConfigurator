@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Windows Application Packaging Project for the widget + helper.
+
+  Instantiated from the VS 2022 "Windows Application Packaging Project" template
+  (Common7\IDE\ProjectTemplates\CSharp\Windows UAP\1033\WapProj\WapProjTemplate.wapproj) rather
+  than hand-authored, per docs/building-the-widget.md's warning that a .wapproj embeds
+  tooling paths and a project GUID that are unsafe to guess. Cannot be built by `dotnet build` -
+  same MSBuild-from-VS requirement as src/Widget.
+-->
+<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <PropertyGroup Condition="'$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '15.0'">
+    <VisualStudioVersion>15.0</VisualStudioVersion>
+  </PropertyGroup>
+
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x86">
+      <Configuration>Debug</Configuration>
+      <Platform>x86</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x86">
+      <Configuration>Release</Configuration>
+      <Platform>x86</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|ARM">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM">
+      <Configuration>Release</Configuration>
+      <Platform>ARM</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|ARM64">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM64">
+      <Configuration>Release</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|AnyCPU">
+      <Configuration>Debug</Configuration>
+      <Platform>AnyCPU</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|AnyCPU">
+      <Configuration>Release</Configuration>
+      <Platform>AnyCPU</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <WapProjPath Condition="'$(WapProjPath)'==''">$(MSBuildExtensionsPath)\Microsoft\DesktopBridge\</WapProjPath>
+  </PropertyGroup>
+
+  <Import Project="$(WapProjPath)\Microsoft.DesktopBridge.props" />
+
+  <PropertyGroup>
+    <ProjectGuid>{DC27A487-8BE7-4140-8E84-0962D9D1AF2A}</ProjectGuid>
+    <TargetPlatformVersion>10.0.26100.0</TargetPlatformVersion>
+    <TargetPlatformMinVersion>10.0.22000.0</TargetPlatformMinVersion>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <AppxPackageSigningEnabled>true</AppxPackageSigningEnabled>
+    <!--
+      Self-signed dev cert, CN=msi-mcenter-lite, CurrentUser\My. Subject must match the
+      Publisher in Package.appxmanifest exactly - the most common cause of a package that
+      builds but won't install. Regenerate via New-SelfSignedCertificate if this thumbprint
+      goes stale (e.g. a fresh machine); see docs/building-the-widget.md step 6.
+    -->
+    <PackageCertificateThumbprint>8CFCFF08075ED1AC7F67877DFF2FF769750832E7</PackageCertificateThumbprint>
+    <NoWarn>$(NoWarn);NU1702</NoWarn>
+    <EntryPointProjectUniqueName>..\Widget\McenterLite.Widget.csproj</EntryPointProjectUniqueName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AppxManifest Include="Package.appxmanifest">
+      <SubType>Designer</SubType>
+    </AppxManifest>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\StoreLogo.png" />
+    <Content Include="Assets\Square44x44Logo.png" />
+    <Content Include="Assets\Square150x150Logo.png" />
+    <Content Include="Assets\Wide310x150Logo.png" />
+    <Content Include="Assets\SplashScreen.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Published self contained from src/Helper by the PublishHelper target below. Must land at
+      Helper\McenterLite.Helper.exe to match the Executable path declared in
+      Package.appxmanifest's windows.fullTrustProcess extension.
+    -->
+    <Content Include="Helper\McenterLite.Helper.exe" />
+  </ItemGroup>
+
+  <Import Project="$(WapProjPath)\Microsoft.DesktopBridge.targets" />
+
+  <!--
+    Publish the helper into Helper\ before packaging.
+
+    This WAS a manual "dotnet publish" step, documented in docs/building-the-widget.md and
+    nowhere enforced. That failed exactly the way an unenforced manual step does: the packaged
+    helper silently went eight hours and five features stale while every package built cleanly and
+    looked correct. Nothing warns you, because a stale binary is still a valid binary - the symptom
+    only appears on device, as a card that never populates or a Function ordinal the two halves
+    disagree about.
+
+    A ProjectReference cannot do this: the helper must be SELF-CONTAINED (the Claw has no .NET
+    runtime and installing one is not part of the sideload flow), and a ProjectReference brings in
+    a framework-dependent build. Hence an explicit publish.
+
+    Note the wapproj is MSBuild.exe-driven while the helper is an SDK project, so this shells out
+    to "dotnet publish" rather than calling MSBuild directly - mixing the two in one invocation is
+    what the NETSDK1047 restore errors in this repo's history came from.
+  -->
+  <Target Name="PublishHelper" BeforeTargets="BeforeBuild">
+    <PropertyGroup>
+      <HelperProject>$(MSBuildThisFileDirectory)..\Helper\McenterLite.Helper.csproj</HelperProject>
+      <HelperOutput>$(MSBuildThisFileDirectory)Helper</HelperOutput>
+    </PropertyGroup>
+
+    <Message Importance="high" Text="Publishing the helper self-contained into $(HelperOutput)..." />
+
+    <Exec Command="dotnet publish &quot;$(HelperProject)&quot; -c $(Configuration) -r win-x64 --self-contained true -o &quot;$(HelperOutput)&quot;"
+          WorkingDirectory="$(MSBuildThisFileDirectory)" />
+
+    <Error Condition="!Exists('$(HelperOutput)\McenterLite.Helper.exe')"
+           Text="The helper did not publish to $(HelperOutput). The package would ship without it." />
+  </Target>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.8249" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Widget\McenterLite.Widget.csproj" />
+  </ItemGroup>
+
+</Project>
