@@ -6,10 +6,10 @@ gate-by-gate detail.
 
 ## Current build
 
-**0.1.0.40, Release configuration.**
+**0.1.0.50, Release configuration.**
 
 ```
-src/Package/AppPackages/McenterLite.Package_0.1.0.40_Test/
+src/Package/AppPackages/McenterLite.Package_0.1.0.50_Test/
 ```
 
 Install from the repo, in any PowerShell — the script elevates and re-launches under 5.1 itself:
@@ -35,62 +35,81 @@ Verified on device **2026-08-10**, against the current UI rather than an earlier
   independently under the `PL2 ≥ PL1 + 2` rule.
 - **Windows power** — CPU Boost (Off / On) and OS Power Mode (Efficiency / Balanced / Performance),
   including AC↔DC sync and reflecting changes made from Windows Settings or the taskbar flyout.
-- **Controller mode (G5)** — switching between Gamepad and Desktop works in both directions.
+- **Controller mode (G5)** — switching between Gamepad and Desktop works in both directions from
+  the widget. The physical MSI button does not sync back; see the limitation below.
+- **Gamepad navigation** — confirmed on device 2026-08-10 after the proxyStub fix, in compact mode.
+  Focus stays where the user put it; the `VisibleChanged` focus-steal hazard did not materialise.
 
 The Graphics card does not appear on the Claw and is not expected to: `HasIgcl` is hard-coded false
 until G6 is implemented. It is only visible under `--fake-hardware`.
 
-### Still unverified within controller mode
+### Known limitation: the physical MSI button does not sync
 
-Switching works; these two sub-cases were not part of that test and remain open:
+**Measured on the Claw 2026-08-10.** Widget → hardware works in both directions and stays in sync.
+Hardware → widget does not: pressing the physical MSI button changes the mode and the widget's
+buttons do not follow. Using only the widget keeps everything consistent.
 
-1. **The physical MSI button.** Press it with the widget open — the selected segment should follow
-   within a second, off the helper's telemetry tick. This is the part most likely to be wrong,
-   since it is the only control the hardware can change behind our back.
-2. **The premise of the whole feature:** that desktop mode still works on the UAC secure desktop.
-   That is why the firmware route matters over software cursor injection. Trigger any elevation
-   prompt and try to move the cursor.
+The helper is not the problem — `Program.RunTelemetryLoopAsync` already pushes `HwMouseMode` once a
+second whenever the pipe is connected and the widget is visible. The open question is whether
+`OsdEditor\ControlModeUserSet` reflects the button at all, and `hardware-notes.md` gate G5 has
+always listed that as unknown.
 
-## Widget placement in the Game Bar — one open question
+**Accepted for now, not being chased.** Using the widget alone is consistent, which is the normal
+case. `Diagnostics/Watch-ControlMode.ps1` is there for whenever it is worth settling: it polls the
+value at 4 Hz and prints every change, and the two outcomes distinguish the causes cleanly —
 
-OEM widgets (ASUS Armoury, MSI Quick Settings) sit at the **far left of the compact nav bar, ahead
-of Home**. The mechanism is the `GameBarWidget` manifest properties, and Game Bar's parser knows
-exactly this set — recovered from the string table around `IsDeviceWidget` in `GameBar.exe`:
+- **No change when the button is pressed** → the registry is a software-write mirror, not live
+  device state. MSI Center writes it when something asks *it* to change mode; the button talks to
+  firmware directly. Polling cannot fix that, and reading the true state needs the vendor HID
+  channel (opcode `0x04`), which is undecoded. Document the limitation rather than chase it.
+- **It does change** → the fault is ours, most likely the `WidgetVisible` gate on the telemetry
+  loop: Game Bar toggles `Visible` every two to three seconds in compact mode and the loop skips a
+  tick whenever it is false.
+
+Switch mode from the widget during the same run as a control — that path is known to work, so it
+proves the watch itself is functioning.
+
+### Still unverified
+
+**The premise of the whole feature:** that desktop mode still works on the UAC secure desktop. That
+is why the firmware route matters over software cursor injection. Trigger any elevation prompt and
+try to move the cursor.
+
+## Widget placement in the Game Bar — answered
+
+**Measured on the Claw 2026-08-10** with `Diagnostics/Get-GameBarWidgets.ps1`; raw output kept as
+`Diagnostics/widget-export.txt`.
+
+Where we land: **left of everything except MSI Quick Settings, Home and Settings.** MSI takes the
+far-left slot with the visual divider.
+
+**There is no manifest property we are missing.** MSI declares exactly the placement set we do:
+
+```
+IsDeviceWidget=true   HomeMenuVisible=true   FavoriteAfterInstall=true   ActivateAfterInstall=true
+```
+
+Notably MSI does **not** declare `CompactModePriorityPlacement`, which had been added here on the
+theory that it was the mechanism. It is a real property — it appears in `GameBar.exe`'s
+manifest-parser string table beside the others — but the widget that actually wins the slot does
+not use it, so it is not the answer. **Removed rather than left in on a guess.**
+
+`IsDeviceWidget` is the divider slot, there is evidently only **one** of it, and MSI wins. This
+settles a question the manifest had carried as unverified since it was written. The tiebreak is not
+reachable from our manifest, so **the way to take that slot is to remove MSI Quick Settings**, which
+is the plan anyway.
+
+Ruled out along the way: Game Bar does **not** carry an OEM allowlist. No MSI or ASUS package
+identity appears anywhere in its binaries. (`Armoury` does appear in `GameBar.exe`, but in the
+game-launcher tile list beside Steam, Epic, GOG and Alienware Command Center — unrelated to
+widgets.)
+
+The full property set Game Bar's parser understands, for future reference:
 
 ```
 ActivateAfterInstall   CompactModePriorityPlacement   FavoriteAfterInstall   HomeMenuVisible
 IsDeviceWidget         PinningSupported               SettingsSupported      Window/Size/ResizeSupported
 ```
-
-We declare all of them except `SettingsSupported` (set in code instead). `IsDeviceWidget` and
-`CompactModePriorityPlacement` are the two that concern placement.
-
-**The value format of `CompactModePriorityPlacement` is unverified.** Every sibling except
-`SettingsSupported` is a plain boolean, so `true` is the obvious shape — but `SettingsSupported`
-takes an attribute instead (`<SettingsSupported AppExtensionId="XboxSettingsWidget" />` in
-`Microsoft.GamingApp`), so a priority integer or attribute form is equally plausible. No widget on
-the dev machine declares it, so there was nothing to copy.
-
-**Settle it on the Claw**, where MSI's widget is installed and demonstrably does this. From any
-PowerShell:
-
-```powershell
-Get-AppxPackage | ForEach-Object {
-  $m = Join-Path $_.InstallLocation 'AppxManifest.xml'
-  if (-not (Test-Path $m)) { return }
-  $t = try { Get-Content $m -Raw -ErrorAction Stop } catch { return }
-  if ($t -match 'gameBarUIExtension') {
-    "=== $($_.Name) ==="
-    [regex]::Match($t, '(?s)<GameBarWidget.*?</GameBarWidget>').Value
-  }
-}
-```
-
-That prints MSI's and ASUS's own declarations verbatim — the exact property names and value forms
-they use to win that slot. Copy whatever they do.
-
-Note the manifest already flags that **MSI's Quick Settings widget also declares `IsDeviceWidget`**,
-so two device widgets may be competing for one slot. The dump above answers that too.
 
 ## Removed features
 

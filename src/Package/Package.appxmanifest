@@ -29,7 +29,7 @@
   <Identity
     Name="McenterLite"
     Publisher="CN=msi-mcenter-lite"
-    Version="0.1.0.49" />
+    Version="0.1.0.50" />
 
   <Properties>
     <DisplayName>M Center Lite</DisplayName>
@@ -89,38 +89,26 @@
                 <FavoriteAfterInstall>true</FavoriteAfterInstall>
 
                 <!--
-                  Marks this as a device-control widget, which is what gets it a prominent slot in
-                  the Game Bar home menu instead of being buried in the widget list.
+                  Marks this as a device-control widget: the slot at the far left of the compact
+                  nav bar, ahead of Home and separated by a divider.
 
-                  NOTE: MSI's own Quick Settings widget also declares this. Two device widgets
-                  competing for that slot is undocumented behaviour - verify on the device which
-                  one wins, and whether it is stable.
+                  MEASURED ON THE CLAW 2026-08-10, which settles the question this comment used to
+                  ask. MSI Quick Settings declares IsDeviceWidget too, and **MSI wins**: it takes
+                  the divider slot and we land immediately after it, ahead of everything except
+                  Home and Settings. So there is evidently ONE device slot and the tiebreak is not
+                  ours to influence from the manifest - we declare exactly the same placement
+                  properties MSI does (see Diagnostics/widget-export.txt for its verbatim block).
+
+                  If that slot is wanted, the way to get it is to remove MSI Quick Settings, not to
+                  add manifest properties.
+
+                  CompactModePriorityPlacement was tried here and REMOVED. It is a real property -
+                  it appears in GameBar.exe's manifest-parser string table alongside these - but
+                  MSI does not declare it, so it is demonstrably not the mechanism, and its value
+                  form was never more than a guess. Shipping an unverified guess that provably is
+                  not the answer is worse than shipping nothing.
                 -->
                 <IsDeviceWidget>true</IsDeviceWidget>
-
-                <!--
-                  Placement in COMPACT mode - the only mode this device uses, and the thing that
-                  puts OEM widgets (ASUS Armoury, MSI Quick Settings) to the far left, ahead of
-                  Home.
-
-                  Undocumented anywhere public. The NAME is certain: it comes from the string table
-                  around IsDeviceWidget in GameBar.exe, which is where its manifest parser keeps
-                  them. The complete set it knows is ActivateAfterInstall,
-                  CompactModePriorityPlacement, FavoriteAfterInstall, HomeMenuVisible,
-                  IsDeviceWidget, PinningSupported, SettingsSupported and Window/Size/ResizeSupported.
-
-                  The VALUE is a guess. Every sibling except SettingsSupported is a plain boolean,
-                  so `true` is the obvious shape - but SettingsSupported proves these can take
-                  attributes instead (Microsoft.GamingApp declares
-                  <SettingsSupported AppExtensionId="XboxSettingsWidget" />), so a priority INTEGER
-                  or an attribute form is equally plausible. No widget installed on the dev machine
-                  declares this one, so there was nothing to copy from.
-
-                  TO SETTLE IT: dump MSI's own widget manifest on the Claw - see
-                  docs/status.md. A value Game Bar cannot parse is ignored, so a wrong guess here
-                  degrades to "not declared" rather than breaking anything.
-                -->
-                <CompactModePriorityPlacement>true</CompactModePriorityPlacement>
 
                 <Window>
                   <Size>
