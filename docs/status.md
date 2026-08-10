@@ -6,10 +6,10 @@ gate-by-gate detail.
 
 ## Current build
 
-**0.1.0.31, Release configuration.**
+**0.1.0.32, Release configuration.**
 
 ```
-src/Package/AppPackages/McenterLite.Package_0.1.0.31_x64_Test/
+src/Package/AppPackages/McenterLite.Package_0.1.0.32_x64_Test/
 ```
 
 Install from the repo, in any PowerShell — the script elevates and re-launches under 5.1 itself:
