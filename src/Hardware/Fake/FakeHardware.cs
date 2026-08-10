@@ -147,7 +147,14 @@ namespace McenterLite.Hardware.Fake
     {
         private readonly Dictionary<Function, int> _values = new Dictionary<Function, int>
         {
-            [Function.IntelFpsTier] = 0,
+            // Endurance Gaming is TWO fields in IGCL, not one tier - see Function.cs, where the
+            // single-tier ordinal 70 is retired and the reason recorded.
+            [Function.IntelEnduranceGaming] = 0,
+            [Function.IntelEnduranceGamingMode] = 1,
+
+            // 0 is APP_CHOICE, not "off". IGCL has no disable value for frame generation.
+            [Function.IntelFrameGeneration] = 0,
+
             [Function.IntelLowLatency] = 0,
             [Function.IntelFrameSync] = 0,
             [Function.IntelAdaptiveSharpness] = 0,

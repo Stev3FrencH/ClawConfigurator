@@ -74,7 +74,7 @@ namespace McenterLite.Widget
         /// <para>
         /// <b>The index is NOT automatically the wire value.</b> It was, when every list happened
         /// to be ordered like its enum, and two selectors now deliberately are not - see
-        /// <see cref="PerfModeSegmentOrder"/> and <see cref="IntelFpsTierSegmentOrder"/>. Those
+        /// <see cref="PerfModeSegmentOrder"/> and <see cref="IntelFrameGenSegmentOrder"/>. Those
         /// pair label to value in one table so display order can be chosen for the user without
         /// changing what gets sent. Where the two orders genuinely coincide the index is passed
         /// straight through, and that is stated at the call site.
@@ -258,20 +258,40 @@ namespace McenterLite.Widget
         /// their game.
         /// </para>
         /// </remarks>
-        private static readonly (int Tier, string Label)[] IntelFpsTierSegmentOrder =
+        /// <summary>
+        /// Frame generation, left to right: label and the IGCL override it sends.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>"Off" is APP_CHOICE, and APP_CHOICE is not off.</b> IGCL's
+        /// <c>ctl_3d_frame_generation_override_t</c> has no disable value - it OVERRIDES what the
+        /// game asked for, and 0 means "do not override". A game that enables frame generation
+        /// itself keeps it enabled while this shows Off. The label is the user's decision, taken
+        /// knowingly; the behaviour is the driver's.
+        /// </para>
+        /// <para>
+        /// Index and wire value coincide here (0,1,2,3), unlike the tier table this replaced. The
+        /// pairing is still written out rather than cast, because "they happen to line up today"
+        /// is exactly the assumption that made the old FPS tier wrong.
+        /// </para>
+        /// </remarks>
+        private static readonly (int Override, string Label)[] IntelFrameGenSegmentOrder =
         {
             (0, "Off"),
-            (3, "30"),
-            (2, "40"),
-            (1, "60"),
+            (1, "2x"),
+            (2, "3x"),
+            (3, "4x"),
         };
 
         private SegmentedControl _perfMode;
         private SegmentedControl _hwMouse;
         private SegmentedControl _cpuBoost;
         private SegmentedControl _powerMode;
-        private SegmentedControl _intelFpsTier;
+        private SegmentedControl _intelEndurance;
+        private SegmentedControl _intelEnduranceMode;
         private SegmentedControl _intelLowLatency;
+        private SegmentedControl _intelFrameGen;
+        private SegmentedControl _rtss;
 
         public MainWidget()
         {
@@ -306,15 +326,31 @@ namespace McenterLite.Widget
                     "Efficiency", "Balanced", "Performance");
                 _powerMode.Selected += OnPowerModeSelected;
 
-                _intelFpsTier = new SegmentedControl(IntelFpsTierSegments,
-                    Array.ConvertAll(IntelFpsTierSegmentOrder, segment => segment.Label));
-                _intelFpsTier.Selected += OnIntelFpsTierSelected;
+                // Endurance Gaming needs no mapping table: ctl_3d_endurance_gaming_control_t is
+                // 0 = off, 1 = on, 2 = auto, already the order it reads in.
+                _intelEndurance = new SegmentedControl(IntelEnduranceSegments,
+                    "Off", "On", "Auto");
+                _intelEndurance.Selected += OnIntelEnduranceSelected;
+
+                // Likewise ctl_3d_endurance_gaming_mode_t: 0 = better performance, 1 = balanced,
+                // 2 = maximum battery. Labelled for what they trade rather than IGCL's names.
+                _intelEnduranceMode = new SegmentedControl(IntelEnduranceModeSegments,
+                    "Performance", "Balanced", "Battery");
+                _intelEnduranceMode.Selected += OnIntelEnduranceModeSelected;
 
                 // Low latency needs no mapping table: IGCL numbers it 0 = Off, 1 = On,
                 // 2 = On+Boost, which is already the order it reads in.
                 _intelLowLatency = new SegmentedControl(IntelLowLatencySegments,
                     "Off", "On", "On + boost");
                 _intelLowLatency.Selected += OnIntelLowLatencySelected;
+
+                _intelFrameGen = new SegmentedControl(IntelFrameGenSegments,
+                    Array.ConvertAll(IntelFrameGenSegmentOrder, segment => segment.Label));
+                _intelFrameGen.Selected += OnIntelFrameGenSelected;
+
+                _rtss = new SegmentedControl(RtssSegments,
+                    Array.ConvertAll(CpuBoostSegmentOrder, segment => segment.Label));
+                _rtss.Selected += OnRtssSelected;
 
                 _connection.SnapshotApplied += OnSnapshotApplied;
                 _connection.ValueChanged += OnValueChanged;
@@ -752,7 +788,12 @@ namespace McenterLite.Widget
             // by any app on the machine and the helper is the only real gate.
             TdpCard.Visibility = Visible(_connection.IsAvailable(Function.Pl1));
             HwMouseCard.Visibility = Visible(caps.HasHwMouse);
-            IntelCard.Visibility = Visible(caps.HasIgcl && _connection.IsAvailable(Function.IntelFpsTier));
+            IntelCard.Visibility =
+                Visible(caps.HasIgcl && _connection.IsAvailable(Function.IntelEnduranceGaming));
+
+            // No capability gate: nothing acts on this yet, so there is no driver or device
+            // support to check. It becomes conditional when the behaviour is decided.
+            RtssCard.Visibility = Visible(_connection.IsAvailable(Function.RtssEnabled));
         }
 
         private static string DescribeBackend(TdpBackendKind backend)
@@ -773,8 +814,11 @@ namespace McenterLite.Widget
             ApplyValue(Function.HwMouseMode);
             ApplyValue(Function.CpuBoost);
             ApplyValue(Function.OsPowerMode);
-            ApplyValue(Function.IntelFpsTier);
+            ApplyValue(Function.IntelEnduranceGaming);
+            ApplyValue(Function.IntelEnduranceGamingMode);
             ApplyValue(Function.IntelLowLatency);
+            ApplyValue(Function.IntelFrameGeneration);
+            ApplyValue(Function.RtssEnabled);
             ApplyValue(Function.MsiCenterRunning);
         }
 
@@ -823,17 +867,34 @@ namespace McenterLite.Widget
                     _powerMode.Show(Clamp(_connection.GetInt(Function.OsPowerMode, 1), 0, 2));
                     break;
 
-                case Function.IntelFpsTier:
-                {
-                    int tier = _connection.GetInt(Function.IntelFpsTier, 0);
-                    int segment = Array.FindIndex(IntelFpsTierSegmentOrder, s => s.Tier == tier);
-                    if (segment >= 0) _intelFpsTier.Show(segment);
+                case Function.IntelEnduranceGaming:
+                    _intelEndurance.Show(Clamp(_connection.GetInt(Function.IntelEnduranceGaming, 0), 0, 2));
                     break;
-                }
+
+                case Function.IntelEnduranceGamingMode:
+                    _intelEnduranceMode.Show(
+                        Clamp(_connection.GetInt(Function.IntelEnduranceGamingMode, 1), 0, 2));
+                    break;
 
                 case Function.IntelLowLatency:
                     _intelLowLatency.Show(Clamp(_connection.GetInt(Function.IntelLowLatency, 0), 0, 2));
                     break;
+
+                case Function.IntelFrameGeneration:
+                {
+                    int value = _connection.GetInt(Function.IntelFrameGeneration, 0);
+                    int segment = Array.FindIndex(IntelFrameGenSegmentOrder, s => s.Override == value);
+                    if (segment >= 0) _intelFrameGen.Show(segment);
+                    break;
+                }
+
+                case Function.RtssEnabled:
+                {
+                    bool enabled = _connection.GetBool(Function.RtssEnabled);
+                    int segment = Array.FindIndex(CpuBoostSegmentOrder, s => s.Enabled == enabled);
+                    if (segment >= 0) _rtss.Show(segment);
+                    break;
+                }
 
                 case Function.MsiCenterRunning:
                     // Inverted on purpose. MSI Center M is a dependency, not a rival: its service is
@@ -856,6 +917,11 @@ namespace McenterLite.Widget
         /// directly above make "Manual is the one with sliders" obvious after a single press. The
         /// card collapsing to a single row is also a clearer signal that MSI is driving power than
         /// a paragraph of warning text was.
+        ///
+        /// Endurance Gaming, in the Graphics card, is gated by the same mode but is DISABLED
+        /// rather than hidden. Different card, different reasoning: hiding two rows out of the
+        /// middle of Graphics would make the card jump around as the mode changes, and unlike the
+        /// sliders these rows are worth reading even when MSI owns them.
         /// </remarks>
         private void ApplyPerfMode(PerfMode mode)
         {
@@ -868,6 +934,22 @@ namespace McenterLite.Widget
                 _perfMode.Show(segment);
 
             PowerLimitControls.Visibility = manual ? Visibility.Visible : Visibility.Collapsed;
+
+            // MSI's Endurance and AI Engine modes drive Intel's Endurance Gaming themselves, so
+            // outside Manual there would be two owners for one setting and the widget would be
+            // the one that loses. The labels grey with the buttons, or a live label sits above a
+            // dead row and reads like a rendering fault.
+            SetEnduranceEnabled(manual);
+        }
+
+        private void SetEnduranceEnabled(bool enabled)
+        {
+            if (_intelEndurance != null) _intelEndurance.IsEnabled = enabled;
+            if (_intelEnduranceMode != null) _intelEnduranceMode.IsEnabled = enabled;
+
+            double opacity = enabled ? 1.0 : 0.4;
+            IntelEnduranceLabel.Opacity = opacity;
+            IntelEnduranceModeLabel.Opacity = opacity;
         }
 
         private async void OnPerfModeSelected(int segment)
@@ -977,13 +1059,38 @@ namespace McenterLite.Widget
             await SendAsync(Function.OsPowerMode, index);
         }
 
-        private async void OnIntelFpsTierSelected(int segment)
+        private async void OnIntelEnduranceSelected(int segment)
         {
             if (_applyingFromHelper) return;
-            if (segment < 0 || segment >= IntelFpsTierSegmentOrder.Length) return;
 
-            _intelFpsTier.Show(segment);
-            await SendAsync(Function.IntelFpsTier, IntelFpsTierSegmentOrder[segment].Tier);
+            _intelEndurance.Show(segment);
+            await SendAsync(Function.IntelEnduranceGaming, segment);
+        }
+
+        private async void OnIntelEnduranceModeSelected(int segment)
+        {
+            if (_applyingFromHelper) return;
+
+            _intelEnduranceMode.Show(segment);
+            await SendAsync(Function.IntelEnduranceGamingMode, segment);
+        }
+
+        private async void OnIntelFrameGenSelected(int segment)
+        {
+            if (_applyingFromHelper) return;
+            if (segment < 0 || segment >= IntelFrameGenSegmentOrder.Length) return;
+
+            _intelFrameGen.Show(segment);
+            await SendAsync(Function.IntelFrameGeneration, IntelFrameGenSegmentOrder[segment].Override);
+        }
+
+        private async void OnRtssSelected(int segment)
+        {
+            if (_applyingFromHelper) return;
+            if (segment < 0 || segment >= CpuBoostSegmentOrder.Length) return;
+
+            _rtss.Show(segment);
+            await SendAsync(Function.RtssEnabled, CpuBoostSegmentOrder[segment].Enabled);
         }
 
         private async void OnIntelLowLatencySelected(int segment)

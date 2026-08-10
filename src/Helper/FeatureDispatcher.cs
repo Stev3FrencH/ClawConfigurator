@@ -103,7 +103,9 @@ namespace McenterLite.Helper
                         ? PipeEnvelope.FromEnum(powerMode)
                         : null;
 
-                case Function.IntelFpsTier:
+                case Function.IntelEnduranceGaming:
+                case Function.IntelEnduranceGamingMode:
+                case Function.IntelFrameGeneration:
                 case Function.IntelLowLatency:
                 case Function.IntelFrameSync:
                 case Function.IntelAdaptiveSharpness:
@@ -111,6 +113,12 @@ namespace McenterLite.Helper
                 case Function.IntelContrast:
                 case Function.IntelGamma:
                     return _hw.Igcl.TryRead(fn, out int igclValue) ? PipeEnvelope.FromInt(igclValue) : null;
+
+                case Function.RtssEnabled:
+                    // Remembered, not acted on - see SettingsKeys.RtssEnabled. Reported like any
+                    // other value so the widget's card populates and the control round-trips
+                    // honestly; what it will DO is not decided yet.
+                    return PipeEnvelope.FromBool(_settings.GetBool(SettingsKeys.RtssEnabled, false));
 
                 case Function.MsiCenterRunning:
                     return PipeEnvelope.FromBool(_hw.IsMsiCenterRunning());
@@ -157,7 +165,9 @@ namespace McenterLite.Helper
                 case Function.OsPowerMode:
                     return SetPowerMode(request);
 
-                case Function.IntelFpsTier:
+                case Function.IntelEnduranceGaming:
+                case Function.IntelEnduranceGamingMode:
+                case Function.IntelFrameGeneration:
                 case Function.IntelLowLatency:
                 case Function.IntelFrameSync:
                 case Function.IntelAdaptiveSharpness:
@@ -165,6 +175,17 @@ namespace McenterLite.Helper
                 case Function.IntelContrast:
                 case Function.IntelGamma:
                     return SetIgcl(request);
+
+                case Function.RtssEnabled:
+                {
+                    // No hardware call and no OpResult to check: nothing acts on this yet. Stored
+                    // so it survives a restart, then echoed back from the store rather than from
+                    // the request, so the widget adopts what was actually persisted.
+                    bool rtss = request.AsBool();
+                    _settings.SetBool(SettingsKeys.RtssEnabled, rtss);
+                    return Ok(request, PipeEnvelope.FromBool(
+                        _settings.GetBool(SettingsKeys.RtssEnabled, rtss)));
+                }
 
                 case Function.PrepareForUninstall:
                     return RestoreEverything(request);
@@ -351,13 +372,16 @@ namespace McenterLite.Helper
             Function.HwMouseMode,
             Function.CpuBoost,
             Function.OsPowerMode,
-            Function.IntelFpsTier,
+            Function.IntelEnduranceGaming,
+            Function.IntelEnduranceGamingMode,
+            Function.IntelFrameGeneration,
             Function.IntelLowLatency,
             Function.IntelFrameSync,
             Function.IntelAdaptiveSharpness,
             Function.IntelSaturation,
             Function.IntelContrast,
             Function.IntelGamma,
+            Function.RtssEnabled,
             Function.MsiCenterRunning,
         };
 

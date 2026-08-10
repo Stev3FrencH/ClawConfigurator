@@ -160,6 +160,17 @@ namespace McenterLite.Helper.Settings
         public const string IntelPrefix = "Intel_";
 
         /// <summary>
+        /// RTSS integration on/off.
+        /// </summary>
+        /// <remarks>
+        /// The value is remembered and reported back, and <b>nothing acts on it yet</b> - the
+        /// behaviour is deliberately unspecified until the Intel work lands. It is stored rather
+        /// than held in memory so the toggle survives a helper restart and does not silently
+        /// reset itself, which is the failure mode the whole settings store exists to avoid.
+        /// </remarks>
+        public const string RtssEnabled = "RtssEnabled";
+
+        /// <summary>
         /// Set once the user has actually moved the CPU-boost control.
         /// </summary>
         /// <remarks>

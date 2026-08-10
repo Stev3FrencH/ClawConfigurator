@@ -190,20 +190,55 @@
                             <TextBlock Grid.Column="1" Text="Graphics" Style="{StaticResource CardTitleStyle}" />
                         </Grid>
 
-                        <!-- "FPS limit" rather than IGCL's own "Endurance Gaming", and the tiers
-                             shown as the frame rates they actually cap at. Segment order is set in
-                             code by IntelFpsTierSegmentOrder and is deliberately NOT the wire
-                             order - the driver numbers these 0/1/2/3 as off/60/40/30, so the
-                             numeric tiers run backwards from how they read here. -->
-                        <TextBlock Text="FPS limit" Style="{StaticResource RowLabelStyle}" Margin="0,12,0,0" />
-                        <Grid x:Name="IntelFpsTierSegments" Margin="0,6,0,0" />
+                <!--
+                             Endurance Gaming, as IGCL actually models it: a control and a
+                             bias, not the single off/30/40/60 "FPS limit" this used to show.
+                             That tier did not exist in the driver - see Function.cs, where
+                             ordinal 70 is retired and the real enums are recorded.
+
+                             Both rows are DISABLED outside Manual mode, because MSI's own
+                             Endurance and AI Engine modes drive this themselves. Disabled
+                             rather than hidden, unlike the power sliders: these stay
+                             meaningful to look at, and the greying is what says "MSI owns
+                             this right now" instead of the row silently vanishing.
+                        -->
+                        <TextBlock x:Name="IntelEnduranceLabel"
+                                   Text="Endurance gaming" Style="{StaticResource RowLabelStyle}" Margin="0,12,0,0" />
+                        <Grid x:Name="IntelEnduranceSegments" Margin="0,6,0,0" />
+
+                        <TextBlock x:Name="IntelEnduranceModeLabel"
+                                   Text="Endurance bias" Style="{StaticResource RowLabelStyle}" Margin="0,12,0,0" />
+                        <Grid x:Name="IntelEnduranceModeSegments" Margin="0,6,0,0" />
 
                         <TextBlock Text="Low latency" Style="{StaticResource RowLabelStyle}" Margin="0,12,0,0" />
                         <Grid x:Name="IntelLowLatencySegments" Margin="0,6,0,0" />
+
+                        <!-- MFG, unlabelled beyond the row title by request. Note "Off" is
+                             IGCL's APP_CHOICE - there is no disable value - so it means
+                             "do not override the game", not "frame generation is off". -->
+                        <TextBlock Text="MFG" Style="{StaticResource RowLabelStyle}" Margin="0,12,0,0" />
+                        <Grid x:Name="IntelFrameGenSegments" Margin="0,6,0,0" />
                     </StackPanel>
                 </Border>
 
-                <!-- 4. Controller -->
+                <!-- 4. RTSS. Placeholder: the toggle round-trips and persists, and nothing acts
+                     on it yet. Deliberate - the behaviour is decided after the Intel work. -->
+                <Border x:Name="RtssCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Grid.Column="0" Glyph="&#xE9D9;" Style="{StaticResource CardIconStyle}" />
+                            <TextBlock Grid.Column="1" Text="RTSS" Style="{StaticResource CardTitleStyle}" />
+                        </Grid>
+
+                        <Grid x:Name="RtssSegments" Margin="0,12,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- 5. Controller -->
                 <Border x:Name="HwMouseCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
                     <StackPanel>
                         <Grid Margin="0,0,0,4">

@@ -103,8 +103,55 @@ namespace McenterLite.Shared.Ipc
         OsPowerMode = 61,
 
         // ── 8. Intel graphics (IGCL) ─────────────────────────────────────────────
-        /// <summary>Endurance Gaming tier. NOTE: IGCL applies this PER APPLICATION, not globally.</summary>
-        IntelFpsTier = 70,
+        //
+        // Ordinal 70 (IntelFpsTier) is RETIRED and must never be reused.
+        //
+        // It modelled Endurance Gaming as a single four-value tier - off / 30 / 40 / 60 fps -
+        // which does not exist in IGCL. Reading the real header (igcl_api.h, 2026-08-10) shows
+        // Endurance Gaming is TWO independent fields and neither is a frame rate:
+        //
+        //   ctl_3d_endurance_gaming_control_t   TURN_OFF=0, TURN_ON=1, AUTO=2
+        //   ctl_3d_endurance_gaming_mode_t      BETTER_PERFORMANCE=0, BALANCED=1, MAXIMUM_BATTERY=2
+        //
+        // Nothing was ever sent to hardware - G6 has only ever run against FakeIgcl and ctlInit
+        // is never called - but 0.2.0 shipped a widget that would have sent tier values, so the
+        // ordinal is retired rather than redefined. An old widget meeting a new helper must not
+        // have "tier 3" quietly land on a field where 3 means something else.
+        //
+        // A literal frame-rate cap, if one is ever wanted, is CTL_3D_FEATURE_FRAME_LIMIT and is a
+        // different feature again.
+
+        /// <summary>
+        /// Endurance Gaming on/off/auto. <c>ctl_3d_endurance_gaming_control_t</c>: 0 off, 1 on,
+        /// 2 auto.
+        /// </summary>
+        /// <remarks>
+        /// GATED ON <see cref="PerfMode.UserScenario"/> in the UI, the same way the power limits
+        /// are: MSI's Endurance and AI Engine modes drive this themselves, so offering it
+        /// alongside them would be two owners for one setting.
+        /// </remarks>
+        IntelEnduranceGaming = 77,
+
+        /// <summary>
+        /// Endurance Gaming bias. <c>ctl_3d_endurance_gaming_mode_t</c>: 0 better performance,
+        /// 1 balanced, 2 maximum battery. Only meaningful while
+        /// <see cref="IntelEnduranceGaming"/> is on.
+        /// </summary>
+        IntelEnduranceGamingMode = 78,
+
+        /// <summary>
+        /// XeSS frame generation. <c>ctl_3d_frame_generation_override_t</c>: 0 app choice,
+        /// 1 = 2x, 2 = 3x, 3 = 4x.
+        /// </summary>
+        /// <remarks>
+        /// <b>0 is APP_CHOICE, not off.</b> IGCL exposes no "disable" value - the enum overrides
+        /// what the game asked for, and 0 means "do not override". A game that turns frame
+        /// generation on itself keeps it on at 0. The widget labels it "Off" because that is what
+        /// it means in practice for a user who never turns it on in-game, but the wire value is
+        /// an override and code must not treat 0 as a guarantee that frame generation is inactive.
+        /// </remarks>
+        IntelFrameGeneration = 79,
+
         IntelLowLatency = 71,
         IntelFrameSync = 72,
 
@@ -127,5 +174,12 @@ namespace McenterLite.Shared.Ipc
         // Ordinal 81 (IntelThermalCmd) is RETIRED. It existed only to stop Intel's IPF/DTT thermal
         // stack from latching the fan above any table we wrote - an escape hatch for EC fan writes.
         // With fan control removed there are no EC writes, so it guards nothing.
+
+        // ── 9. RivaTuner Statistics Server ───────────────────────────────────────
+        // Its own group rather than an Intel ordinal: RTSS is a third-party tool, not part of the
+        // graphics driver, and the Intel block 70-79 is now full.
+
+        /// <summary>RTSS integration on/off. Behaviour deliberately unspecified for now.</summary>
+        RtssEnabled = 90,
     }
 }
