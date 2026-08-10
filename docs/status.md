@@ -1,4 +1,4 @@
-# Status — 2026-08-08
+# Status — 2026-08-10
 
 A snapshot for picking this back up: what's built, what's confirmed on the real Claw, what's
 broken, and exactly what to run next. See [`hardware-notes.md`](hardware-notes.md) for the full
@@ -6,10 +6,10 @@ gate-by-gate detail.
 
 ## Current build
 
-**0.1.0.36, Release configuration.**
+**0.1.0.37, Release configuration.**
 
 ```
-src/Package/AppPackages/McenterLite.Package_0.1.0.36_x64_Test/
+src/Package/AppPackages/McenterLite.Package_0.1.0.37_x64_Test/
 ```
 
 Install from the repo, in any PowerShell — the script elevates and re-launches under 5.1 itself:
@@ -29,30 +29,27 @@ powershell -ExecutionPolicy Bypass -File .\Diagnostics\Start-FakeHelper.ps1
 
 ## Confirmed working on the Claw
 
-Verified on device, though note the UI has moved on since — the controls below were tested as a
-toggle and a differently-ordered mode row, so the underlying behaviour is confirmed but the
-current layout is not.
+Verified on device **2026-08-10**, against the current UI rather than an earlier layout.
 
-- CPU Boost — applies correctly. Now two buttons (Off / On) rather than a toggle.
-- OS Power Mode — Efficiency / Balanced / Performance, including AC↔DC sync, and reflecting
-  changes made from Windows Settings or the taskbar flyout.
-- Power Limits — sliders apply, and the mode selector gates them. The three modes were tested as
-  Endurance / User Scenario / AI Engine; they now read Endurance / AI Engine / **Manual** (the same
-  UserScenario mode, renamed), and the sliders now **hide** outside Manual rather than greying out.
-  The two sliders are also no longer welded together — see below.
+- **Power limits** — sliders apply, the mode selector gates them, and the two limits move
+  independently under the `PL2 ≥ PL1 + 2` rule.
+- **Windows power** — CPU Boost (Off / On) and OS Power Mode (Efficiency / Balanced / Performance),
+  including AC↔DC sync and reflecting changes made from Windows Settings or the taskbar flyout.
+- **Controller mode (G5)** — switching between Gamepad and Desktop works in both directions.
 
-## Changed since the last on-device test
+The Graphics card does not appear on the Claw and is not expected to: `HasIgcl` is hard-coded false
+until G6 is implemented. It is only visible under `--fake-hardware`.
 
-**The power sliders are independent now** (2026-08-09). They used to be rigidly coupled: move
-either one and the other tracked it exactly 2 W away, so the only way to open a gap was to pin PL1
-at 35 W and raise PL2 alone — and stepping PL1 back down slammed the gap shut. That was inferred
-from four captured MSI Center pairs, all of which happened to sit at the minimum gap. MSI Center M
-actually enforces just one rule, `PL2 ≥ PL1 + 2`, and keeps any wider gap.
+### Still unverified within controller mode
 
-Each slider now moves on its own. The other one only shifts when the rule would otherwise break,
-and it is always the *other* one that gives way — raising PL1 into PL2 **pushes PL2 up** rather
-than blocking PL1, and lowering PL2 into PL1 **pulls PL1 down**. Worth walking both directions on
-the Claw, particularly that lowering PL1 from a widened pair leaves PL2 where it is.
+Switching works; these two sub-cases were not part of that test and remain open:
+
+1. **The physical MSI button.** Press it with the widget open — the selected segment should follow
+   within a second, off the helper's telemetry tick. This is the part most likely to be wrong,
+   since it is the only control the hardware can change behind our back.
+2. **The premise of the whole feature:** that desktop mode still works on the UAC secure desktop.
+   That is why the firmware route matters over software cursor injection. Trigger any elevation
+   prompt and try to move the cursor.
 
 ## Removed features
 
@@ -79,26 +76,36 @@ measurement to find.
 **A consequence worth noting:** nothing in the app writes to the embedded controller any more.
 Fan control was the only feature that would have.
 
-## No open bugs
+## Open bug — gamepad navigation
 
-The Lighting card not appearing was the last one, and removing the feature closed it.
+**Found on device 2026-08-10: the widget could not be navigated with the controller at all, only
+with a mouse.** Two independent defects, both fixed in 0.1.0.37 and both **awaiting re-test**:
+
+1. **Nothing was ever focused.** `SetInitialFocus` ran in the same dispatcher callback that made
+   the cards visible, and XAML defers layout to the next frame — so every candidate still measured
+   `ActualHeight == 0`, the size guard skipped all of them, and focus was never set. Nothing called
+   it again, because the snapshot normally arrives once. With no focused element there is no origin
+   for XY focus navigation, so the D-pad had nothing to move from. It now retries on
+   `LayoutUpdated` until focus lands, then unsubscribes.
+2. **Selecting a segment threw focus away.** `SegmentedControl.Show` assigned a different `Style`
+   object to each button; assigning `Style` re-applies the control template, and a control that
+   rebuilds its template loses focus. The selected state is now three brushes set in place, so the
+   template is built once and kept.
+
+Initial focus also uses `FocusState.Keyboard` rather than `Programmatic`, which is what actually
+reveals the focus rectangle — on a device with no cursor, a focused control you cannot see is
+indistinguishable from broken navigation.
+
+**Why a mouse hid all of this:** clicking sets focus, so every desktop test papered over both
+defects. The `--fake-hardware` check on the dev machine could not have caught it either, for the
+same reason.
 
 ## Needs testing on the Claw
 
-**Controller mode (G5), newly implemented.** `RegistryHwMouseProvider` writes
-`OsdEditor\ControlModeUserSet` (`"XInput"` ↔ `"Desktop"`). Worth checking:
-
-1. **Desktop** actually turns the right stick into a cursor.
-2. **Gamepad** puts it back.
-3. **The physical MSI button.** Press it with the widget open — the selected segment should follow
-   within a second, because the helper pushes this on its telemetry tick. This is the part most
-   likely to be wrong, since it is the only control the hardware can change behind our back.
-4. **The premise of the whole feature:** that desktop mode still works on the UAC secure desktop.
-   That is why the firmware route matters over software cursor injection, and it has never been
-   tested. Trigger any elevation prompt and try to move the cursor.
-
-**CPU boost is now two buttons** (Off / On) rather than a toggle, so it lines up with the Power
-mode segments. Same underlying control — worth a quick confirm it still applies.
+- **Gamepad navigation end to end**, per the two fixes above: the focus rectangle is visible
+  without touching a mouse, the D-pad reaches every control, focus survives pressing a segment,
+  and left/right adjusts a focused slider without trapping focus.
+- The two controller-mode sub-cases listed under Confirmed working.
 
 ## Outstanding work
 

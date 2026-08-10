@@ -191,13 +191,18 @@
                 </Setter>
             </Style>
 
-            <!-- The active segment. Dark-on-accent rather than white-on-accent - #4CC2FF is light
-                 enough that white text loses contrast. -->
-            <Style x:Key="SegmentButtonSelectedStyle" TargetType="Button" BasedOn="{StaticResource SegmentButtonStyle}">
-                <Setter Property="Background" Value="{StaticResource AccentBrush}" />
-                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-                <Setter Property="Foreground" Value="#1B2129" />
-            </Style>
+            <!--
+                Text colour for the ACTIVE segment. Dark-on-accent rather than white-on-accent -
+                #4CC2FF is light enough that white text loses contrast.
+
+                This was a SegmentButtonSelectedStyle that MainWidget swapped onto the selected
+                button. Swapping Style re-applies the control template, and a control that rebuilds
+                its template loses focus - which made the segments unusable with a gamepad, since
+                pressing one threw focus out of the widget. The selected state is now three brushes
+                set in place by SegmentedControl.Paint, so the template is built once and kept.
+                Resolved BY NAME from code, like SuccessBrush - it has no XAML reference.
+            -->
+            <SolidColorBrush x:Key="SegmentSelectedForegroundBrush" Color="#1B2129" />
 
             <!-- Inline notice used for both the connection banner and the MSI Center notice. -->
             <Style x:Key="NoticeStyle" TargetType="Border">

@@ -125,10 +125,38 @@ namespace McenterLite.Widget
                 Index = index;
 
                 for (int i = 0; i < _segments.Length; i++)
-                {
-                    _segments[i].Style = (Style)Application.Current.Resources[
-                        i == index ? "SegmentButtonSelectedStyle" : "SegmentButtonStyle"];
-                }
+                    Paint(_segments[i], i == index);
+            }
+
+            /// <summary>
+            /// Recolours one segment IN PLACE.
+            /// </summary>
+            /// <remarks>
+            /// <para>
+            /// Sets the three brushes that differ rather than swapping the button's
+            /// <see cref="FrameworkElement.Style"/>, which is what this did originally.
+            /// </para>
+            /// <para>
+            /// <b>Assigning Style re-applies the control template</b>, and a control that rebuilds
+            /// its template loses focus. So selecting a segment with the gamepad threw focus out of
+            /// the widget and the next D-pad press had nowhere to travel from - the control was
+            /// unusable with a controller the moment you pressed anything on it. Nothing about that
+            /// is visible with a mouse, which re-establishes focus on every click.
+            /// </para>
+            /// <para>
+            /// The layout half of the appearance - height, corner radius, padding, content template
+            /// - stays in <c>SegmentButtonStyle</c>, applied once at construction and never
+            /// reassigned.
+            /// </para>
+            /// </remarks>
+            private static void Paint(Button segment, bool selected)
+            {
+                var resources = Application.Current.Resources;
+
+                segment.Background = (Brush)resources[selected ? "AccentBrush" : "SurfaceSubtleBrush"];
+                segment.BorderBrush = (Brush)resources[selected ? "AccentBrush" : "SurfaceStrokeBrush"];
+                segment.Foreground = (Brush)resources[
+                    selected ? "SegmentSelectedForegroundBrush" : "TextPrimaryBrush"];
             }
 
             public bool IsEnabled
@@ -318,6 +346,10 @@ namespace McenterLite.Widget
             if (_widget != null)
                 _widget.VisibleChanged += OnWidgetVisibleChanged;
 
+            // Must be subscribed before the snapshot can arrive: it is what retries the initial
+            // focus once the cards have real sizes. See OnLayoutUpdated.
+            LayoutUpdated += OnLayoutUpdated;
+
             try
             {
                 await StartAsync();
@@ -331,6 +363,8 @@ namespace McenterLite.Widget
 
         protected override void OnNavigatedFrom(NavigationEventArgs e)
         {
+            LayoutUpdated -= OnLayoutUpdated;
+
             if (_widget != null)
             {
                 _widget.VisibleChanged -= OnWidgetVisibleChanged;
@@ -520,8 +554,43 @@ namespace McenterLite.Widget
                 }
 
                 App.Log("OnSnapshotApplied: _applyingFromHelper set false");
+
+                // Gates the focus attempt: before the first snapshot the cards' visibility is not
+                // known, and focusing a control that is about to be hidden is worse than waiting.
+                _snapshotApplied = true;
                 SetInitialFocus();
             });
+        }
+
+        /// <summary>
+        /// Retries <see cref="SetInitialFocus"/> once layout has actually run.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>This is what makes the widget usable with a gamepad at all.</b> The focus attempt in
+        /// <see cref="OnSnapshotApplied"/> runs in the same dispatcher callback that made the cards
+        /// visible, and XAML defers layout to the next frame - so every candidate still measured
+        /// <c>ActualHeight == 0</c>, the size guard skipped all of them, and nothing was focused.
+        /// Nothing called it again either, because the snapshot normally arrives once.
+        /// </para>
+        /// <para>
+        /// With no focused element there is no origin for XY focus navigation, so the D-pad had
+        /// nothing to move from and the widget could only be driven with a mouse - which sets focus
+        /// on click, hiding the bug completely on a desktop.
+        /// </para>
+        /// <para>
+        /// <see cref="FrameworkElement.LayoutUpdated"/> fires after each layout pass, so the first
+        /// one following the snapshot has real sizes. It unsubscribes as soon as focus lands, since
+        /// it fires often and there is nothing left to do.
+        /// </para>
+        /// </remarks>
+        private void OnLayoutUpdated(object sender, object e)
+        {
+            if (!_initialFocusSet && _snapshotApplied)
+                SetInitialFocus();
+
+            if (_initialFocusSet)
+                LayoutUpdated -= OnLayoutUpdated;
         }
 
         /// <summary>
@@ -548,11 +617,14 @@ namespace McenterLite.Widget
         {
             if (_initialFocusSet) return;
 
-            // Ordered by how likely the card is to be on screen. The Windows power card is the
-            // only one that is never hidden, so its segments are the guaranteed fallback - the
-            // TDP card above collapses on an unsupported device.
+            // Top-down, so focus starts where the eye does. The mode segments come before the
+            // sliders they gate because they are the top control in the top card AND they are on
+            // screen whenever that card is, where the sliders are hidden outside Manual mode. The
+            // Windows power card is the only one never hidden, so its segments are the guaranteed
+            // fallback - every card above it collapses on an unsupported device.
             Control[] candidates =
             {
+                _perfMode?.FirstSegment,
                 Pl1Slider,
                 _cpuBoost?.FirstSegment,
                 _powerMode?.FirstSegment,
@@ -561,21 +633,27 @@ namespace McenterLite.Widget
             foreach (var control in candidates)
             {
                 // A collapsed parent card leaves the control itself Visible, so the ancestor has
-                // to be consulted - IsLoaded plus a non-zero size is the reliable signal here.
+                // to be consulted - a non-zero size is the reliable signal here. It is also why
+                // this cannot run before a layout pass; see OnLayoutUpdated.
                 if (control == null) continue;
                 if (control.Visibility != Visibility.Visible) continue;
                 if (!control.IsEnabled) continue;
                 if (control.ActualHeight <= 0) continue;
 
-                // Programmatic, not Pointer: it preserves whether the focus rectangle was already
-                // being shown, so a touch user does not suddenly get gamepad chrome.
-                if (control.Focus(FocusState.Programmatic))
+                // Keyboard, not Programmatic. Programmatic focus does not reveal the focus
+                // rectangle, so on a device with no cursor the user gets a focused control they
+                // cannot see and no way to tell navigation is working. This device is driven with
+                // a stick; showing where focus is IS the feature.
+                if (control.Focus(FocusState.Keyboard))
                 {
                     _initialFocusSet = true;
                     return;
                 }
             }
         }
+
+        /// <summary>True once the helper's first snapshot has been applied and cards are settled.</summary>
+        private bool _snapshotApplied;
 
         private bool _initialFocusSet;
 
