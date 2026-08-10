@@ -43,11 +43,17 @@ namespace McenterLite.Shared.Tests
         [InlineData(8, 10, 8, 10)]
         [InlineData(17, 19, 17, 19)]
         [InlineData(25, 30, 25, 30)]
-        // A coupled pair keeps its gap: the AC knee 35/37 becomes the DC knee 25/27.
+        // A minimum-gap pair keeps its gap: the AC 35/37 becomes 25/27 on battery.
         [InlineData(35, 37, 25, 27)]
         [InlineData(30, 32, 25, 27)]
         // Over PL2 only.
         [InlineData(20, 45, 20, 30)]
+        // The widest pair the sliders can now produce. Unreachable before the limits became
+        // independent - the old coupling only widened a gap with PL1 pinned at its ceiling, so
+        // 8/45 could not be asked for at all. PL1 is already under the DC ceiling and stays put;
+        // only PL2 is capped.
+        [InlineData(8, 45, 8, 30)]
+        [InlineData(8, 30, 8, 30)]
         // Over both: capped to the battery ceilings.
         [InlineData(35, 45, 25, 30)]
         [InlineData(30, 40, 25, 30)]
@@ -61,99 +67,183 @@ namespace McenterLite.Shared.Tests
         }
 
         [Theory]
-        // Walking PL1 up drags PL2 with it, holding the 2 W headroom.
-        [InlineData(8, 10)]
-        [InlineData(9, 11)]
-        [InlineData(17, 19)]
-        [InlineData(34, 36)]
-        // The knee: PL1 tops out at 35, PL2 at 37.
-        [InlineData(35, 37)]
-        public void CoupleFromPl1_DragsPl2AlongAtTheMinimumHeadroom(int pl1, int expectedPl2)
+        // Only PL2's starting value matters here - PL1's is replaced by the value being requested.
+        //
+        // PL1 moves on its own while there is headroom above it. This is the whole point: PL2 is
+        // an independent value, so it keeps whatever gap the user opened.
+        [InlineData(45, 20, 20, 45)]
+        [InlineData(45, 34, 34, 45)]   // and downwards too - the gap WIDENS rather than closing
+        [InlineData(30, 27, 27, 30)]
+        // PL1 rising into PL2 pushes PL2 up rather than being blocked below it. Honouring the
+        // requested PL1 is what makes "raise the sustained limit" possible from a minimum pair.
+        [InlineData(10, 20, 20, 22)]
+        [InlineData(22, 21, 21, 23)]
+        [InlineData(10, 35, 35, 37)]
+        // Out of range: PL1 is capped at its own ceiling, and PL2 comes along only as far as
+        // the rule requires.
+        [InlineData(10, 99, 35, 37)]
+        [InlineData(45, 0, 8, 45)]
+        public void ConstrainFromPl1_MovesPl2OnlyWhenTheHeadroomDemandsIt(
+            int startPl2, int requestedPl1, int expectedPl1, int expectedPl2)
         {
             var caps = Claw8Ex();
-            int actualPl1 = pl1, actualPl2 = 0;
-            caps.CoupleFromPl1(ref actualPl1, ref actualPl2);
+            int pl1 = requestedPl1, pl2 = startPl2;
+            caps.ConstrainFromPl1(ref pl1, ref pl2);
 
-            Assert.Equal(pl1, actualPl1);
-            Assert.Equal(expectedPl2, actualPl2);
+            Assert.Equal(expectedPl1, pl1);
+            Assert.Equal(expectedPl2, pl2);
         }
 
         [Theory]
-        // Below the knee PL1 follows PL2 down, staying 2 W under.
-        [InlineData(10, 8)]
-        [InlineData(19, 17)]
-        [InlineData(37, 35)]
-        // Past the knee PL1 is pinned and PL2 travels alone to its own ceiling.
-        [InlineData(38, 35)]
-        [InlineData(45, 35)]
-        public void CoupleFromPl2_PinsPl1AtItsCeiling(int pl2, int expectedPl1)
+        // Mirror of the above: only PL1's starting value matters.
+        //
+        // PL2 moves on its own while it stays clear of PL1.
+        [InlineData(20, 40, 20, 40)]
+        [InlineData(20, 30, 20, 30)]
+        [InlineData(8, 10, 8, 10)]
+        // PL2 descending into PL1 pulls PL1 down with it - the mirror of the push above.
+        [InlineData(35, 36, 34, 36)]
+        [InlineData(35, 20, 18, 20)]
+        // Out of range.
+        [InlineData(20, 99, 20, 45)]
+        [InlineData(20, 0, 8, 10)]
+        public void ConstrainFromPl2_MovesPl1OnlyWhenTheHeadroomDemandsIt(
+            int startPl1, int requestedPl2, int expectedPl1, int expectedPl2)
         {
             var caps = Claw8Ex();
-            int actualPl1 = 0, actualPl2 = pl2;
-            caps.CoupleFromPl2(ref actualPl1, ref actualPl2);
+            int pl1 = startPl1, pl2 = requestedPl2;
+            caps.ConstrainFromPl2(ref pl1, ref pl2);
 
-            Assert.Equal(pl2, actualPl2);
-            Assert.Equal(expectedPl1, actualPl1);
+            Assert.Equal(expectedPl1, pl1);
+            Assert.Equal(expectedPl2, pl2);
         }
 
         [Fact]
-        public void Coupling_HoldsTheHeadroomAcrossTheWholeRange()
+        public void Constraining_HoldsTheHeadroomFromEveryPairToEveryTarget()
         {
-            // Whichever slider is driven, and wherever it lands, the pair the user ends up with
-            // must be one the firmware accepts. This is the invariant the two sliders exist to
-            // preserve, so it is checked exhaustively rather than at a few sample points.
+            // Whichever slider is driven, from wherever the pair currently sits, and wherever it
+            // lands, the result must be a pair the firmware accepts. That is the invariant the two
+            // sliders exist to preserve, and with the limits independent the starting pair is now
+            // part of the input - so this sweeps every valid start against every target rather
+            // than driving one slider from a fixed seed.
             var caps = Claw8Ex();
 
-            for (int v = caps.MinPl1; v <= caps.MaxPl1; v++)
+            for (int startPl1 = caps.MinPl1; startPl1 <= caps.MaxPl1; startPl1++)
             {
-                int pl1 = v, pl2 = 0;
-                caps.CoupleFromPl1(ref pl1, ref pl2);
-                Assert.True(pl2 - pl1 >= caps.Pl2MinOffset, $"PL1={v} gave {pl1}/{pl2}");
-                Assert.InRange(pl1, caps.MinPl1, caps.MaxPl1);
-                Assert.InRange(pl2, caps.MinPl1 + caps.Pl2MinOffset, caps.MaxPl2);
-            }
+                for (int startPl2 = startPl1 + caps.Pl2MinOffset; startPl2 <= caps.MaxPl2; startPl2++)
+                {
+                    for (int target = caps.MinPl1; target <= caps.MaxPl2; target++)
+                    {
+                        int pl1 = target, pl2 = startPl2;
+                        caps.ConstrainFromPl1(ref pl1, ref pl2);
+                        AssertValidPair(caps, pl1, pl2, $"PL1 {startPl1}/{startPl2} -> {target}");
 
-            for (int v = caps.MinPl1 + caps.Pl2MinOffset; v <= caps.MaxPl2; v++)
-            {
-                int pl1 = 0, pl2 = v;
-                caps.CoupleFromPl2(ref pl1, ref pl2);
-                Assert.True(pl2 - pl1 >= caps.Pl2MinOffset, $"PL2={v} gave {pl1}/{pl2}");
-                Assert.InRange(pl1, caps.MinPl1, caps.MaxPl1);
-                Assert.InRange(pl2, caps.MinPl1 + caps.Pl2MinOffset, caps.MaxPl2);
+                        pl1 = startPl1;
+                        pl2 = target;
+                        caps.ConstrainFromPl2(ref pl1, ref pl2);
+                        AssertValidPair(caps, pl1, pl2, $"PL2 {startPl1}/{startPl2} -> {target}");
+                    }
+                }
             }
         }
 
         [Fact]
-        public void Coupling_IsReversibleBelowTheKnee()
+        public void Constraining_LeavesTheUntouchedLimitAloneWhereverItLegallyCan()
         {
-            // Drive PL1 to 20, then drive PL2 back to what it produced: PL1 must return to 20.
-            // Below the knee the two sliders are two views of one value, and a round trip that
-            // drifted would let a user walk the pair somewhere by nudging back and forth.
+            // The independence itself, stated as an invariant rather than at sample points: the
+            // limit the user did NOT move may only change when leaving it put would break the
+            // headroom rule. Without this a regression back to rigid coupling still satisfies
+            // every "is the pair valid" assertion above.
             var caps = Claw8Ex();
 
-            int pl1 = 20, pl2 = 0;
-            caps.CoupleFromPl1(ref pl1, ref pl2);
+            for (int startPl1 = caps.MinPl1; startPl1 <= caps.MaxPl1; startPl1++)
+            {
+                for (int startPl2 = startPl1 + caps.Pl2MinOffset; startPl2 <= caps.MaxPl2; startPl2++)
+                {
+                    for (int target = caps.MinPl1; target <= caps.MaxPl2; target++)
+                    {
+                        int pl1 = target, pl2 = startPl2;
+                        caps.ConstrainFromPl1(ref pl1, ref pl2);
+                        if (startPl2 - pl1 >= caps.Pl2MinOffset)
+                        {
+                            Assert.True(pl2 == startPl2,
+                                $"PL1 {startPl1}/{startPl2} -> {target} moved PL2 to {pl2} with no need to");
+                        }
 
-            int backPl1 = 0, backPl2 = pl2;
-            caps.CoupleFromPl2(ref backPl1, ref backPl2);
-
-            Assert.Equal(20, backPl1);
-            Assert.Equal(pl2, backPl2);
+                        pl1 = startPl1;
+                        pl2 = target;
+                        caps.ConstrainFromPl2(ref pl1, ref pl2);
+                        if (pl2 - startPl1 >= caps.Pl2MinOffset)
+                        {
+                            Assert.True(pl1 == startPl1,
+                                $"PL2 {startPl1}/{startPl2} -> {target} moved PL1 to {pl1} with no need to");
+                        }
+                    }
+                }
+            }
         }
 
         [Fact]
-        public void CoupleFromPl1_ClosesAGapOpenedAtTheCeiling()
+        public void Constraining_IsReversible()
         {
-            // 35/45 is the widened pair. Stepping PL1 down to 34 pulls PL2 back to 36 - the
-            // documented consequence of "the sliders move together", and the only way to close a
-            // gap once it has been opened.
+            // Push PL1 up until it carries PL2, then drag PL2 back down: PL1 must come back to
+            // exactly where it started. A round trip that drifted would let a user walk the pair
+            // somewhere by nudging back and forth.
+            var caps = Claw8Ex();
+
+            int pl1 = 20, pl2 = 22;
+
+            caps.ConstrainFromPl1(ref pl1, ref pl2);
+            Assert.Equal(20, pl1);
+            Assert.Equal(22, pl2);
+
+            pl1 = 30;
+            caps.ConstrainFromPl1(ref pl1, ref pl2);
+            Assert.Equal(30, pl1);
+            Assert.Equal(32, pl2);
+
+            pl2 = 22;
+            caps.ConstrainFromPl2(ref pl1, ref pl2);
+            Assert.Equal(20, pl1);
+            Assert.Equal(22, pl2);
+        }
+
+        [Fact]
+        public void ConstrainFromPl1_PreservesAWidenedGap()
+        {
+            // 35/45 is the widest legal pair. Stepping PL1 down to 34 must leave PL2 at 45.
+            //
+            // This test is the INVERSE of the one it replaced, which asserted 34/36 - the old rigid
+            // coupling dragged PL2 down to PL1 + 2 and there was no way to keep a gap open. If this
+            // ever fails with 36, the coupling has come back.
             var caps = Claw8Ex();
 
             int pl1 = 34, pl2 = 45;
-            caps.CoupleFromPl1(ref pl1, ref pl2);
+            caps.ConstrainFromPl1(ref pl1, ref pl2);
 
             Assert.Equal(34, pl1);
-            Assert.Equal(36, pl2);
+            Assert.Equal(45, pl2);
+        }
+
+        [Fact]
+        public void ClampPowerLimits_PreservesAWidenedGap()
+        {
+            // The helper re-clamps every pair the widget sends, so a clamp that closed gaps would
+            // undo the independence on the way through the pipe no matter what the widget computed.
+            var caps = Claw8Ex();
+
+            int pl1 = 10, pl2 = 45;
+            caps.ClampPowerLimits(ref pl1, ref pl2);
+
+            Assert.Equal(10, pl1);
+            Assert.Equal(45, pl2);
+        }
+
+        private static void AssertValidPair(DeviceCaps caps, int pl1, int pl2, string because)
+        {
+            Assert.True(pl2 - pl1 >= caps.Pl2MinOffset, $"{because} gave {pl1}/{pl2}");
+            Assert.InRange(pl1, caps.MinPl1, caps.MaxPl1);
+            Assert.InRange(pl2, caps.MinPl1 + caps.Pl2MinOffset, caps.MaxPl2);
         }
 
         [Fact]

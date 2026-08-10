@@ -179,35 +179,45 @@ mode id — do not treat it as one.
 AC and DC are **separate values**; MSI Center wrote both identically in every capture, so whether
 its own UI ever diverges them is unknown.
 
-### The two limits move as a pair
-
-The captured values are not four arbitrary points — they are the shape of MSI's own slider
-behaviour, and the app now reproduces it:
+### The two limits are independent, bound by one rule
 
 | | AC | On battery |
 |---|---|---|
-| Minimum | 8 / 10 W | 8 / 10 W |
-| Coupled range | rises together, PL2 = PL1 + 2 | same |
-| Knee (PL1 maxed) | **35 / 37 W** | **25 / 27 W** |
-| PL2 alone, past the knee | up to **45 W** | up to **30 W** |
-| Headroom rule | PL2 ≥ PL1 + 2 | PL2 ≥ PL1 + 2 |
+| PL1 range | 8 – **35 W** | 8 – **25 W** |
+| PL2 range | 10 – **45 W** | 10 – **30 W** |
+| The only rule between them | **PL2 ≥ PL1 + 2** | same |
 
-Moving either slider moves the other by the same watt, so the pair walks up as one until PL1
-reaches its ceiling; past that PL1 is pinned and only PL2 continues. That is exactly the four
-captured pairs: `8/10`, `17/19`, `35/37` (the knee), and `35/45` (PL1 pinned, PL2 raised alone).
+Each limit moves on its own. Any gap of 2 W or more is legal and is **kept** — lowering PL1 widens
+the gap rather than dragging PL2 down behind it. The rule is enforced only when a move would
+otherwise break it, and always by moving the *other* limit out of the way rather than by refusing
+the one the user asked for:
 
-Consequence worth knowing: lowering PL1 from its ceiling pulls a widened PL2 back down to
-PL1 + 2. That is what "they move together" means, and it is also the only way to close a gap
-once opened.
+- **PL1 rising into PL2 pushes PL2 up** to `PL1 + 2`. PL1 is not blocked at `PL2 − 2`. Blocking
+  would satisfy the same rule, but it makes the ordinary case — both limits at the bottom, raise
+  the sustained limit — impossible without first walking the other slider up a watt at a time.
+- **PL2 descending into PL1 pulls PL1 down** to `PL2 − 2`. The mirror of the above.
 
-**We deliberately do diverge them.** The firmware keeps a separate DC pair, so the battery limit
-is free to honour, and an 8-inch handheld running 35 W unplugged empties itself fast. The user's
+> **Corrected 2026-08-09.** This was previously recorded as a *rigid coupling* — move either
+> slider and the other tracks it exactly 2 W away, with a "knee" at 35/37 past which only PL2
+> continues. That was an **inference from the four captured pairs above**, every one of which
+> happens to sit at the minimum gap, and it was wrong. Watching MSI Center M directly showed the
+> weaker constraint. The four captures are still valid evidence for the units and the ranges; they
+> simply never distinguished "the limits are welded together" from "the limits have a floor
+> between them". Worth remembering as a general caution about this whole document: several entries
+> here are single-shape inferences from a handful of snapshots.
+
+`DeviceCaps.ConstrainFromPl1` / `ConstrainFromPl2` implement the two bullets, and the helper
+re-applies the same invariant through `ClampPowerLimits` on every write, since the widget's copy
+is a UX affordance and the helper is the boundary that actually has to hold.
+
+**AC and DC deliberately diverge.** The firmware keeps a separate DC pair, so the battery limit is
+free to honour, and an 8-inch handheld running 35 W unplugged empties itself fast. The user's
 single choice is written to the AC pair as-is and to the DC pair under a lower ceiling —
 **25 W PL1 / 30 W PL2** (`DeviceCaps.MaxPl1Dc` / `MaxPl2Dc`). No second control, nothing to
 remember to switch when the charger comes out.
 
 The DC pair **carries the gap down** rather than capping the two limits independently, so a
-coupled 35/37 becomes 25/27 — the same relationship at a lower ceiling — where independent capping
+minimum-gap 35/37 becomes 25/27 — the same relationship at a lower ceiling — where independent capping
 would give 25/30 and hand the user boost headroom they never asked for. A deliberately widened
 pair keeps its gap until the PL2 ceiling takes it (35/45 → 25/30). The result then goes through
 the same clamp, so the headroom rule holds on battery too. Both pairs are read back and verified

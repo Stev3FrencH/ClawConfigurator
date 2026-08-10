@@ -163,26 +163,34 @@ namespace McenterLite.Shared.Model
         /// </summary>
         /// <remarks>
         /// <para>
-        /// The two limits move together. Raising PL1 by a watt raises PL2 by a watt, holding the
-        /// firmware's minimum headroom, so the pair walks up as one from 8/10 to
-        /// <see cref="MaxPl1"/>/<see cref="MaxPl1"/>+2 - 35/37 on AC, 25/27 on battery. Past that
-        /// PL1 is pinned and only PL2 can go further, which is exactly the shape MSI's own UI
-        /// produced in the captured transcripts.
+        /// The two limits are INDEPENDENT, bound only by <see cref="Pl2MinOffset"/> - PL2 must sit
+        /// at least that far above PL1, and any wider gap is legal and is kept. So PL1 moves on its
+        /// own and PL2 stays exactly where the user left it, in both directions: lowering PL1 opens
+        /// the gap rather than dragging PL2 down with it.
         /// </para>
         /// <para>
-        /// Consequence worth knowing: lowering PL1 from its ceiling pulls a widened PL2 back down
-        /// to PL1 + 2. That is what "they move together" means, and it is also the only way to
-        /// close a gap once opened.
+        /// The one case where PL2 moves is when PL1 rises into it. PL1 is then <b>pushed through</b>
+        /// rather than blocked - the requested PL1 is honoured and PL2 is carried up to
+        /// <c>PL1 + Pl2MinOffset</c>. Blocking PL1 at <c>PL2 - Pl2MinOffset</c> would satisfy the
+        /// same rule, but it makes the common case (both limits at the bottom, raise the sustained
+        /// limit) impossible without moving the other slider first, one watt at a time.
+        /// </para>
+        /// <para>
+        /// This REPLACED a rigid coupling that recomputed <c>pl2 = pl1 + Pl2MinOffset</c> on every
+        /// move. That was inferred from four captured MSI Center pairs - 8/10, 17/19, 35/37, 35/45 -
+        /// which are all consistent with rigid coupling but only because their gap happened to be
+        /// at the minimum. Watching MSI Center directly showed the weaker rule. See
+        /// <c>docs/hardware-notes.md</c>.
         /// </para>
         /// </remarks>
-        public void CoupleFromPl1(ref int pl1, ref int pl2)
+        public void ConstrainFromPl1(ref int pl1, ref int pl2)
         {
             if (pl1 < MinPl1) pl1 = MinPl1;
             if (pl1 > MaxPl1) pl1 = MaxPl1;
 
-            pl2 = pl1 + Pl2MinOffset;
-            if (pl2 > MaxPl2) pl2 = MaxPl2;
-
+            // Clamp is already exactly PL1-driven: it raises PL2 to the floor when the gap is too
+            // small, never lowers it, and gives up PL1 only when MaxPl2 makes the rule
+            // unsatisfiable. Nothing to do beforehand.
             Clamp(ref pl1, ref pl2, MaxPl1, MaxPl2);
         }
 
@@ -190,20 +198,20 @@ namespace McenterLite.Shared.Model
         /// Recomputes the pair after the user moved the <b>PL2</b> slider.
         /// </summary>
         /// <remarks>
-        /// The mirror of <see cref="CoupleFromPl1"/>: PL1 follows PL2 down by the same headroom
-        /// until PL1 reaches its own ceiling, after which PL2 continues alone to
-        /// <see cref="MaxPl2"/>. So PL2 is the slider that reaches the top - 45 W on AC, 30 W on
-        /// battery - and PL1 simply stops.
+        /// The mirror of <see cref="ConstrainFromPl1"/>. PL2 moves on its own, and PL1 is pulled
+        /// down only when PL2 descends into the headroom above it.
         /// </remarks>
-        public void CoupleFromPl2(ref int pl1, ref int pl2)
+        public void ConstrainFromPl2(ref int pl1, ref int pl2)
         {
             int minPl2 = MinPl1 + Pl2MinOffset;
             if (pl2 < minPl2) pl2 = minPl2;
             if (pl2 > MaxPl2) pl2 = MaxPl2;
 
-            pl1 = pl2 - Pl2MinOffset;
-            if (pl1 > MaxPl1) pl1 = MaxPl1;
-            if (pl1 < MinPl1) pl1 = MinPl1;
+            // Load-bearing, and the whole reason this is not just a call to Clamp. PL2 is what the
+            // user moved, so PL1 is what gives way. Clamp restores the same invariant from the
+            // other side - it would push PL2 back UP to pl1 + offset and undo the drag.
+            int ceiling = pl2 - Pl2MinOffset;
+            if (pl1 > ceiling) pl1 = ceiling;
 
             Clamp(ref pl1, ref pl2, MaxPl1, MaxPl2);
         }

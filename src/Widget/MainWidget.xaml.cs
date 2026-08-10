@@ -628,13 +628,6 @@ namespace McenterLite.Widget
             TdpCard.Visibility = Visible(_connection.IsAvailable(Function.Pl1));
             HwMouseCard.Visibility = Visible(caps.HasHwMouse);
             IntelCard.Visibility = Visible(caps.HasIgcl && _connection.IsAvailable(Function.IntelFpsTier));
-
-            // Slider ranges come from the device, not from markup: the ceilings differ per model
-            // and the helper is the one that knows them.
-            Pl1Slider.Minimum = caps.MinPl1;
-            Pl1Slider.Maximum = caps.MaxPl1;
-            Pl2Slider.Minimum = caps.MinPl1 + caps.Pl2MinOffset;
-            Pl2Slider.Maximum = caps.MaxPl2;
         }
 
         private static string DescribeBackend(TdpBackendKind backend)
@@ -777,44 +770,47 @@ namespace McenterLite.Widget
         /// OTHER slider, do not recurse". Sharing a flag would work today and mislead whoever next
         /// has to reason about which suppression is in effect.
         /// </remarks>
-        private bool _couplingLimits;
+        private bool _syncingLimits;
 
         private async void Pl1Slider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
-            if (_applyingFromHelper || _couplingLimits) return;
+            if (_applyingFromHelper || _syncingLimits) return;
 
+            // The OTHER slider's current value is passed in, not recomputed, because the two limits
+            // are independent - PL2 keeps whatever gap the user opened unless PL1 rises into it.
             int pl1 = (int)e.NewValue;
             int pl2 = (int)Pl2Slider.Value;
-            _connection.Caps.CoupleFromPl1(ref pl1, ref pl2);
+            _connection.Caps.ConstrainFromPl1(ref pl1, ref pl2);
 
-            await ApplyCoupledLimitsAsync(pl1, pl2);
+            await ApplyLimitPairAsync(pl1, pl2);
         }
 
         private async void Pl2Slider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
-            if (_applyingFromHelper || _couplingLimits) return;
+            if (_applyingFromHelper || _syncingLimits) return;
 
             int pl1 = (int)Pl1Slider.Value;
             int pl2 = (int)e.NewValue;
-            _connection.Caps.CoupleFromPl2(ref pl1, ref pl2);
+            _connection.Caps.ConstrainFromPl2(ref pl1, ref pl2);
 
-            await ApplyCoupledLimitsAsync(pl1, pl2);
+            await ApplyLimitPairAsync(pl1, pl2);
         }
 
         /// <summary>
-        /// Paints a coupled pair and sends both halves.
+        /// Paints the resulting pair and sends both halves.
         /// </summary>
         /// <remarks>
-        /// Both are always sent, whichever slider the user touched, because the coupling means one
-        /// gesture changes two values. Sending only the moved one would leave the helper holding a
-        /// pair the widget is no longer showing.
+        /// Both are always sent, whichever slider the user touched. Most gestures now move only one
+        /// limit, but one CAN still move both - raising PL1 into PL2 carries PL2 up with it - and
+        /// sending only the moved one would leave the helper holding a pair the widget is no longer
+        /// showing.
         ///
         /// PL1 goes first: the helper clamps PL2 to at least PL1 + the firmware headroom, so
         /// raising PL1 before PL2 never transits through a pair that gets clamped and echoed back.
         /// </remarks>
-        private async Task ApplyCoupledLimitsAsync(int pl1, int pl2)
+        private async Task ApplyLimitPairAsync(int pl1, int pl2)
         {
-            _couplingLimits = true;
+            _syncingLimits = true;
             try
             {
                 Pl1Slider.Value = pl1;
@@ -824,7 +820,7 @@ namespace McenterLite.Widget
             }
             finally
             {
-                _couplingLimits = false;
+                _syncingLimits = false;
             }
 
             await SendAsync(Function.Pl1, pl1);

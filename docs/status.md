@@ -6,10 +6,10 @@ gate-by-gate detail.
 
 ## Current build
 
-**0.1.0.35, Release configuration.**
+**0.1.0.36, Release configuration.**
 
 ```
-src/Package/AppPackages/McenterLite.Package_0.1.0.35_x64_Test/
+src/Package/AppPackages/McenterLite.Package_0.1.0.36_x64_Test/
 ```
 
 Install from the repo, in any PowerShell — the script elevates and re-launches under 5.1 itself:
@@ -39,6 +39,20 @@ current layout is not.
 - Power Limits — sliders apply, and the mode selector gates them. The three modes were tested as
   Endurance / User Scenario / AI Engine; they now read Endurance / AI Engine / **Manual** (the same
   UserScenario mode, renamed), and the sliders now **hide** outside Manual rather than greying out.
+  The two sliders are also no longer welded together — see below.
+
+## Changed since the last on-device test
+
+**The power sliders are independent now** (2026-08-09). They used to be rigidly coupled: move
+either one and the other tracked it exactly 2 W away, so the only way to open a gap was to pin PL1
+at 35 W and raise PL2 alone — and stepping PL1 back down slammed the gap shut. That was inferred
+from four captured MSI Center pairs, all of which happened to sit at the minimum gap. MSI Center M
+actually enforces just one rule, `PL2 ≥ PL1 + 2`, and keeps any wider gap.
+
+Each slider now moves on its own. The other one only shifts when the rule would otherwise break,
+and it is always the *other* one that gives way — raising PL1 into PL2 **pushes PL2 up** rather
+than blocking PL1, and lowering PL2 into PL1 **pulls PL1 down**. Worth walking both directions on
+the Claw, particularly that lowering PL1 from a widened pair leaves PL2 where it is.
 
 ## Removed features
 
