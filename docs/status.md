@@ -6,10 +6,10 @@ gate-by-gate detail.
 
 ## Current build
 
-**0.1.0.38, Release configuration.**
+**0.1.0.40, Release configuration.**
 
 ```
-src/Package/AppPackages/McenterLite.Package_0.1.0.38_x64_Test/
+src/Package/AppPackages/McenterLite.Package_0.1.0.40_Test/
 ```
 
 Install from the repo, in any PowerShell — the script elevates and re-launches under 5.1 itself:
@@ -110,11 +110,26 @@ indistinguishable from broken navigation.
 `--fake-hardware` pass had the same blind spot. Nothing but a controller finds these — worth
 remembering for any future UI change, since none of it is reachable by a unit test either.
 
-### Known gap
+### Pinning loses focus — accepted, not fixed
 
-Re-arming keys off Game Bar's `VisibleChanged`. A **pinned** widget stays visible when the Game Bar
-overlay is dismissed, so that event may not fire on the way back and focus would not be restored.
-Untested. If navigation is ever dead specifically after pinning, this is the reason.
+Re-arming keys off Game Bar's `VisibleChanged`, and a **pinned** widget stays `Visible` when the
+overlay is dismissed, so that event never fires on the way back. Confirmed on 2026-08-10: focus is
+lost the moment the widget is pinned and does not come back.
+
+**Deliberately not fixed.** This device uses the Game Bar in **compact mode, which has no pinning**,
+so the broken path is one the user cannot reach. `PinningSupported` stays true in the manifest
+because it costs nothing and Game Bar shows the affordance in desktop mode.
+
+An attempt was made and **reverted** (0.1.0.39). It made `ArmInitialFocus` refuse to steal focus
+already inside the widget — checking `FocusManager.GetFocusedElement()` against the visual tree —
+so it could safely hang off `PinnedChanged`, `GameBarDisplayModeChanged` and
+`Window.Current.Activated`. That broke navigation on the **first** open of the Game Bar, before
+pinning was involved at all. The cause was never established; the likeliest candidate is that
+something in our tree (the `ScrollViewer` is focusable) holds focus early, so the steal-guard reads
+as "focus is already inside" and suppresses the initial focus that the user actually needs. **If
+this is ever revisited, start by testing that hypothesis** rather than re-adding the same three
+event subscriptions. 0.1.0.40 is 0.1.0.38's navigation code, re-versioned so it installs over the
+reverted build.
 
 ## Needs testing on the Claw
 
