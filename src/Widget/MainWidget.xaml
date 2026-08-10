@@ -96,14 +96,16 @@
                         </Grid>
 
                         <!-- Mode sits ABOVE the sliders because it gates them: MSI only honours
-                             manual limits in User Scenario. Order matches PerfMode's ordinals. -->
+                             manual limits in the mode shown here as "Manual" (its own name for it
+                             is User Scenario). Segment order is set in code by PerfModeOrder, and
+                             is deliberately NOT the order of PerfMode's ordinals. -->
                         <Grid x:Name="PerfModeSegments" Margin="0,12,0,0" />
 
                         <TextBlock x:Name="PerfModeHint"
                                    Style="{StaticResource HintStyle}"
                                    Visibility="Collapsed"
                                    Foreground="{StaticResource WarningBrush}"
-                                   Text="MSI is managing power in this mode. Switch to User Scenario to set limits yourself." />
+                                   Text="MSI is managing power in this mode. Switch to Manual to set limits yourself." />
 
                         <Grid Margin="0,12,0,0">
                             <Grid.ColumnDefinitions>

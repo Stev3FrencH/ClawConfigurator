@@ -174,14 +174,15 @@ namespace McenterLite.Hardware.Windows
             }
 
             // Reported, not corrected. The mode is a control of its own (see ApplyMode), so the
-            // user can switch to User Scenario deliberately rather than having us do it behind a
-            // slider - which would also move settings unrelated to power, since mode changes
-            // affect lighting too.
+            // user can switch to it deliberately rather than having us do it behind a slider -
+            // which would also move settings unrelated to power, since mode changes affect
+            // lighting too.
             if (TryReadMode(out var mode) && mode != PerfMode.UserScenario)
             {
                 return OpResult.Fail(
                     $"Saved {pl1}/{pl2} W, but MSI Center is in {Describe(mode)} mode and is managing "
-                    + "power itself. Switch to User Scenario for these limits to take effect.");
+                    + $"power itself. Switch to {Describe(PerfMode.UserScenario)} for these limits "
+                    + "to take effect.");
             }
 
             return OpResult.Success();
@@ -280,10 +281,13 @@ namespace McenterLite.Hardware.Windows
             return OpResult.Success();
         }
 
+        // These strings reach the user, so they must match the widget's button labels. MSI's own
+        // name for UserScenario is "User Scenario"; the UI calls it "Manual", and an error telling
+        // someone to switch to a mode with no button of that name is a dead end.
         private static string Describe(PerfMode mode) => mode switch
         {
             PerfMode.Endurance => "Endurance",
-            PerfMode.UserScenario => "User Scenario",
+            PerfMode.UserScenario => "Manual",
             PerfMode.AiEngine => "AI Engine",
             _ => "an unrecognised",
         };

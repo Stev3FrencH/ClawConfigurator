@@ -18,7 +18,7 @@
   <Identity
     Name="McenterLite"
     Publisher="CN=msi-mcenter-lite"
-    Version="0.1.0.28" />
+    Version="0.1.0.29" />
 
   <Properties>
     <DisplayName>M Center Lite</DisplayName>
@@ -40,7 +40,7 @@
       EntryPoint="McenterLite.Widget.App">
       <uap:VisualElements
         DisplayName="M Center Lite"
-        Description="Power, fan and lighting controls for the MSI Claw 8 EX AI+"
+        Description="Power and fan controls for the MSI Claw 8 EX AI+"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"

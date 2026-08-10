@@ -97,9 +97,11 @@ namespace McenterLite.Hardware.Fake
             // in User Scenario. Without this the widget's mode gating is untestable off-device.
             if (_mode != PerfMode.UserScenario)
             {
+                // Wording tracks the real provider's, which uses the widget's button labels -
+                // "Manual", not MSI's own "User Scenario".
                 return OpResult.Fail(
                     $"Saved {pl1}/{pl2} W, but MSI Center is in {_mode} mode and is managing power "
-                    + "itself. Switch to User Scenario for these limits to take effect.");
+                    + "itself. Switch to Manual for these limits to take effect.");
             }
 
             return OpResult.Success();

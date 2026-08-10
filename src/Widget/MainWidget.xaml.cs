@@ -178,6 +178,41 @@ namespace McenterLite.Widget
             }
         }
 
+        /// <summary>
+        /// The perf-mode segments, left to right: what each one says and which
+        /// <see cref="PerfMode"/> it means.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This exists so the buttons can be arranged for the USER without touching the wire
+        /// contract. They read Endurance → AI Engine → Manual, ordered by how much power the
+        /// device draws, which is not the order of <see cref="PerfMode"/>'s ordinals
+        /// (Endurance 0, UserScenario 1, AiEngine 2).
+        /// </para>
+        /// <para>
+        /// Every other selector in this widget casts its index straight to an enum, so reordering
+        /// one silently changes what the helper is told. This is the one control where display
+        /// order and wire value are decoupled, and this table is the only thing keeping them
+        /// honest - both directions go through it, never a cast.
+        /// </para>
+        /// <para>
+        /// Label and mode are paired in ONE table rather than two arrays kept in step, so
+        /// rearranging the buttons is a matter of moving whole rows and cannot desynchronise what
+        /// a button says from what it does.
+        /// </para>
+        /// <para>
+        /// "Manual" rather than MSI's "User Scenario": their name is meaningless out of context,
+        /// and the thing that matters about the mode is that it is the only one where the sliders
+        /// below do anything.
+        /// </para>
+        /// </remarks>
+        private static readonly (PerfMode Mode, string Label)[] PerfModeSegmentOrder =
+        {
+            (PerfMode.Endurance, "Endurance"),
+            (PerfMode.AiEngine, "AI Engine"),
+            (PerfMode.UserScenario, "Manual"),
+        };
+
         private SegmentedControl _perfMode;
         private OptionCycler _fanPreset;
         private SegmentedControl _powerMode;
@@ -198,9 +233,11 @@ namespace McenterLite.Widget
 
             try
             {
-                // Order is the contract: every index below is cast directly to the enum it names.
+                // Labels come from the table, so they cannot drift out of step with the modes they
+                // stand for. Everywhere else in this file the index IS the wire value; this
+                // control is the one exception - see PerfModeSegmentOrder.
                 _perfMode = new SegmentedControl(PerfModeSegments,
-                    "Endurance", "User Scenario", "AI Engine");
+                    Array.ConvertAll(PerfModeSegmentOrder, segment => segment.Label));
                 _perfMode.Selected += OnPerfModeSelected;
 
                 _fanPreset = new OptionCycler(FanPresetButton,
@@ -699,28 +736,30 @@ namespace McenterLite.Widget
         {
             bool manual = mode == PerfMode.UserScenario;
 
-            // Unknown is not in the dropdown: MSI reported a mode we do not model, so leave the
+            // Unknown is not on the control: MSI reported a mode we do not model, so leave the
             // selection alone rather than misrepresenting it as one of the three we do.
-            if (mode != PerfMode.Unknown)
-                _perfMode.Show((int)mode);
+            int segment = Array.FindIndex(PerfModeSegmentOrder, s => s.Mode == mode);
+            if (segment >= 0)
+                _perfMode.Show(segment);
 
             Pl1Slider.IsEnabled = manual;
             Pl2Slider.IsEnabled = manual;
             PerfModeHint.Visibility = manual ? Visibility.Collapsed : Visibility.Visible;
         }
 
-        private async void OnPerfModeSelected(int index)
+        private async void OnPerfModeSelected(int segment)
         {
             if (_applyingFromHelper) return;
+            if (segment < 0 || segment >= PerfModeSegmentOrder.Length) return;
 
-            _perfMode.Show(index);
-            var mode = (PerfMode)index;
+            _perfMode.Show(segment);
+            var mode = PerfModeSegmentOrder[segment].Mode;
             ApplyPerfMode(mode);
             await SendAsync(Function.PerfMode, (int)mode);
 
-            // A mode change moves more than the mode: MSI couples lighting to it, and the power
-            // limits it reports can change too. Re-sync everything rather than guessing the blast
-            // radius of someone else's state machine.
+            // A mode change moves more than the mode: the power limits MSI reports can change with
+            // it. Re-sync everything rather than guessing the blast radius of someone else's state
+            // machine.
             await _connection.RefreshAsync();
         }
 
