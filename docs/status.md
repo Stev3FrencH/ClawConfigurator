@@ -57,11 +57,26 @@ Fan control was the only feature that would have.
 
 The Lighting card not appearing was the last one, and removing the feature closed it.
 
+## Needs testing on the Claw
+
+**Controller mode (G5), newly implemented.** `RegistryHwMouseProvider` writes
+`OsdEditor\ControlModeUserSet` (`"XInput"` ↔ `"Desktop"`). Worth checking:
+
+1. **Desktop** actually turns the right stick into a cursor.
+2. **Gamepad** puts it back.
+3. **The physical MSI button.** Press it with the widget open — the selected segment should follow
+   within a second, because the helper pushes this on its telemetry tick. This is the part most
+   likely to be wrong, since it is the only control the hardware can change behind our back.
+4. **The premise of the whole feature:** that desktop mode still works on the UAC secure desktop.
+   That is why the firmware route matters over software cursor injection, and it has never been
+   tested. Trigger any elevation prompt and try to move the cursor.
+
+**CPU boost is now two buttons** (Off / On) rather than a toggle, so it lines up with the Power
+mode segments. Same underlying control — worth a quick confirm it still applies.
+
 ## Outstanding work
 
 - **Uninstall/restore flow**, end-to-end on the Claw — should put back the captured original power
-  limits. Much less to restore now that three features are gone.
-- Desktop/gamepad mode (G5) and Intel GPU controls (G6) remain unimplemented stubs. G5 is the
-  cheaper of the two: it is green via registry (`OsdEditor\ControlModeUserSet`, REG_SZ, `"XInput"`
-  ↔ `"Desktop"`, confirmed both directions), so it is the same provider pattern as TDP rather than
-  new discovery work.
+  limits. Note controller mode is deliberately *not* restored: the physical button owns that state
+  as much as we do, so replaying an old value would be a guess, not a restore.
+- Intel GPU controls (G6) remain an unimplemented stub.

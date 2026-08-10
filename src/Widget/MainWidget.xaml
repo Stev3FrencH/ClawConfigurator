@@ -152,22 +152,23 @@
                 <!-- 5. Controller -->
                 <Border x:Name="HwMouseCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
                     <StackPanel>
-                        <Grid>
+                        <Grid Margin="0,0,0,4">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <FontIcon Grid.Column="0" Glyph="&#xE7FC;" Style="{StaticResource CardIconStyle}" />
-                            <TextBlock Grid.Column="1" Text="Desktop mouse mode" Style="{StaticResource CardTitleStyle}" />
-                            <ToggleSwitch x:Name="HwMouseToggle"
-                                          Grid.Column="2"
-                                          Style="{StaticResource CompactToggleStyle}"
-                                          Toggled="HwMouseToggle_Toggled" />
+                            <TextBlock Grid.Column="1" Text="Controller" Style="{StaticResource CardTitleStyle}" />
                         </Grid>
 
+                        <!-- Two named buttons rather than a toggle. A switch labelled "desktop
+                             mouse mode" leaves the off state unnamed, and "off" here is not
+                             nothing - it is gamepad mode. Segment order is set in code by
+                             HwMouseSegmentOrder. -->
+                        <Grid x:Name="HwMouseSegments" Margin="0,12,0,0" />
+
                         <TextBlock Style="{StaticResource HintStyle}"
-                                   Text="Switches the controller firmware itself, so the cursor keeps working on secure screens such as the elevation prompt. The physical button changes this too." />
+                                   Text="Desktop switches the controller firmware into a real mouse, so the cursor keeps working on secure screens such as the elevation prompt. The physical button changes this too." />
                     </StackPanel>
                 </Border>
 
@@ -184,17 +185,17 @@
                             <TextBlock Grid.Column="1" Text="Windows power" Style="{StaticResource CardTitleStyle}" />
                         </Grid>
 
-                        <Grid Margin="0,12,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="CPU boost" Style="{StaticResource RowLabelStyle}" />
-                            <ToggleSwitch x:Name="CpuBoostToggle"
-                                          Grid.Column="1"
-                                          Style="{StaticResource CompactToggleStyle}"
-                                          Toggled="CpuBoostToggle_Toggled" />
-                        </Grid>
+                        <!-- Two buttons rather than a ToggleSwitch. The switch could not be lined
+                             up with the segments below it: its template grid carries
+                             MinWidth 154 (ToggleSwitchThemeMinWidth) while the visible track is
+                             only 44 wide, and that MinWidth is on the template, so setting
+                             MinWidth on the control cannot shrink it. Nudging it left with a
+                             negative margin would move the track but leave the focus rectangle -
+                             SwitchAreaGrid, which spans all three template columns - overhanging
+                             the card on a device driven by a stick. Segments align by
+                             construction instead. -->
+                        <TextBlock Text="CPU boost" Style="{StaticResource RowLabelStyle}" Margin="0,12,0,0" />
+                        <Grid x:Name="CpuBoostSegments" Margin="0,6,0,0" />
 
                         <TextBlock Text="Power mode" Style="{StaticResource RowLabelStyle}" Margin="0,12,0,0" />
                         <Grid x:Name="PowerModeSegments" Margin="0,6,0,0" />

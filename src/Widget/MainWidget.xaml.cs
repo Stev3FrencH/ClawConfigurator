@@ -175,6 +175,16 @@ namespace McenterLite.Widget
             {
                 set { foreach (var segment in _segments) segment.IsEnabled = value; }
             }
+
+            /// <summary>
+            /// The leftmost button, for <see cref="SetInitialFocus"/>.
+            /// </summary>
+            /// <remarks>
+            /// The segments are created in code, so they have no <c>x:Name</c> to reference from
+            /// the focus-candidate list. Without this the only candidate left is a slider whose
+            /// card hides on an unsupported device, and nothing would take focus at all.
+            /// </remarks>
+            public Control FirstSegment => _segments.Length > 0 ? _segments[0] : null;
         }
 
         /// <summary>
@@ -212,7 +222,40 @@ namespace McenterLite.Widget
             (PerfMode.UserScenario, "Manual"),
         };
 
+        /// <summary>
+        /// The controller-mode segments, left to right: what each says and the wire value it means.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Same paired-table shape as <see cref="PerfModeSegmentOrder"/>, and for the same reason:
+        /// label and meaning move together, so rearranging the buttons cannot desynchronise what
+        /// one says from what it does.
+        /// </para>
+        /// <para>
+        /// Gamepad sits first because it is the device's native state - the mode it boots in and
+        /// the one the physical button returns to. Reading left to right then runs from "as the
+        /// device ships" to "overridden", matching how the perf-mode segments are ordered.
+        /// </para>
+        /// </remarks>
+        private static readonly (bool DesktopMode, string Label)[] HwMouseSegmentOrder =
+        {
+            (false, "Gamepad"),
+            (true, "Desktop"),
+        };
+
+        /// <summary>
+        /// The CPU-boost segments, left to right. Off first, so the row reads in the same
+        /// direction as every other selector here: least intervention on the left.
+        /// </summary>
+        private static readonly (bool Enabled, string Label)[] CpuBoostSegmentOrder =
+        {
+            (false, "Off"),
+            (true, "On"),
+        };
+
         private SegmentedControl _perfMode;
+        private SegmentedControl _hwMouse;
+        private SegmentedControl _cpuBoost;
         private SegmentedControl _powerMode;
         private OptionCycler _intelFpsTier;
         private OptionCycler _intelLowLatency;
@@ -237,6 +280,14 @@ namespace McenterLite.Widget
                 _perfMode = new SegmentedControl(PerfModeSegments,
                     Array.ConvertAll(PerfModeSegmentOrder, segment => segment.Label));
                 _perfMode.Selected += OnPerfModeSelected;
+
+                _hwMouse = new SegmentedControl(HwMouseSegments,
+                    Array.ConvertAll(HwMouseSegmentOrder, segment => segment.Label));
+                _hwMouse.Selected += OnHwMouseSelected;
+
+                _cpuBoost = new SegmentedControl(CpuBoostSegments,
+                    Array.ConvertAll(CpuBoostSegmentOrder, segment => segment.Label));
+                _cpuBoost.Selected += OnCpuBoostSelected;
 
                 _powerMode = new SegmentedControl(PowerModeSegments,
                     "Efficiency", "Balanced", "Performance");
@@ -508,11 +559,14 @@ namespace McenterLite.Widget
         {
             if (_initialFocusSet) return;
 
+            // Ordered by how likely the card is to be on screen. The Windows power card is the
+            // only one that is never hidden, so its segments are the guaranteed fallback - the
+            // TDP card above collapses on an unsupported device.
             Control[] candidates =
             {
                 Pl1Slider,
-                HwMouseToggle,
-                CpuBoostToggle,
+                _cpuBoost?.FirstSegment,
+                _powerMode?.FirstSegment,
             };
 
             foreach (var control in candidates)
@@ -641,12 +695,22 @@ namespace McenterLite.Widget
 
 
                 case Function.HwMouseMode:
-                    HwMouseToggle.IsOn = _connection.GetBool(Function.HwMouseMode);
+                {
+                    // Pushed on the helper's telemetry tick, not just at connect, because the
+                    // physical MSI button changes this without going through the widget.
+                    bool desktopMode = _connection.GetBool(Function.HwMouseMode);
+                    int segment = Array.FindIndex(HwMouseSegmentOrder, s => s.DesktopMode == desktopMode);
+                    if (segment >= 0) _hwMouse.Show(segment);
                     break;
+                }
 
                 case Function.CpuBoost:
-                    CpuBoostToggle.IsOn = _connection.GetBool(Function.CpuBoost);
+                {
+                    bool boost = _connection.GetBool(Function.CpuBoost);
+                    int segment = Array.FindIndex(CpuBoostSegmentOrder, s => s.Enabled == boost);
+                    if (segment >= 0) _cpuBoost.Show(segment);
                     break;
+                }
 
                 case Function.OsPowerMode:
                     _powerMode.Show(Clamp(_connection.GetInt(Function.OsPowerMode, 1), 0, 2));
@@ -773,16 +837,22 @@ namespace McenterLite.Widget
             await SendAsync(Function.Pl2, pl2);
         }
 
-        private async void HwMouseToggle_Toggled(object sender, RoutedEventArgs e)
+        private async void OnHwMouseSelected(int segment)
         {
             if (_applyingFromHelper) return;
-            await SendAsync(Function.HwMouseMode, HwMouseToggle.IsOn);
+            if (segment < 0 || segment >= HwMouseSegmentOrder.Length) return;
+
+            _hwMouse.Show(segment);
+            await SendAsync(Function.HwMouseMode, HwMouseSegmentOrder[segment].DesktopMode);
         }
 
-        private async void CpuBoostToggle_Toggled(object sender, RoutedEventArgs e)
+        private async void OnCpuBoostSelected(int segment)
         {
             if (_applyingFromHelper) return;
-            await SendAsync(Function.CpuBoost, CpuBoostToggle.IsOn);
+            if (segment < 0 || segment >= CpuBoostSegmentOrder.Length) return;
+
+            _cpuBoost.Show(segment);
+            await SendAsync(Function.CpuBoost, CpuBoostSegmentOrder[segment].Enabled);
         }
 
         private async void OnPowerModeSelected(int index)

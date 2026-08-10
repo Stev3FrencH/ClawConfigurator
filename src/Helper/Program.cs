@@ -266,7 +266,7 @@ namespace McenterLite.Helper
         }
 
         /// <summary>
-        /// Pushes the OS power mode while the widget is on screen.
+        /// Pushes the OS power mode and the controller mode while the widget is on screen.
         /// </summary>
         /// <remarks>
         /// Gated on visibility because the widget is a UWP app that Windows suspends whenever the
@@ -320,6 +320,26 @@ namespace McenterLite.Helper
                     catch (Exception ex)
                     {
                         Log.Warn($"Power-mode telemetry read failed: {ex.Message}");
+                    }
+                }
+
+                // The controller mode has the same problem as the power mode, only more so: the
+                // PHYSICAL MSI button switches it, so it can change with the widget open and this
+                // app never told. Without this push the toggle shows whatever was true at connect
+                // time and quietly disagrees with the device.
+                if (hardware.HwMouse.Available)
+                {
+                    try
+                    {
+                        if (hardware.HwMouse.TryRead(out bool desktopMode))
+                        {
+                            server.Send(PipeEnvelope.Event(
+                                Function.HwMouseMode, PipeEnvelope.FromBool(desktopMode)));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warn($"Controller-mode telemetry read failed: {ex.Message}");
                     }
                 }
             }

@@ -14,8 +14,8 @@ AI+ (Panther Lake, `CG3EM` / board `1T91`), delivered as an Xbox Game Bar widget
 >
 > **The scope has narrowed deliberately.** Fan control, battery charge limit and RGB LED were all
 > removed (2026-08-08): each is set in MSI Center, none changes often, and MSI's own controls are
-> better than anything this widget could offer for them. Desktop/gamepad mode (G5) and Intel GPU
-> controls (G6) are unimplemented stubs. See
+> better than anything this widget could offer for them. Controller mode (G5) is implemented but
+> not yet tried on the Claw; Intel GPU controls (G6) remain an unimplemented stub. See
 > [docs/hardware-notes.md](docs/hardware-notes.md) for the full gate-by-gate picture, including the
 > findings from the removed features, which are kept as a device record.
 >
@@ -32,7 +32,7 @@ Eight features were planned. Three were removed once it was clear MSI Center doe
 | 2 | ~~Fan presets~~ — **removed**, set it in MSI Center | descoped 2026-08-08 |
 | 3 | ~~Battery charge limit~~ — **removed**, set it in MSI Center | descoped 2026-08-08 |
 | 4 | ~~RGB LED~~ — **removed**, MSI Center's lighting control is far richer | descoped 2026-08-08 |
-| 5 | Desktop / gamepad mode (firmware) | blocked on gate G5 |
+| 5 | Controller mode — Gamepad / Desktop (real HID mouse) | ✅ implemented, unverified on device |
 | 6 | CPU Boost | ✅ verified on device |
 | 7 | OS Power Mode | ✅ verified on device |
 | 8 | Intel GPU controls (IGCL) | blocked on gate G6 |

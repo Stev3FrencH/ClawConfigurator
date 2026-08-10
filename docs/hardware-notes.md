@@ -869,13 +869,32 @@ read-back path and the physical-button interaction.
 | How to read current mode | | opcode `0x04` is the read; framing unknown |
 | Physical button behaviour | | the MSI button changes mode behind our back |
 
-**Result: GREEN via registry.** `HKLM\SOFTWARE\WOW6432Node\MSI\MSI Center M\OsdEditor`,
-value `ControlModeUserSet`, REG_SZ, `"XInput"` ↔ `"Desktop"`, confirmed in both directions.
-Note the same value name also exists (empty) under `Component\User Scenario` — writing that one
-would diff convincingly and do nothing.
+**Result: GREEN via registry. IMPLEMENTED 2026-08-08.**
+`HKLM\SOFTWARE\WOW6432Node\MSI\MSI Center M\OsdEditor`, value `ControlModeUserSet`, REG_SZ,
+`"XInput"` ↔ `"Desktop"`, confirmed in both directions. Note the same value name also exists
+(empty) under `Component\User Scenario` — writing that one would diff convincingly and do nothing.
+`RegistryHwMouseProvider` hard-codes the `OsdEditor` path for exactly that reason.
 
 The firmware HID route (`0x24` SwitchMode, `0x04` desktop / `0x02` DInput) remains the fallback,
-and is still the only route that works when MSI Center is not running.
+and is still the only route that works when MSI Center is not running. Not implemented — the
+registry path is verified and needs no HID handle.
+
+**How the shared-ownership problem is handled.** The physical MSI button switches the same mode, so
+a read can disagree with our last write at any moment through no fault of ours. Two consequences,
+both deliberate:
+
+- **Nothing re-applies a stored mode at startup**, and nothing is captured for uninstall restore.
+  We do not own this state, so "putting it back" would mean overwriting whatever the user or the
+  button last chose with a value from an arbitrary earlier moment.
+- **The helper pushes the mode on its ~1 Hz telemetry tick** while the widget is visible, so the
+  buttons follow the hardware. Without that the widget would show whatever was true at connect
+  time and silently disagree with the device after one button press.
+
+The widget shows this as two named buttons, Gamepad and Desktop, rather than a toggle: "off" on a
+switch labelled *desktop mouse mode* leaves the actual resulting state unnamed.
+
+**Unverified:** that desktop mode still works on the UAC secure desktop. That is the whole premise
+of the firmware route over software cursor injection, and it has not been tested on device.
 
 ---
 

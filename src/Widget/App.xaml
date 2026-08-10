@@ -137,14 +137,10 @@
                 content and dropping MinWidth is what makes that layout possible - the default
                 154px MinWidth exists to reserve room for the caption text.
             -->
-            <Style x:Key="CompactToggleStyle" TargetType="ToggleSwitch">
-                <Setter Property="MinWidth" Value="0" />
-                <Setter Property="MinHeight" Value="{StaticResource ControlHeight}" />
-                <Setter Property="OnContent" Value="" />
-                <Setter Property="OffContent" Value="" />
-                <Setter Property="HorizontalAlignment" Value="Right" />
-                <Setter Property="VerticalAlignment" Value="Center" />
-            </Style>
+            <!-- CompactToggleStyle was here. Every ToggleSwitch is now a two-segment button pair
+                 instead: the switch cannot be right-aligned with the segments around it, because
+                 its template grid carries MinWidth 154 against a 44-wide visible track and that
+                 MinWidth is inside the template, out of reach of the control's own MinWidth. -->
 
             <!-- Sliders get a taller hit area than the desktop default. This runs on a handheld:
                  every interaction is a thumb or a stick, never a mouse. -->

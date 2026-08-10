@@ -14,8 +14,8 @@ namespace McenterLite.Hardware.Windows
     /// than offering a control that does nothing.
     /// </para>
     /// <para>
-    /// Live today: power limits (registry), CPU boost and OS power mode (plain Windows APIs).
-    /// Pending: firmware mouse mode, Intel GPU. Battery charge limit, lighting and fan control
+    /// Live today: power limits and controller mode (registry), CPU boost and OS power mode
+    /// (plain Windows APIs). Pending: Intel GPU. Battery charge limit, lighting and fan control
     /// were all removed - each is better handled in MSI Center itself.
     /// </para>
     /// </remarks>
@@ -43,8 +43,9 @@ namespace McenterLite.Hardware.Windows
                 MaxPl1Dc = 25,
                 MaxPl2Dc = 30,
 
+                HasHwMouse = false,   // set below, once the provider has probed
+
                 // Not implemented yet. Reported as absent rather than broken.
-                HasHwMouse = false,
                 HasIgcl = false,
             };
 
@@ -53,6 +54,9 @@ namespace McenterLite.Hardware.Windows
                 ? tdp.Backend
                 : TdpBackendKind.Unavailable;
 
+            var hwMouse = new RegistryHwMouseProvider();
+            Caps.HasHwMouse = identity.IsClaw8Ex && hwMouse.Available;
+
             // A device we do not recognise gets nothing, whatever the registry contains. Every
             // value above is calibrated to one model, and a wrong power limit on a different Claw
             // is a real write to real firmware.
@@ -60,7 +64,9 @@ namespace McenterLite.Hardware.Windows
                 ? tdp
                 : new UnavailableTdp("This device is not an MSI Claw 8 EX AI+.");
 
-            HwMouse = new UnavailableHwMouse("Desktop mouse mode is not implemented yet.");
+            HwMouse = identity.IsClaw8Ex
+                ? (IHwMouseProvider)hwMouse
+                : new UnavailableHwMouse("This device is not an MSI Claw 8 EX AI+.");
             Igcl = new UnavailableIgcl("Intel graphics controls are not implemented yet.");
 
             Power = new WindowsPowerProvider();
