@@ -90,23 +90,6 @@ namespace McenterLite.Helper
                         ? PipeEnvelope.FromEnum(perfMode)
                         : null;
 
-                case Function.FanEnabled:
-                    return _hw.Fan.TryReadState(out var fanEnabledState)
-                        ? PipeEnvelope.FromBool(fanEnabledState.ControlEnabled)
-                        : null;
-
-                case Function.FanPreset:
-                    // The EC stores a table, not a preset id, so the selection is ours to remember.
-                    return PipeEnvelope.FromInt(_settings.GetInt(SettingsKeys.FanPreset, 0));
-
-                case Function.FanState:
-                    return _hw.Fan.TryReadState(out var fanState) ? fanState.Serialize() : null;
-
-                case Function.FanFullSpeed:
-                    return _hw.Fan.TryReadState(out var fullSpeedState)
-                        ? PipeEnvelope.FromBool(fullSpeedState.FullSpeed)
-                        : null;
-
                 case Function.HwMouseMode:
                     return _hw.HwMouse.TryRead(out bool desktopMode)
                         ? PipeEnvelope.FromBool(desktopMode)
@@ -164,20 +147,6 @@ namespace McenterLite.Helper
                     return Apply(request, _hw.Tdp.ApplyMode(request.AsEnum(PerfMode.UserScenario)),
                         () => ReadValue(Function.PerfMode));
 
-                case Function.FanEnabled:
-                    return Apply(request, _hw.Fan.SetEnabled(request.AsBool()), () =>
-                    {
-                        _settings.SetBool(SettingsKeys.FanEnabled, request.AsBool());
-                        return ReadValue(Function.FanEnabled);
-                    });
-
-                case Function.FanPreset:
-                    return SetFanPreset(request);
-
-                case Function.FanFullSpeed:
-                    return Apply(request, _hw.Fan.SetFullSpeed(request.AsBool()),
-                        () => ReadValue(Function.FanFullSpeed));
-
                 case Function.HwMouseMode:
                     return Apply(request, _hw.HwMouse.Apply(request.AsBool()),
                         () => ReadValue(Function.HwMouseMode));
@@ -196,12 +165,6 @@ namespace McenterLite.Helper
                 case Function.IntelContrast:
                 case Function.IntelGamma:
                     return SetIgcl(request);
-
-                case Function.IntelThermalCmd:
-                    // Stopping Intel's thermal stack is a system-level change and the escape
-                    // hatch for a latched fan. Not yet implemented; it lands with fan control.
-                    return PipeEnvelope.Failure(request.Id, request.Fn,
-                        "Intel thermal control is not implemented yet.");
 
                 case Function.PrepareForUninstall:
                     return RestoreEverything(request);
@@ -238,28 +201,6 @@ namespace McenterLite.Helper
             // Report what the hardware ended up at, which may not be what was asked for.
             _hw.Tdp.TryRead(out int actualPl1, out int actualPl2);
             return Ok(request, PipeEnvelope.FromInt(request.Fn == Function.Pl1 ? actualPl1 : actualPl2));
-        }
-
-        private PipeEnvelope SetFanPreset(PipeEnvelope request)
-        {
-            if (!_hw.Fan.Available)
-                return PipeEnvelope.Failure(request.Id, request.Fn, _hw.Fan.UnavailableReason);
-
-            var preset = request.AsEnum(FanPreset.Default);
-
-            // Capture the factory table before the first write, so uninstall can put it back.
-            // Leaving a non-factory curve on the EC is a thermal problem, not a preference.
-            if (_hw.Fan.TryReadState(out var before) && before.ReadOk && before.Table != null)
-                _settings.CaptureOriginal(SettingsKeys.FanPreset,
-                    new FanState { Table = before.Table, Temps = before.Temps, ReadOk = true }.Serialize());
-
-            var result = _hw.Fan.ApplyPreset(preset);
-            if (!result.Ok) return PipeEnvelope.Failure(request.Id, request.Fn, result.Error);
-
-            _settings.SetInt(SettingsKeys.FanPreset, (int)preset);
-            Log.Info($"Applied the {preset} fan preset.");
-
-            return Ok(request, PipeEnvelope.FromEnum(preset));
         }
 
         private PipeEnvelope SetCpuBoost(PipeEnvelope request)
@@ -322,14 +263,6 @@ namespace McenterLite.Helper
         private PipeEnvelope RestoreEverything(PipeEnvelope request)
         {
             var problems = new List<string>();
-
-            // The fan first and unconditionally. Everything else here is a preference; a
-            // non-factory fan table left on the EC is a thermal hazard.
-            if (_hw.Fan.Available)
-            {
-                var fanResult = _hw.Fan.RestoreFactory();
-                if (!fanResult.Ok) problems.Add($"fan: {fanResult.Error}");
-            }
 
             // Power limits. Captured on the first write, restored here - without this the device
             // keeps whatever limit was last set forever, including after an uninstall, and the
@@ -415,10 +348,6 @@ namespace McenterLite.Helper
             Function.Pl2,
             Function.TdpBackend,
             Function.PerfMode,
-            Function.FanEnabled,
-            Function.FanPreset,
-            Function.FanState,
-            Function.FanFullSpeed,
             Function.HwMouseMode,
             Function.CpuBoost,
             Function.OsPowerMode,

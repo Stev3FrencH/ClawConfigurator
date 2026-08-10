@@ -58,15 +58,8 @@ namespace McenterLite.Shared.Model
         public Ipc.TdpBackendKind TdpBackend { get; set; } = Ipc.TdpBackendKind.Unavailable;
 
         // ── Feature availability ─────────────────────────────────────────────────
-        public bool HasFan { get; set; }
         public bool HasHwMouse { get; set; }
         public bool HasIgcl { get; set; }
-
-        /// <summary>
-        /// Lowest duty the firmware will honour at idle (58 on the Claw 8 EX). Below this the
-        /// firmware overrides the curve, so the UI should not imply the value is meaningful.
-        /// </summary>
-        public int FanDutyFloor { get; set; }
 
         public string Serialize()
         {
@@ -80,10 +73,8 @@ namespace McenterLite.Shared.Model
             Append(sb, "maxPl2Dc", MaxPl2Dc);
             Append(sb, "pl2Off", Pl2MinOffset);
             Append(sb, "tdpBackend", (int)TdpBackend);
-            Append(sb, "fan", HasFan ? "1" : "0");
             Append(sb, "hwMouse", HasHwMouse ? "1" : "0");
             Append(sb, "igcl", HasIgcl ? "1" : "0");
-            Append(sb, "dutyFloor", FanDutyFloor);
             return sb.ToString();
         }
 
@@ -117,12 +108,10 @@ namespace McenterLite.Shared.Model
                             ? (Ipc.TdpBackendKind)backend
                             : Ipc.TdpBackendKind.Unavailable;
                         break;
-                    case "fan": caps.HasFan = value == "1"; break;
-                    // "charge" retired with the charge-limit feature; an older helper may still
-                    // send it, and the default branch below drops it harmlessly.
+                    // "charge", "led", "fan" and "dutyFloor" retired with their features. An older
+                    // helper may still send them, and unknown keys fall through harmlessly.
                     case "hwMouse": caps.HasHwMouse = value == "1"; break;
                     case "igcl": caps.HasIgcl = value == "1"; break;
-                    case "dutyFloor": caps.FanDutyFloor = ToInt(value, caps.FanDutyFloor); break;
                     // Unknown keys are ignored on purpose - forward compatibility.
                 }
             }

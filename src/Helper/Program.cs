@@ -266,20 +266,25 @@ namespace McenterLite.Helper
         }
 
         /// <summary>
-        /// Pushes fan telemetry and the OS power mode while the widget is on screen.
+        /// Pushes the OS power mode while the widget is on screen.
         /// </summary>
         /// <remarks>
         /// Gated on visibility because the widget is a UWP app that Windows suspends whenever the
-        /// Game Bar is dismissed. Polling the EC for a suspended reader would be pure cost on a
+        /// Game Bar is dismissed. Polling for a suspended reader would be pure cost on a
         /// battery-powered device.
         ///
         /// <para>
         /// The power mode is a first-class Windows control - the taskbar battery flyout and
         /// Settings can both change it without this app being involved at all. Without polling it
         /// here the widget only ever learns the mode at connect time, and shows a stale choice
-        /// indefinitely once something else changes it. Pushed the same way as fan telemetry: an
-        /// unconditional read-and-send every tick, relying on the widget's own dedup (it only
-        /// re-renders a value that actually changed) rather than tracking "did this change" twice.
+        /// indefinitely once something else changes it. It is an unconditional read-and-send every
+        /// tick, relying on the widget's own dedup (it only re-renders a value that actually
+        /// changed) rather than tracking "did this change" twice.
+        /// </para>
+        /// <para>
+        /// This loop once carried fan telemetry too, which is why it exists at all. The power mode
+        /// alone still justifies it - it is the one value here that something outside this app
+        /// changes routinely.
         /// </para>
         /// </remarks>
         private static async Task RunTelemetryLoopAsync(
@@ -300,19 +305,6 @@ namespace McenterLite.Helper
                 }
 
                 if (!server.IsConnected || !dispatcher.WidgetVisible) continue;
-
-                if (hardware.Fan.Available)
-                {
-                    try
-                    {
-                        if (hardware.Fan.TryReadState(out var state))
-                            server.Send(PipeEnvelope.Event(Function.FanState, state.Serialize()));
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Warn($"Telemetry read failed: {ex.Message}");
-                    }
-                }
 
                 if (hardware.Power.Available)
                 {
@@ -439,15 +431,6 @@ namespace McenterLite.Helper
                         ? $"Re-applied PL1={pl1}W PL2={pl2}W."
                         : $"Could not re-apply power limits: {result.Error}");
                 }
-            }
-
-            if (hardware.Fan.Available && settings.GetBool(SettingsKeys.FanEnabled, false))
-            {
-                var preset = (FanPreset)settings.GetInt(SettingsKeys.FanPreset, 0);
-                var result = hardware.Fan.ApplyPreset(preset);
-                Log.Info(result.Ok
-                    ? $"Re-applied the {preset} fan preset."
-                    : $"Could not re-apply the fan preset: {result.Error}");
             }
 
             // CPU boost is only re-applied once the user has actually chosen a value. Writing a

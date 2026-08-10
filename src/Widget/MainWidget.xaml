@@ -137,42 +137,8 @@
                     </StackPanel>
                 </Border>
 
-                <!-- 2. Fan -->
-                <Border x:Name="FanCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
-                    <StackPanel>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <FontIcon Grid.Column="0" Glyph="&#xE72C;" Style="{StaticResource CardIconStyle}" />
-                            <TextBlock Grid.Column="1" Text="Fan" Style="{StaticResource CardTitleStyle}" />
-                            <ToggleSwitch x:Name="FanEnabledToggle"
-                                          Grid.Column="2"
-                                          Style="{StaticResource CompactToggleStyle}"
-                                          Toggled="FanEnabledToggle_Toggled" />
-                        </Grid>
-
-                        <!-- The three shipping presets, named as ClawTweaks names them. It also
-                             offers Custom and a debug entry; neither is in scope here. -->
-                        <Button x:Name="FanPresetButton"
-                                Style="{StaticResource CycleButtonStyle}"
-                                Margin="0,12,0,0"
-                                Click="FanPresetButton_Click" />
-
-                        <TextBlock x:Name="FanStateText"
-                                   Style="{StaticResource HintStyle}" />
-
-                        <TextBlock x:Name="FanMismatchText"
-                                   FontSize="{StaticResource HintSize}"
-                                   TextWrapping="Wrap"
-                                   LineHeight="17"
-                                   Foreground="{StaticResource ErrorBrush}"
-                                   Visibility="Collapsed"
-                                   Margin="0,8,0,0" />
-                    </StackPanel>
-                </Border>
+                <!-- 2. Fan was here. Removed 2026-08-08: fan control stays in MSI Center. Gate G2
+                     never resolved the byte layout, so nothing was ever written to the EC. -->
 
                 <!-- 3. Battery charge limit was here. Removed 2026-08-08: it is set in MSI
                      Center, changes rarely, and the registry path this app could reach did not

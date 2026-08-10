@@ -15,19 +15,13 @@ namespace McenterLite.Hardware.Windows
     /// </para>
     /// <para>
     /// Live today: power limits (registry), CPU boost and OS power mode (plain Windows APIs).
-    /// Pending: fan, firmware mouse mode, Intel GPU. Battery charge limit and lighting were
-    /// removed - both are better handled in MSI Center itself.
+    /// Pending: firmware mouse mode, Intel GPU. Battery charge limit, lighting and fan control
+    /// were all removed - each is better handled in MSI Center itself.
     /// </para>
     /// </remarks>
     [SupportedOSPlatform("windows")]
     public sealed class WindowsHardware : IHardware
     {
-        /// <summary>
-        /// Lowest duty the EX firmware honours at idle. Below this the curve is overridden, so a
-        /// lower point makes the device louder at idle rather than quieter.
-        /// </summary>
-        private const int ExDutyFloor = 58;
-
         public WindowsHardware(DeviceDetection.DeviceIdentity identity)
         {
             // Caps first: the provider needs the battery ceilings to derive the DC pair.
@@ -50,11 +44,8 @@ namespace McenterLite.Hardware.Windows
                 MaxPl2Dc = 30,
 
                 // Not implemented yet. Reported as absent rather than broken.
-                HasFan = false,
                 HasHwMouse = false,
                 HasIgcl = false,
-
-                FanDutyFloor = ExDutyFloor,
             };
 
             var tdp = new RegistryTdpProvider(Caps);
@@ -69,7 +60,6 @@ namespace McenterLite.Hardware.Windows
                 ? tdp
                 : new UnavailableTdp("This device is not an MSI Claw 8 EX AI+.");
 
-            Fan = new UnavailableFan("Fan control is not implemented yet.", ExDutyFloor);
             HwMouse = new UnavailableHwMouse("Desktop mouse mode is not implemented yet.");
             Igcl = new UnavailableIgcl("Intel graphics controls are not implemented yet.");
 
@@ -78,7 +68,6 @@ namespace McenterLite.Hardware.Windows
 
         public DeviceCaps Caps { get; }
         public ITdpProvider Tdp { get; }
-        public IFanProvider Fan { get; }
         public IHwMouseProvider HwMouse { get; }
         public IPowerProvider Power { get; }
         public IIgclProvider Igcl { get; }
@@ -117,34 +106,6 @@ namespace McenterLite.Hardware.Windows
         }
 
         public OpResult ApplyMode(PerfMode mode) => OpResult.Unavailable(UnavailableReason);
-    }
-
-    internal sealed class UnavailableFan : IFanProvider
-    {
-        public UnavailableFan(string reason, int dutyFloor)
-        {
-            UnavailableReason = reason;
-            DutyFloor = dutyFloor;
-        }
-
-        public bool Available => false;
-        public string UnavailableReason { get; }
-
-        public int[] FactoryTemps => null;
-        public int[] FactoryDuties => null;
-        public int DutyFloor { get; }
-        public FanPreset CurrentPreset => FanPreset.Default;
-
-        public bool TryReadState(out FanState state)
-        {
-            state = null;
-            return false;
-        }
-
-        public OpResult ApplyPreset(FanPreset preset) => OpResult.Unavailable(UnavailableReason);
-        public OpResult SetEnabled(bool enabled) => OpResult.Unavailable(UnavailableReason);
-        public OpResult SetFullSpeed(bool on) => OpResult.Unavailable(UnavailableReason);
-        public OpResult RestoreFactory() => OpResult.Unavailable(UnavailableReason);
     }
 
     internal sealed class UnavailableHwMouse : IHwMouseProvider

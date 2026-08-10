@@ -25,7 +25,7 @@ namespace McenterLite.Shared.Ipc
     /// </para>
     ///
     /// <para>
-    /// Structured payloads (fan state, device caps) are carried as strings using their own compact
+    /// Structured payloads such as device caps are carried as strings using their own compact
     /// encodings rather than nested JSON, which keeps this parser flat and total.
     /// </para>
     /// </summary>

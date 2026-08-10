@@ -28,9 +28,9 @@ namespace McenterLite.Shared.Ipc
         DeviceCaps = 3,
 
         /// <summary>
-        /// Widget -> helper, "1" when the widget is on screen. Gates the ~1 Hz <see cref="FanState"/>
-        /// push. The widget is a UWP app and is suspended when the Game Bar is dismissed, so the
-        /// helper must be told rather than inferring it.
+        /// Widget -> helper, "1" when the widget is on screen. Gates the ~1 Hz telemetry push (now
+        /// just <see cref="OsPowerMode"/>). The widget is a UWP app and is suspended when the Game
+        /// Bar is dismissed, so the helper must be told rather than inferring it.
         /// </summary>
         WidgetVisible = 4,
 
@@ -57,21 +57,15 @@ namespace McenterLite.Shared.Ipc
         /// </remarks>
         PerfMode = 13,
 
-        // ── 2. Fan presets ───────────────────────────────────────────────────────
-        /// <summary>Master switch. When false the firmware's own curve drives the fan.</summary>
-        FanEnabled = 20,
-
-        /// <summary>Selected profile. See <see cref="FanPreset"/>. No custom curve is exposed.</summary>
-        FanPreset = 21,
-
-        /// <summary>
-        /// Helper -> widget telemetry, pushed at ~1 Hz while the widget is visible.
-        /// Content is a serialized <c>FanState</c>.
-        /// </summary>
-        FanState = 22,
-
-        /// <summary>Full-speed override. A separate EC control from the curve, not a preset.</summary>
-        FanFullSpeed = 23,
+        // ── 2. Fan presets — REMOVED ─────────────────────────────────────────────
+        //
+        // Ordinals 20 (FanEnabled), 21 (FanPreset), 22 (FanState) and 23 (FanFullSpeed) are
+        // RETIRED and must never be reused.
+        //
+        // Descoped 2026-08-08. Fan control stays in MSI Center. Gate G2 never resolved the byte
+        // layout - the six-point curve MSI ships could not be reconciled with the five-point model
+        // the desk research described - so nothing was ever written to the EC. Findings kept in
+        // docs/hardware-notes.md.
 
         // ── 3. Battery charge limit — REMOVED ────────────────────────────────────
         //
@@ -130,11 +124,8 @@ namespace McenterLite.Shared.Ipc
         /// <summary>Helper -> widget. MSI Center M is running and may be fighting us for the EC/HID.</summary>
         MsiCenterRunning = 80,
 
-        /// <summary>
-        /// Intel thermal-stack control. Intel's IPF/DTT owns a fan participant ABOVE the EC and can
-        /// latch the fan at maximum regardless of our table. See <see cref="IntelThermalCommand"/>.
-        /// This is the escape hatch and must ship before any EC write.
-        /// </summary>
-        IntelThermalCmd = 81,
+        // Ordinal 81 (IntelThermalCmd) is RETIRED. It existed only to stop Intel's IPF/DTT thermal
+        // stack from latching the fan above any table we wrote - an escape hatch for EC fan writes.
+        // With fan control removed there are no EC writes, so it guards nothing.
     }
 }

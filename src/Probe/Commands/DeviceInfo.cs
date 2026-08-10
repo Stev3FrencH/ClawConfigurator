@@ -34,11 +34,10 @@ namespace McenterLite.Probe.Commands
 
             if (identity.IsAnyClaw)
             {
-                // The EC table layout, duty floor and power ceilings differ between Claw
-                // generations. Applying 8 EX values elsewhere would write a wrong fan table to a
-                // real embedded controller.
-                Console.WriteLine("A Claw, but NOT the 8 EX. Hardware features stay disabled: the EC layout,");
-                Console.WriteLine("duty floor and power limits in this project are calibrated to the 8 EX only.");
+                // The power ceilings differ between Claw generations. Applying 8 EX values
+                // elsewhere would write wrong power limits to real firmware.
+                Console.WriteLine("A Claw, but NOT the 8 EX. Hardware features stay disabled: the power limits");
+                Console.WriteLine("in this project are calibrated to the 8 EX only.");
                 return 3;
             }
 

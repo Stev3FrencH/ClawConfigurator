@@ -30,8 +30,13 @@ fresh package.
 
 ## Removed features
 
-Both removed 2026-08-08, for the same reason: MSI Center already does them, and does them better
-than this widget could. Narrowing scope, not abandoning work.
+All three removed 2026-08-08, for the same reason: MSI Center already does them, and does them
+better than this widget could. Narrowing scope, not abandoning work.
+
+**Fan presets.** Gate G2 never resolved the byte layout — the six-point curve MSI ships could not
+be reconciled with the five-point model the desk research described — so nothing was ever written
+to the EC. `Function` ordinals 20–23 are retired, along with 81 (`IntelThermalCmd`), which existed
+only to stop Intel's thermal stack latching the fan above an EC table we no longer write.
 
 **Battery charge limit.** Set in MSI Center, changes rarely, and the registry path this app could
 reach did not enforce it. `Function` ordinals 30 and 31 are retired.
@@ -40,21 +45,23 @@ reach did not enforce it. `Function` ordinals 30 and 31 are retired.
 the most this widget could offer was an on/off toggle sitting next to MSI Center's far richer
 control. `Function` ordinal 40 is retired.
 
-Both sets of findings are kept in [`hardware-notes.md`](hardware-notes.md) as a device record
-rather than deleted — the charge limit in particular was eventually traced to
-`MSI_ACPI.Get_AP` / `Set_AP`, sub-function 0, byte 5, encoded `percent | 0x80`, which took several
-rounds of on-device measurement to find.
+All findings are kept in [`hardware-notes.md`](hardware-notes.md) as a device record rather than
+deleted — the charge limit in particular was eventually traced to `MSI_ACPI.Get_AP` / `Set_AP`,
+sub-function 0, byte 5, encoded `percent | 0x80`, which took several rounds of on-device
+measurement to find.
+
+**A consequence worth noting:** nothing in the app writes to the embedded controller any more.
+Fan control was the only feature that would have.
 
 ## No open bugs
 
-The Lighting card not appearing was the last one, and removing the feature closes it.
+The Lighting card not appearing was the last one, and removing the feature closed it.
 
 ## Outstanding work
 
-- **Gate G2, fan control** — the largest remaining feature. Still needs the byte layout resolved
-  before anything is written. `Diagnostics/Sweep-MsiAcpi.ps1` is the tool to try: snapshot across
-  MSI Center's fan settings and diff, exactly how the charge limit was eventually located. Note
-  `Get_Fan` / `Set_Fan` both take a `Package_32`, same shape as everything else on that class.
-- **Uninstall/restore flow**, end-to-end on the Claw — should put back every captured original
-  value. Less to restore now that two features are gone.
-- Desktop/gamepad mode (G5) and Intel GPU controls (G6) remain unimplemented stubs.
+- **Uninstall/restore flow**, end-to-end on the Claw — should put back the captured original power
+  limits. Much less to restore now that three features are gone.
+- Desktop/gamepad mode (G5) and Intel GPU controls (G6) remain unimplemented stubs. G5 is the
+  cheaper of the two: it is green via registry (`OsdEditor\ControlModeUserSet`, REG_SZ, `"XInput"`
+  ↔ `"Desktop"`, confirmed both directions), so it is the same provider pattern as TDP rather than
+  new discovery work.

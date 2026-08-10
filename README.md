@@ -12,27 +12,29 @@ AI+ (Panther Lake, `CG3EM` / board `1T91`), delivered as an Xbox Game Bar widget
 > Mode and the Power Limits card are verified working end-to-end, including reflecting changes made
 > outside the widget (Windows Settings, the taskbar flyout, the physical mode button).
 >
-> **The scope has narrowed deliberately.** Battery charge limit and RGB LED were both removed
-> (2026-08-08): each is set in MSI Center, neither changes often, and MSI's own controls are better
-> than anything this widget could offer for them. Fan (gate G2) still needs Phase 0 discovery
-> finished before it can be turned on at all; desktop/gamepad mode (G5) and Intel GPU controls (G6)
-> are unimplemented stubs regardless of their gate status. See
+> **The scope has narrowed deliberately.** Fan control, battery charge limit and RGB LED were all
+> removed (2026-08-08): each is set in MSI Center, none changes often, and MSI's own controls are
+> better than anything this widget could offer for them. Desktop/gamepad mode (G5) and Intel GPU
+> controls (G6) are unimplemented stubs. See
 > [docs/hardware-notes.md](docs/hardware-notes.md) for the full gate-by-gate picture, including the
-> findings from the two removed features, which are kept as a device record.
+> findings from the removed features, which are kept as a device record.
+>
+> What is left is the part MSI Center is *worse* at: changing power limits quickly, from a
+> controller, without leaving the game.
 
 ## Scope
 
-Eight features, deliberately few:
+Eight features were planned. Three were removed once it was clear MSI Center does them better:
 
 | # | Feature | Status |
 |---|---|---|
-| 1 | TDP (PL1 / PL2) — via MSI Center's registry model | ✅ implemented, unverified on device |
-| 2 | Fan presets — 3 fixed profiles, no custom curve | blocked on gate G2 |
+| 1 | TDP (PL1 / PL2) — via MSI Center's registry model | ✅ verified on device |
+| 2 | ~~Fan presets~~ — **removed**, set it in MSI Center | descoped 2026-08-08 |
 | 3 | ~~Battery charge limit~~ — **removed**, set it in MSI Center | descoped 2026-08-08 |
 | 4 | ~~RGB LED~~ — **removed**, MSI Center's lighting control is far richer | descoped 2026-08-08 |
 | 5 | Desktop / gamepad mode (firmware) | blocked on gate G5 |
-| 6 | CPU Boost | ✅ implemented |
-| 7 | OS Power Mode | ✅ implemented |
+| 6 | CPU Boost | ✅ verified on device |
+| 7 | OS Power Mode | ✅ verified on device |
 | 8 | Intel GPU controls (IGCL) | blocked on gate G6 |
 
 Live metrics and per-game profiles are out of scope.
@@ -53,12 +55,12 @@ Live metrics and per-game profiles are out of scope.
 - **One writer for settings.** The helper owns `settings.json`; the widget persists nothing
   functional. This removes the whole family of "my setting reset itself" bugs.
 - **Single device.** Another Claw generation is treated as unsupported, not as close enough — the
-  EC layout, duty floor and power ceilings differ.
+  power ceilings differ, and a wrong limit is a real write to real firmware.
 
 ## Layout
 
 ```
-src/Shared/      netstandard2.0   IPC contract, fan model, payload encodings. No dependencies.
+src/Shared/      netstandard2.0   IPC contract, device caps, payload encodings. No dependencies.
 src/Hardware/    net8.0-windows   Provider interfaces, fakes, Windows power, device detection.
 src/Helper/      net8.0-windows   Elevated pipe server. Owns all hardware access.
 src/Probe/       net8.0-windows   Phase-0 discovery tool and regression harness.
@@ -200,19 +202,21 @@ Do not copy code: ClawTweaks is AGPLv3, and copying it would force the same lice
 
 ## Safety
 
-Fan control writes to an embedded controller. The mitigations are structural, not advisory:
+**Nothing here writes to the embedded controller.** Fan control was the only feature that would
+have, and it was removed — so the EC duty tables, the ≤ 75 clamp, the monotonic-curve rule and the
+Intel IPF escape hatch that used to live here are all gone with it. What remains writes MSI
+Center's own registry model and documented Windows power APIs, nothing lower.
 
-- Only three fixed presets; no user-authored duty value ever reaches the EC.
-- Every duty is clamped to ≤ 75, MSI's own ceiling.
-- Only table indices 1..6 are written; the EC's own boundary bytes are preserved.
-- Curves are forced monotonic — a duty that falls as temperature rises is the one shape that can
-  actually cook the device.
-- Every write is read back and compared before being reported as successful.
-- The factory table is captured before the first write and restored on uninstall.
-- The Intel IPF escape hatch ships before any EC write.
+The mitigations that do still apply are structural rather than advisory:
 
-The table builder lives in `Shared` with no platform dependencies specifically so it is unit-tested
-without the device.
+- **Every value is clamped in the helper**, never only in the UI. The pipe is ACL'd to all app
+  packages, so slider bounds are a convenience and the helper is the enforcement point.
+- **Every write is read back** and the actual value returned. A write the hardware ignored is
+  reported as a failure, not as success.
+- **Power limits are captured before the first write** and restored on uninstall, so the device
+  does not keep our numbers forever.
+- **The device gate is exact.** Another Claw generation is treated as unsupported rather than close
+  enough — the power ceilings differ, and a wrong limit is a real write to real firmware.
 
 **Do not run this and ClawTweaks at the same time.** Both write the same EC.
 

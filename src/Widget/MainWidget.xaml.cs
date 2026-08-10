@@ -70,9 +70,8 @@ namespace McenterLite.Widget
         /// </para>
         /// <para>
         /// The option strings live here rather than in XAML because the index IS the wire value -
-        /// it is cast straight to <c>PerfMode</c>, <c>FanPreset</c> and friends.
-        /// Keeping the list next to the code that casts it makes that coupling visible; in XAML it
-        /// was three files apart.
+        /// it is cast straight to the enum it names. Keeping the list next to the code that casts
+        /// it makes that coupling visible; in XAML it was three files apart.
         /// </para>
         /// </remarks>
         private sealed class OptionCycler
@@ -214,7 +213,6 @@ namespace McenterLite.Widget
         };
 
         private SegmentedControl _perfMode;
-        private OptionCycler _fanPreset;
         private SegmentedControl _powerMode;
         private OptionCycler _intelFpsTier;
         private OptionCycler _intelLowLatency;
@@ -239,9 +237,6 @@ namespace McenterLite.Widget
                 _perfMode = new SegmentedControl(PerfModeSegments,
                     Array.ConvertAll(PerfModeSegmentOrder, segment => segment.Label));
                 _perfMode.Selected += OnPerfModeSelected;
-
-                _fanPreset = new OptionCycler(FanPresetButton,
-                    "MSI Default", "Quiet Idle", "Cooling \u00B7 Early Ramp");
 
                 _powerMode = new SegmentedControl(PowerModeSegments,
                     "Efficiency", "Balanced", "Performance");
@@ -277,9 +272,9 @@ namespace McenterLite.Widget
             // NOT Window.Current.VisibilityChanged, which was the original and was wrong. Game Bar
             // documents Visible as a COMPOSITE of GameBarDisplayMode, WindowState and Pinned - a
             // pinned widget stays visible when the Game Bar overlay itself is dismissed, and the
-            // window-level event does not know that. Getting it backwards means either polling the
-            // embedded controller for a reader that is not there, or a pinned widget showing fan
-            // telemetry that has silently stopped updating.
+            // window-level event does not know that. Getting it backwards means either polling for
+            // a reader that is not there, or a pinned widget whose telemetry has silently stopped
+            // updating.
             if (_widget != null)
                 _widget.VisibleChanged += OnWidgetVisibleChanged;
 
@@ -516,7 +511,6 @@ namespace McenterLite.Widget
             Control[] candidates =
             {
                 Pl1Slider,
-                FanEnabledToggle,
                 HwMouseToggle,
                 CpuBoostToggle,
             };
@@ -589,7 +583,6 @@ namespace McenterLite.Widget
             // cannot see is a value they cannot send, which matters because the pipe is reachable
             // by any app on the machine and the helper is the only real gate.
             TdpCard.Visibility = Visible(_connection.IsAvailable(Function.Pl1));
-            FanCard.Visibility = Visible(caps.HasFan && _connection.IsAvailable(Function.FanPreset));
             HwMouseCard.Visibility = Visible(caps.HasHwMouse);
             IntelCard.Visibility = Visible(caps.HasIgcl && _connection.IsAvailable(Function.IntelFpsTier));
 
@@ -616,9 +609,6 @@ namespace McenterLite.Widget
             ApplyValue(Function.PerfMode);
             ApplyValue(Function.Pl1);
             ApplyValue(Function.Pl2);
-            ApplyValue(Function.FanEnabled);
-            ApplyValue(Function.FanPreset);
-            ApplyValue(Function.FanState);
             ApplyValue(Function.HwMouseMode);
             ApplyValue(Function.CpuBoost);
             ApplyValue(Function.OsPowerMode);
@@ -649,18 +639,6 @@ namespace McenterLite.Widget
                     Pl2ValueText.Text = $"{(int)Pl2Slider.Value} W";
                     break;
 
-                case Function.FanEnabled:
-                    FanEnabledToggle.IsOn = _connection.GetBool(Function.FanEnabled);
-                    _fanPreset.IsEnabled = FanEnabledToggle.IsOn;
-                    break;
-
-                case Function.FanPreset:
-                    _fanPreset.Show(Clamp(_connection.GetInt(Function.FanPreset, 0), 0, 2));
-                    break;
-
-                case Function.FanState:
-                    ApplyFanState(_connection.Get(Function.FanState));
-                    break;
 
                 case Function.HwMouseMode:
                     HwMouseToggle.IsOn = _connection.GetBool(Function.HwMouseMode);
@@ -688,37 +666,6 @@ namespace McenterLite.Widget
                     MsiCenterWarning.Visibility = Visible(!_connection.GetBool(Function.MsiCenterRunning));
                     break;
             }
-        }
-
-        private void ApplyFanState(string payload)
-        {
-            if (string.IsNullOrEmpty(payload))
-            {
-                FanStateText.Text = "";
-                FanMismatchText.Visibility = Visibility.Collapsed;
-                return;
-            }
-
-            var state = FanState.Parse(payload);
-
-            if (!state.ReadOk)
-            {
-                FanStateText.Text = "Could not read the fan controller.";
-                FanMismatchText.Visibility = Visibility.Collapsed;
-                return;
-            }
-
-            var rpm = state.Rpm >= 0 ? $"{state.Rpm} rpm" : "rpm unavailable";
-            var owner = state.ControlEnabled ? "software curve" : "firmware curve";
-            FanStateText.Text = state.FullSpeed ? $"{rpm} - full speed override" : $"{rpm} - {owner}";
-
-            // Surfaced rather than swallowed: the controller can accept a write and keep running
-            // the old curve, and reporting that as success is the failure this app must not have.
-            // The helper decides this - only it knows the factory curve and the model duty floor
-            // that the preset resolves against.
-            FanMismatchText.Visibility = Visible(state.ControlEnabled && !state.Matches);
-            if (state.ControlEnabled && !state.Matches)
-                FanMismatchText.Text = "The controller is not running the selected profile.";
         }
 
         // ── User input ──────────────────────────────────────────────────────────
@@ -824,19 +771,6 @@ namespace McenterLite.Widget
 
             await SendAsync(Function.Pl1, pl1);
             await SendAsync(Function.Pl2, pl2);
-        }
-
-        private async void FanEnabledToggle_Toggled(object sender, RoutedEventArgs e)
-        {
-            if (_applyingFromHelper) return;
-            _fanPreset.IsEnabled = FanEnabledToggle.IsOn;
-            await SendAsync(Function.FanEnabled, FanEnabledToggle.IsOn);
-        }
-
-        private async void FanPresetButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (_applyingFromHelper) return;
-            await SendAsync(Function.FanPreset, _fanPreset.Advance());
         }
 
         private async void HwMouseToggle_Toggled(object sender, RoutedEventArgs e)

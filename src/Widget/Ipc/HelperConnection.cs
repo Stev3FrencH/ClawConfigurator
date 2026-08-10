@@ -226,8 +226,8 @@ namespace McenterLite.Widget.Ipc
 
         private void OnEventReceived(PipeEnvelope envelope)
         {
-            // Pushes are how the widget learns about state it does not own: fan telemetry, and
-            // things the user changed on the device itself, like the physical mode button.
+            // Pushes are how the widget learns about state it does not own - things the user
+            // changed outside it, like the taskbar power flyout or the physical mode button.
             if (envelope.Fn == Function.Snapshot)
             {
                 ApplySnapshot(envelope.Value);

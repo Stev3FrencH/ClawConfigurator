@@ -105,8 +105,7 @@ namespace McenterLite.Helper.Settings
         /// <remarks>
         /// Write-once is the whole point. Capturing on every start would, on the second start,
         /// record the value WE set as if it were the user's - and uninstall would then "restore"
-        /// the device to our settings forever. This matters most for the fan table: leaving a
-        /// non-factory curve on the EC after uninstall is a thermal problem, not a preference.
+        /// the device to our settings forever, which is not a restore at all.
         /// </remarks>
         public void CaptureOriginal(string key, string value)
         {
@@ -154,11 +153,6 @@ namespace McenterLite.Helper.Settings
         public const string Pl1 = "Pl1";
         public const string Pl2 = "Pl2";
         public const string TdpBackend = "TdpBackend";
-
-        public const string FanEnabled = "FanEnabled";
-        public const string FanPreset = "FanPreset";
-
-
 
         public const string CpuBoost = "CpuBoost";
         public const string OsPowerMode = "OsPowerMode";

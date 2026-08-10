@@ -78,46 +78,6 @@ namespace McenterLite.Hardware
         OpResult ApplyMode(PerfMode mode);
     }
 
-    /// <summary>The EC fan curve, exposed only as a small fixed set of presets.</summary>
-    public interface IFanProvider : IFeatureProvider
-    {
-        /// <summary>
-        /// The device's own factory temperature axis, captured before the first write.
-        /// Null when it could not be read. Also what uninstall restores.
-        /// </summary>
-        int[] FactoryTemps { get; }
-
-        /// <summary>The device's own factory duty curve, captured before the first write.</summary>
-        int[] FactoryDuties { get; }
-
-        /// <summary>Lowest duty the firmware honours at idle. Below this the curve is overridden.</summary>
-        int DutyFloor { get; }
-
-        /// <summary>The preset last applied, used to judge whether the EC still holds it.</summary>
-        FanPreset CurrentPreset { get; }
-
-        /// <summary>
-        /// Reads the EC, including <see cref="FanState.Matches"/>.
-        /// </summary>
-        /// <remarks>
-        /// The implementation must set <c>Matches</c> itself - it is the only party that knows both
-        /// the factory curve and the duty floor the preset resolves against, so it is the only one
-        /// that can compare the read-back against what was actually written.
-        /// </remarks>
-        bool TryReadState(out FanState state);
-
-        /// <summary>Writes a preset, then re-reads and verifies the bytes it wrote.</summary>
-        OpResult ApplyPreset(FanPreset preset);
-
-        /// <summary>Hands the curve back to firmware (false) or takes software control (true).</summary>
-        OpResult SetEnabled(bool enabled);
-
-        OpResult SetFullSpeed(bool on);
-
-        /// <summary>Puts the factory table back. Called on uninstall, and available as a panic action.</summary>
-        OpResult RestoreFactory();
-    }
-
     /// <summary>
     /// The controller's firmware desktop-mouse mode.
     /// </summary>
@@ -168,7 +128,6 @@ namespace McenterLite.Hardware
         DeviceCaps Caps { get; }
 
         ITdpProvider Tdp { get; }
-        IFanProvider Fan { get; }
         IHwMouseProvider HwMouse { get; }
         IPowerProvider Power { get; }
         IIgclProvider Igcl { get; }

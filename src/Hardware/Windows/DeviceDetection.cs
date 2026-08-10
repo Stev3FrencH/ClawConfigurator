@@ -8,9 +8,9 @@ namespace McenterLite.Hardware.Windows
     public static class DeviceDetection
     {
         /// <summary>
-        /// Everything this project knows is calibrated to one model: EC table layout, duty floor,
-        /// power-limit ceilings, HID report formats. Applying Claw 8 EX values to a different
-        /// Claw generation would write a wrong fan table to a real embedded controller, so an
+        /// Everything this project knows is calibrated to one model: power-limit ceilings, and the
+        /// HID report formats the remaining stubs would use. Applying Claw 8 EX values to another
+        /// Claw generation would write wrong power limits to real firmware, so an
         /// unrecognised device disables every hardware feature rather than guessing.
         /// </summary>
         public sealed class DeviceIdentity

@@ -18,10 +18,8 @@ namespace McenterLite.Shared.Tests
             MaxPl2Dc = 30,
             Pl2MinOffset = 2,
             TdpBackend = TdpBackendKind.Wmi,
-            HasFan = true,
             HasHwMouse = true,
             HasIgcl = true,
-            FanDutyFloor = 58,
         };
 
         [Fact]
@@ -37,7 +35,6 @@ namespace McenterLite.Shared.Tests
             Assert.Equal(30, parsed.MaxPl2Dc);
             Assert.Equal(2, parsed.Pl2MinOffset);
             Assert.Equal(TdpBackendKind.Wmi, parsed.TdpBackend);
-            Assert.Equal(58, parsed.FanDutyFloor);
             Assert.True(parsed.HasIgcl);
         }
 
@@ -393,62 +390,4 @@ namespace McenterLite.Shared.Tests
             Assert.NotEqual((int)Function.TdpBackend, (int)Function.PerfMode);
         }
     }
-
-    public class FanStateTests
-    {
-        [Fact]
-        public void RoundTrips()
-        {
-            var state = new FanState
-            {
-                Table = new byte[] { 0, 0, 40, 49, 58, 67, 75, 94 },
-                ControlEnabled = true,
-                ReadOk = true,
-                FullSpeed = false,
-                Rpm = 3571,
-                Temps = new[] { 44, 54, 64, 74, 82 },
-                Matches = false,
-            };
-
-            var parsed = FanState.Parse(state.Serialize());
-
-            Assert.Equal(state.Table, parsed.Table);
-            Assert.True(parsed.ControlEnabled);
-            Assert.True(parsed.ReadOk);
-            Assert.False(parsed.FullSpeed);
-            Assert.Equal(3571, parsed.Rpm);
-            Assert.Equal(state.Temps, parsed.Temps);
-            Assert.False(parsed.Matches);
-        }
-
-        [Fact]
-        public void Parse_DefaultsMatchesToTrueWhenAbsent()
-        {
-            // A payload without the trailing field must not be read as "mismatch" - that would
-            // put a permanent warning under the fan card for a state nobody actually reported.
-            var parsed = FanState.Parse("0,0,40,49,58,67,75,94|1|1|0|3571|44,54,64,74,82");
-
-            Assert.True(parsed.Matches);
-        }
-
-        [Fact]
-        public void RoundTrips_UnavailableRpm()
-        {
-            var parsed = FanState.Parse(new FanState { ReadOk = false, Rpm = -1 }.Serialize());
-
-            Assert.False(parsed.ReadOk);
-            Assert.Equal(-1, parsed.Rpm);
-        }
-
-        [Fact]
-        public void Parse_ToleratesTruncatedInput()
-        {
-            FanState.Parse("");
-            FanState.Parse(null);
-            FanState.Parse("0,0,40|1");
-            FanState.Parse("|||||");
-            FanState.Parse("garbage|garbage|garbage|garbage|garbage|garbage");
-        }
-    }
-
 }

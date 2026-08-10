@@ -27,7 +27,7 @@ namespace McenterLite.Shared.Tests
         [Fact]
         public void RoundTrips_NullValue()
         {
-            var parsed = RoundTrip(new PipeEnvelope(1, Command.Get, Function.FanState));
+            var parsed = RoundTrip(new PipeEnvelope(1, Command.Get, Function.OsPowerMode));
             Assert.Null(parsed.Value);
         }
 
@@ -175,20 +175,20 @@ namespace McenterLite.Shared.Tests
         [Fact]
         public void AsEnum_RejectsOutOfRangeValues()
         {
-            var ok = new PipeEnvelope(1, Command.Set, Function.FanPreset,
-                PipeEnvelope.FromEnum(FanPreset.Cooling));
-            Assert.Equal(FanPreset.Cooling, ok.AsEnum(FanPreset.Default));
+            var ok = new PipeEnvelope(1, Command.Set, Function.OsPowerMode,
+                PipeEnvelope.FromEnum(OsPowerMode.BestPerformance));
+            Assert.Equal(OsPowerMode.BestPerformance, ok.AsEnum(OsPowerMode.Balanced));
 
             // An out-of-range ordinal must not become an undefined enum value that later
             // switch statements silently fall through.
-            var bad = new PipeEnvelope(1, Command.Set, Function.FanPreset, "77");
-            Assert.Equal(FanPreset.Default, bad.AsEnum(FanPreset.Default));
+            var bad = new PipeEnvelope(1, Command.Set, Function.OsPowerMode, "77");
+            Assert.Equal(OsPowerMode.Balanced, bad.AsEnum(OsPowerMode.Balanced));
         }
 
         [Fact]
         public void Event_UsesZeroCorrelationId()
         {
-            var evt = PipeEnvelope.Event(Function.FanState, "x");
+            var evt = PipeEnvelope.Event(Function.OsPowerMode, "x");
             Assert.Equal(0, evt.Id);
             Assert.Equal(Command.Event, evt.Cmd);
         }

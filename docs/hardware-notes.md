@@ -495,6 +495,17 @@ settled this had the UI open), and find out what re-asserts MSI's own values ove
 
 ## Gate G2 — Fan presets
 
+> **FEATURE REMOVED 2026-08-08.** Fan control stays in MSI Center. This gate never resolved — the
+> six-point curve MSI ships on this device could not be reconciled with the five-point model the
+> desk research described, and the duty scales were never shown to match — so **nothing was ever
+> written to the EC**. The code is gone from every layer; `Function` ordinals 20–23 are retired,
+> along with 81 (`IntelThermalCmd`), which existed only as the escape hatch for EC fan writes.
+>
+> **Everything below is kept as a device record, not as live work.** If it is ever revisited,
+> `Diagnostics/Sweep-MsiAcpi.ps1` is the tool to start with: `Get_Fan` / `Set_Fan` take the same
+> `Package_32` as everything else on that class, so snapshotting across MSI Center's fan settings
+> and diffing is the approach that finally located the charge limit in G3.
+
 Only three fixed profiles are exposed; no custom curve. The values below come from the reference
 project's widget code and are **carried over as hypotheses** — every one must be confirmed on this
 device before a single write.

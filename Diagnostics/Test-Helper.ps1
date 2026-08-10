@@ -29,16 +29,9 @@
     Convenience: set PL1 to this many watts and report what both limits ended up at, plus what
     landed in MSI's registry. The helper couples and clamps, so the result is often not the input.
 
-.PARAMETER ChargeLimit
-    Convenience: 60, 80 or 100. 100 switches the limiter off, because "charge to full" is how the
-    device represents "no limit".
-
 .PARAMETER Restore
     Put every value back to what it was before this app first touched it. The helper captures the
     original on the first write of each setting, so this undoes a test session in one command.
-
-    Worth running after any testing that set a charge limit. That one is invisible day to day, so
-    a forgotten 60% limit turns up weeks later as "my battery stopped charging".
 
 .NOTES
     Run elevated. The pipe grants the current user full control, and the helper itself must be
@@ -49,7 +42,6 @@
 .EXAMPLE
     .\Test-Helper.ps1
     .\Test-Helper.ps1 -Tdp 25
-    .\Test-Helper.ps1 -ChargeLimit 60
     .\Test-Helper.ps1 -Set PerfMode -Value 1
 #>
 
@@ -60,7 +52,6 @@ param(
     [string]$Set,
     [string]$Value,
     [int]$Tdp,
-    [int]$ChargeLimit,
     [switch]$Restore
 )
 
@@ -71,17 +62,17 @@ $PipeName = 'McenterLiteHelper'
 # Must match src/Shared/Ipc/Function.cs. Ordinals there are explicit and never reused, so this
 # map only ever grows.
 #
-# RETIRED, deliberately absent: 30/31 (charge limit) and 40 (lighting). Both features were removed
-# 2026-08-08 and their ordinals must never be reused - listing them here would invite exactly that.
+# RETIRED, deliberately absent: 20-23 (fan), 30/31 (charge limit), 40 (lighting) and 81 (Intel
+# thermal, which only existed to keep Intel's stack off the fan). All removed 2026-08-08 and their
+# ordinals must never be reused - listing them here would invite exactly that.
 $Fn = @{
     Hello = 1; Snapshot = 2; DeviceCaps = 3; WidgetVisible = 4; PrepareForUninstall = 5
     Pl1 = 10; Pl2 = 11; TdpBackend = 12; PerfMode = 13
-    FanEnabled = 20; FanPreset = 21; FanState = 22; FanFullSpeed = 23
     HwMouseMode = 50
     CpuBoost = 60; OsPowerMode = 61
     IntelFpsTier = 70; IntelLowLatency = 71; IntelFrameSync = 72
     IntelAdaptiveSharpness = 73; IntelSaturation = 74; IntelContrast = 75; IntelGamma = 76
-    MsiCenterRunning = 80; IntelThermalCmd = 81
+    MsiCenterRunning = 80
 }
 $FnName = @{}
 foreach ($k in $Fn.Keys) { $FnName[$Fn[$k]] = $k }
@@ -122,7 +113,7 @@ function Invoke-Helper {
     $script:writer.WriteLine("{`"id`":$id,`"cmd`":$Cmd,`"fn`":$Function,`"v`":$v}")
 
     # Read until the reply with OUR id. The helper can push unsolicited telemetry (cmd 3), and
-    # taking the next line blindly would attribute a fan reading to a power-limit request.
+    # taking the next line blindly would attribute a telemetry push to a power-limit request.
     for ($i = 0; $i -lt 50; $i++) {
         $line = $script:reader.ReadLine()
         if ($null -eq $line) { throw 'The helper closed the pipe.' }
@@ -190,21 +181,6 @@ function Show-TdpRegistry {
     }
 }
 
-function Show-BatteryRegistry {
-    $path = 'HKLM:\SOFTWARE\WOW6432Node\MSI\MSI Center M\Battery'
-    try {
-        $level = (Get-ItemProperty -Path $path -ErrorAction Stop).BatteryLevel
-        $meaning = switch ("$level") { '0' { '100% (no limit)' } '1' { '80%' } '2' { '60%' } default { 'unrecognised' } }
-        Write-Host ''
-        Write-Host '=== What landed in MSI Center''s model ===' -ForegroundColor Cyan
-        Write-Host ("  BatteryLevel = `"{0}`"  ->  {1}" -f $level, $meaning)
-        Write-Host '  (the numbering is inverted: a higher level is a LOWER limit)' -ForegroundColor DarkGray
-    } catch {
-        Write-Warning "Could not read $path"
-    }
-}
-
-Connect-Helper
 try {
     if ($PSBoundParameters.ContainsKey('Tdp')) {
         Write-Host ''
@@ -220,27 +196,6 @@ try {
         return
     }
 
-    if ($PSBoundParameters.ContainsKey('ChargeLimit')) {
-        $enable = if ($ChargeLimit -ge 100) { '0' } else { '1' }
-        Write-Host ''
-        Write-Host "=== Setting the charge limit to $ChargeLimit% ===" -ForegroundColor Cyan
-        Show-Reply 'ChargeLimitEnabled ->' (Invoke-Helper -Cmd $CmdSet -Function $Fn.ChargeLimitEnabled -Val $enable)
-        if ($enable -eq '1') {
-            Show-Reply 'ChargeLimitPercent ->' (Invoke-Helper -Cmd $CmdSet -Function $Fn.ChargeLimitPercent -Val "$ChargeLimit")
-        }
-        Show-Reply 'Enabled (read back)' (Invoke-Helper -Cmd $CmdGet -Function $Fn.ChargeLimitEnabled)
-        Show-Reply 'Percent (read back)' (Invoke-Helper -Cmd $CmdGet -Function $Fn.ChargeLimitPercent)
-        Show-BatteryRegistry
-        Write-Host ''
-        Write-Host 'This proves the value was stored. It does NOT prove charging stops -' -ForegroundColor DarkGray
-        Write-Host 'for that, run Watch-Battery.ps1 with the charger connected.' -ForegroundColor DarkGray
-        if ($ChargeLimit -lt 100) {
-            Write-Host ''
-            Write-Host 'REMEMBER: this limit persists in the controller, across reboots and after' -ForegroundColor Yellow
-            Write-Host 'this app is gone. Undo it with:  .\Test-Helper.ps1 -Restore' -ForegroundColor Yellow
-        }
-        return
-    }
 
     if ($Restore) {
         Write-Host ''
@@ -248,10 +203,7 @@ try {
         Show-Reply 'Restore' (Invoke-Helper -Cmd $CmdSet -Function $Fn.PrepareForUninstall -Val '1')
         Show-Reply 'Pl1' (Invoke-Helper -Cmd $CmdGet -Function $Fn.Pl1)
         Show-Reply 'Pl2' (Invoke-Helper -Cmd $CmdGet -Function $Fn.Pl2)
-        Show-Reply 'ChargeLimitEnabled' (Invoke-Helper -Cmd $CmdGet -Function $Fn.ChargeLimitEnabled)
-        Show-Reply 'ChargeLimitPercent' (Invoke-Helper -Cmd $CmdGet -Function $Fn.ChargeLimitPercent)
         Show-TdpRegistry
-        Show-BatteryRegistry
         return
     }
 
