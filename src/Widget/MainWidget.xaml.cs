@@ -736,12 +736,15 @@ namespace McenterLite.Widget
         // Every handler starts with the same guard. See _applyingFromHelper.
 
         /// <summary>
-        /// Paints the mode dropdown and enables or disables the sliders it gates.
+        /// Paints the mode selector and shows or hides the sliders it gates.
         /// </summary>
         /// <remarks>
-        /// The sliders are disabled rather than hidden in the non-manual modes. A control that
-        /// vanishes leaves the user with no way to understand why - a greyed one next to the mode
-        /// that greyed it explains itself.
+        /// The sliders are HIDDEN outside Manual mode, not greyed. They were greyed at first, on
+        /// the argument that a disabled control next to the mode that disabled it explains itself
+        /// - but on an 8-inch screen it mostly read as clutter, and the three mode buttons sitting
+        /// directly above make "Manual is the one with sliders" obvious after a single press. The
+        /// card collapsing to a single row is also a clearer signal that MSI is driving power than
+        /// a paragraph of warning text was.
         /// </remarks>
         private void ApplyPerfMode(PerfMode mode)
         {
@@ -753,9 +756,7 @@ namespace McenterLite.Widget
             if (segment >= 0)
                 _perfMode.Show(segment);
 
-            Pl1Slider.IsEnabled = manual;
-            Pl2Slider.IsEnabled = manual;
-            PerfModeHint.Visibility = manual ? Visibility.Collapsed : Visibility.Visible;
+            PowerLimitControls.Visibility = manual ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private async void OnPerfModeSelected(int segment)

@@ -75,6 +75,7 @@ Write-Host "Helper build: $($helperBuilt.ToString('yyyy-MM-dd HH:mm'))" -Foregro
 
 $task = Get-ScheduledTask -TaskPath $TaskPath -TaskName $TaskName -ErrorAction SilentlyContinue
 $wasEnabled = $task -and $task.State -ne 'Disabled'
+$fake = $null
 
 try {
     if ($task) {
@@ -97,9 +98,20 @@ try {
     Write-Host 'Ctrl+C to stop and put the real helper back.' -ForegroundColor Cyan
     Write-Host ''
 
-    & $helper --fake-hardware
+    # Start-Process -PassThru, not "& $helper". Invoked with the call operator the helper is a
+    # child this script cannot address, so Ctrl+C returns control here - running the restore below
+    # - while leaving the helper alive and still holding the build output locked. Keeping the
+    # handle lets the finally guarantee it dies.
+    $fake = Start-Process -FilePath $helper -ArgumentList '--fake-hardware' -PassThru -NoNewWindow
+    $fake.WaitForExit()
 }
 finally {
+    if ($fake -and -not $fake.HasExited) {
+        Write-Host ''
+        Write-Host 'Stopping the fake helper...' -ForegroundColor Cyan
+        try { $fake.Kill(); $fake.WaitForExit(5000) } catch { }
+    }
+
     Write-Host ''
     if ($wasEnabled) {
         Write-Host 'Re-enabling the real helper task...' -ForegroundColor Cyan

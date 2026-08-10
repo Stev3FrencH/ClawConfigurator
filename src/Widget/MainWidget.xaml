@@ -101,39 +101,39 @@
                              is deliberately NOT the order of PerfMode's ordinals. -->
                         <Grid x:Name="PerfModeSegments" Margin="0,12,0,0" />
 
-                        <TextBlock x:Name="PerfModeHint"
-                                   Style="{StaticResource HintStyle}"
-                                   Visibility="Collapsed"
-                                   Foreground="{StaticResource WarningBrush}"
-                                   Text="MSI is managing power in this mode. Switch to Manual to set limits yourself." />
+                        <!-- Both sliders and their labels live in one panel so they collapse
+                             together. MSI only honours manual limits in Manual mode, so in the two
+                             automatic modes there is nothing here to set and the card shrinks to
+                             just the mode row. -->
+                        <StackPanel x:Name="PowerLimitControls" Visibility="Collapsed">
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Sustained" Style="{StaticResource RowLabelStyle}" />
+                                <TextBlock x:Name="Pl1ValueText" Grid.Column="1" Style="{StaticResource ValueStyle}" />
+                            </Grid>
+                            <Slider x:Name="Pl1Slider"
+                                    Style="{StaticResource CardSliderStyle}"
+                                    Minimum="8" Maximum="35" StepFrequency="1"
+                                    TickFrequency="1"
+                                    ValueChanged="Pl1Slider_ValueChanged" />
 
-                        <Grid Margin="0,12,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Sustained" Style="{StaticResource RowLabelStyle}" />
-                            <TextBlock x:Name="Pl1ValueText" Grid.Column="1" Style="{StaticResource ValueStyle}" />
-                        </Grid>
-                        <Slider x:Name="Pl1Slider"
-                                Style="{StaticResource CardSliderStyle}"
-                                Minimum="8" Maximum="35" StepFrequency="1"
-                                TickFrequency="1"
-                                ValueChanged="Pl1Slider_ValueChanged" />
-
-                        <Grid Margin="0,4,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Boost" Style="{StaticResource RowLabelStyle}" />
-                            <TextBlock x:Name="Pl2ValueText" Grid.Column="1" Style="{StaticResource ValueStyle}" />
-                        </Grid>
-                        <Slider x:Name="Pl2Slider"
-                                Style="{StaticResource CardSliderStyle}"
-                                Minimum="10" Maximum="45" StepFrequency="1"
-                                TickFrequency="1"
-                                ValueChanged="Pl2Slider_ValueChanged" />
+                            <Grid Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Boost" Style="{StaticResource RowLabelStyle}" />
+                                <TextBlock x:Name="Pl2ValueText" Grid.Column="1" Style="{StaticResource ValueStyle}" />
+                            </Grid>
+                            <Slider x:Name="Pl2Slider"
+                                    Style="{StaticResource CardSliderStyle}"
+                                    Minimum="10" Maximum="45" StepFrequency="1"
+                                    TickFrequency="1"
+                                    ValueChanged="Pl2Slider_ValueChanged" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 
@@ -166,9 +166,6 @@
                              nothing - it is gamepad mode. Segment order is set in code by
                              HwMouseSegmentOrder. -->
                         <Grid x:Name="HwMouseSegments" Margin="0,12,0,0" />
-
-                        <TextBlock Style="{StaticResource HintStyle}"
-                                   Text="Desktop switches the controller firmware into a real mouse, so the cursor keeps working on secure screens such as the elevation prompt. The physical button changes this too." />
                     </StackPanel>
                 </Border>
 
