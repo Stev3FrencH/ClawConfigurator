@@ -451,6 +451,10 @@ namespace McenterLite.Widget
             {
                 bool visible = sender.Visible;
                 await _connection.SetVisibleAsync(visible);
+
+                // Being shown again is the moment to put focus back - see ArmInitialFocus.
+                if (visible)
+                    await RunOnUiAsync(ArmInitialFocus);
             }
             catch (Exception ex)
             {
@@ -557,8 +561,13 @@ namespace McenterLite.Widget
 
                 // Gates the focus attempt: before the first snapshot the cards' visibility is not
                 // known, and focusing a control that is about to be hidden is worse than waiting.
+                //
+                // Focus is NOT set here. ApplyCaps has just unhidden the cards and layout has not
+                // run yet, so every control inside a newly-shown card still measures zero while the
+                // never-hidden Windows power card already has a real height - focusing from here
+                // reliably skipped the top card and landed on CPU boost. OnLayoutUpdated does it
+                // once the sizes are real.
                 _snapshotApplied = true;
-                SetInitialFocus();
             });
         }
 
@@ -586,11 +595,42 @@ namespace McenterLite.Widget
         /// </remarks>
         private void OnLayoutUpdated(object sender, object e)
         {
-            if (!_initialFocusSet && _snapshotApplied)
-                SetInitialFocus();
+            SetInitialFocus();
 
             if (_initialFocusSet)
                 LayoutUpdated -= OnLayoutUpdated;
+        }
+
+        /// <summary>
+        /// Re-arms focus selection after Game Bar shows the widget again.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Focus is a property of the live visual tree, not something the widget owns: when Game
+        /// Bar hides us the focused element stops being focused, and nothing puts it back. Without
+        /// this the very first show worked and every subsequent one was dead - the same symptom as
+        /// having no focus code at all, because <see cref="_initialFocusSet"/> latched true on that
+        /// first success and made <see cref="SetInitialFocus"/> a no-op forever after.
+        /// </para>
+        /// <para>
+        /// Only ever triggered by BECOMING VISIBLE, never on a snapshot or a value change. Focus is
+        /// the user's cursor on a device with no cursor, and moving it while they are working is
+        /// worse than leaving it alone. Being re-shown is the one moment there is nothing to
+        /// disturb.
+        /// </para>
+        /// </remarks>
+        private void ArmInitialFocus()
+        {
+            _initialFocusSet = false;
+
+            // Unsubscribe first: this can run many times over a session and handlers otherwise
+            // stack up, one per show.
+            LayoutUpdated -= OnLayoutUpdated;
+            LayoutUpdated += OnLayoutUpdated;
+
+            // Usually lands right here - on a re-show the tree is already laid out and the sizes
+            // are real. The subscription above is for the first show, where they are not.
+            SetInitialFocus();
         }
 
         /// <summary>
@@ -609,13 +649,19 @@ namespace McenterLite.Widget
         /// reason: before that, visibility is not yet known.
         /// </para>
         /// <para>
-        /// Only ever set once. Re-focusing on every snapshot would yank focus out from under
-        /// someone mid-adjustment whenever a value arrived.
+        /// Set once per SHOW, not once per session, and never on a snapshot - re-focusing when a
+        /// value arrives would yank focus out from under someone mid-adjustment.
+        /// <see cref="ArmInitialFocus"/> owns the re-arming and explains the distinction.
         /// </para>
         /// </remarks>
         private void SetInitialFocus()
         {
             if (_initialFocusSet) return;
+
+            // Nothing worth focusing until the helper has told us which cards exist - except the
+            // banner's Retry button, which is the only control on screen when the helper is down
+            // and would otherwise be unreachable without a mouse.
+            if (!_snapshotApplied && StatusActionButton.Visibility != Visibility.Visible) return;
 
             // Top-down, so focus starts where the eye does. The mode segments come before the
             // sliders they gate because they are the top control in the top card AND they are on
@@ -624,6 +670,7 @@ namespace McenterLite.Widget
             // fallback - every card above it collapses on an unsupported device.
             Control[] candidates =
             {
+                StatusActionButton,
                 _perfMode?.FirstSegment,
                 Pl1Slider,
                 _cpuBoost?.FirstSegment,

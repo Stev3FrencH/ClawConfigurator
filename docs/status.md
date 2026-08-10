@@ -6,10 +6,10 @@ gate-by-gate detail.
 
 ## Current build
 
-**0.1.0.37, Release configuration.**
+**0.1.0.38, Release configuration.**
 
 ```
-src/Package/AppPackages/McenterLite.Package_0.1.0.37_x64_Test/
+src/Package/AppPackages/McenterLite.Package_0.1.0.38_x64_Test/
 ```
 
 Install from the repo, in any PowerShell — the script elevates and re-launches under 5.1 itself:
@@ -76,35 +76,50 @@ measurement to find.
 **A consequence worth noting:** nothing in the app writes to the embedded controller any more.
 Fan control was the only feature that would have.
 
-## Open bug — gamepad navigation
+## Gamepad navigation — fixed 2026-08-10, confirmed working
 
-**Found on device 2026-08-10: the widget could not be navigated with the controller at all, only
-with a mouse.** Two independent defects, both fixed in 0.1.0.37 and both **awaiting re-test**:
+**The widget could not be navigated with a controller at all, only with a mouse.** Found on the
+Claw, then reproduced and fixed on the dev machine with an Xbox controller under
+`--fake-hardware` — the fault is entirely in the widget, so it reproduces anywhere. **Four**
+defects, not one; each alone was enough to break it.
 
 1. **Nothing was ever focused.** `SetInitialFocus` ran in the same dispatcher callback that made
    the cards visible, and XAML defers layout to the next frame — so every candidate still measured
    `ActualHeight == 0`, the size guard skipped all of them, and focus was never set. Nothing called
    it again, because the snapshot normally arrives once. With no focused element there is no origin
-   for XY focus navigation, so the D-pad had nothing to move from. It now retries on
-   `LayoutUpdated` until focus lands, then unsubscribes.
+   for XY focus navigation, so the D-pad had nothing to move from. `OnLayoutUpdated` now does it,
+   once the sizes are real.
 2. **Selecting a segment threw focus away.** `SegmentedControl.Show` assigned a different `Style`
    object to each button; assigning `Style` re-applies the control template, and a control that
-   rebuilds its template loses focus. The selected state is now three brushes set in place, so the
-   template is built once and kept.
+   rebuilds its template loses focus. The selected state is now three brushes set in place by
+   `Paint`, so the template is built once and kept.
+3. **Focus landed on the second card.** The first fix left the synchronous `SetInitialFocus()` call
+   in `OnSnapshotApplied`, where the just-unhidden TDP card still measured zero but the
+   never-hidden Windows power card already had a real height — so focus went to CPU boost and
+   latched, and the `LayoutUpdated` retry unsubscribed without reconsidering. That call is gone.
+4. **Dead on every show after the first.** `_initialFocusSet` latched for the session. Game Bar
+   hiding the widget un-focuses the focused element and nothing puts it back, so the second open
+   was indistinguishable from having no focus code at all. `ArmInitialFocus` re-arms on
+   `VisibleChanged → true` — the one moment there is nothing to disturb.
 
-Initial focus also uses `FocusState.Keyboard` rather than `Programmatic`, which is what actually
-reveals the focus rectangle — on a device with no cursor, a focused control you cannot see is
+Initial focus uses `FocusState.Keyboard` rather than `Programmatic`, which is what actually reveals
+the focus rectangle. On a device with no cursor, a focused control you cannot see is
 indistinguishable from broken navigation.
 
-**Why a mouse hid all of this:** clicking sets focus, so every desktop test papered over both
-defects. The `--fake-hardware` check on the dev machine could not have caught it either, for the
-same reason.
+**Why every earlier test missed this:** a mouse click sets focus, so it papered over all four. The
+`--fake-hardware` pass had the same blind spot. Nothing but a controller finds these — worth
+remembering for any future UI change, since none of it is reachable by a unit test either.
+
+### Known gap
+
+Re-arming keys off Game Bar's `VisibleChanged`. A **pinned** widget stays visible when the Game Bar
+overlay is dismissed, so that event may not fire on the way back and focus would not be restored.
+Untested. If navigation is ever dead specifically after pinning, this is the reason.
 
 ## Needs testing on the Claw
 
-- **Gamepad navigation end to end**, per the two fixes above: the focus rectangle is visible
-  without touching a mouse, the D-pad reaches every control, focus survives pressing a segment,
-  and left/right adjusts a focused slider without trapping focus.
+- **Gamepad navigation**, as a re-confirm. Verified on the dev machine with a controller, and the
+  code involved is device-independent, but the Claw is the target.
 - The two controller-mode sub-cases listed under Confirmed working.
 
 ## Outstanding work

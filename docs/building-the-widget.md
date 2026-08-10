@@ -327,6 +327,22 @@ focus-trapping is a vertical layout, which this already is: D-pad up/down moves 
 while left/right adjusts the focused slider. Engagement would add an A press per slider for
 nothing.
 
+### Gamepad navigation only breaks in ways a mouse cannot show you
+
+Four separate defects shipped here before anyone drove the widget with a controller, because **a
+mouse click sets focus** and so hides every one of them. If you change anything about focus, the
+segments, or when cards are shown, retest with a controller and **do not touch the mouse first**.
+See `docs/status.md` for the four and what each looked like. The recurring shapes:
+
+- **Reading `ActualHeight` in the same callback that changed `Visibility`.** Layout is deferred to
+  the next frame, so a just-unhidden control still measures zero. `LayoutUpdated` is the signal.
+- **Assigning `Style` to a focused control.** It re-applies the control template and focus is lost.
+  Set the individual properties instead.
+- **Latching "focus has been set" for the session.** Game Bar hides and re-shows widgets, and a
+  hidden widget's focused element stops being focused. Re-arm on `VisibleChanged`.
+- **`FocusState.Programmatic` does not reveal the focus rectangle.** On a device with no cursor,
+  focus you cannot see reads as broken navigation. Use `FocusState.Keyboard`.
+
 ### Why buttons instead of dropdowns
 
 The Claw is driven with a game controller. A `ComboBox` costs a press to open, D-pad travel
