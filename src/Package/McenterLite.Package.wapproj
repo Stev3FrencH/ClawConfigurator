@@ -96,8 +96,7 @@
 
   <ItemGroup>
     <!--
-      Published self contained from src/Helper via "dotnet publish" with -r win-x64 and the
-      self-contained flag, -o pointed at this Helper folder. Must land at
+      Published self contained from src/Helper by the PublishHelper target below. Must land at
       Helper\McenterLite.Helper.exe to match the Executable path declared in
       Package.appxmanifest's windows.fullTrustProcess extension.
     -->
@@ -105,6 +104,39 @@
   </ItemGroup>
 
   <Import Project="$(WapProjPath)\Microsoft.DesktopBridge.targets" />
+
+  <!--
+    Publish the helper into Helper\ before packaging.
+
+    This WAS a manual "dotnet publish" step, documented in docs/building-the-widget.md and
+    nowhere enforced. That failed exactly the way an unenforced manual step does: the packaged
+    helper silently went eight hours and five features stale while every package built cleanly and
+    looked correct. Nothing warns you, because a stale binary is still a valid binary - the symptom
+    only appears on device, as a card that never populates or a Function ordinal the two halves
+    disagree about.
+
+    A ProjectReference cannot do this: the helper must be SELF-CONTAINED (the Claw has no .NET
+    runtime and installing one is not part of the sideload flow), and a ProjectReference brings in
+    a framework-dependent build. Hence an explicit publish.
+
+    Note the wapproj is MSBuild.exe-driven while the helper is an SDK project, so this shells out
+    to "dotnet publish" rather than calling MSBuild directly - mixing the two in one invocation is
+    what the NETSDK1047 restore errors in this repo's history came from.
+  -->
+  <Target Name="PublishHelper" BeforeTargets="BeforeBuild">
+    <PropertyGroup>
+      <HelperProject>$(MSBuildThisFileDirectory)..\Helper\McenterLite.Helper.csproj</HelperProject>
+      <HelperOutput>$(MSBuildThisFileDirectory)Helper</HelperOutput>
+    </PropertyGroup>
+
+    <Message Importance="high" Text="Publishing the helper self-contained into $(HelperOutput)..." />
+
+    <Exec Command="dotnet publish &quot;$(HelperProject)&quot; -c $(Configuration) -r win-x64 --self-contained true -o &quot;$(HelperOutput)&quot;"
+          WorkingDirectory="$(MSBuildThisFileDirectory)" />
+
+    <Error Condition="!Exists('$(HelperOutput)\McenterLite.Helper.exe')"
+           Text="The helper did not publish to $(HelperOutput). The package would ship without it." />
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.8249" PrivateAssets="all" />

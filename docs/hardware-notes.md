@@ -910,7 +910,7 @@ be written before the device is available — only `ctlGetSupported*` needs the 
 
 | Feature | Supported | Notes |
 |---|---|---|
-| Endurance Gaming (FPS tier) | | **per-application, not global** — affects the UI wording |
+| Endurance Gaming (FPS tier) | | **per-application, not global.** Shown in the widget as "FPS limit": Off / 30 / 40 / 60 |
 | Low latency | | 0 = Off, 1 = On, 2 = On+Boost |
 | Frame sync | | 0 = App default, 1 = VSync off, 2 = VSync on, 3 = Smooth Sync, 4 = Speed Sync |
 | Adaptive sharpness | | 0 = off, 1..100 |

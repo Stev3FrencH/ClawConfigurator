@@ -189,11 +189,6 @@
 
                         <TextBlock Text="Low latency" Style="{StaticResource RowLabelStyle}" Margin="0,12,0,0" />
                         <Grid x:Name="IntelLowLatencySegments" Margin="0,6,0,0" />
-
-                        <!-- Honest wording: the driver applies this per executable, so a global
-                             switch would be a lie. -->
-                        <TextBlock Style="{StaticResource HintStyle}"
-                                   Text="Applies to the game currently in focus, not system-wide." />
                     </StackPanel>
                 </Border>
 

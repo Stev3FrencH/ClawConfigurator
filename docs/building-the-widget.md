@@ -130,15 +130,23 @@ confidence — it embeds absolute-ish tooling paths and a project GUID.
 ### Getting the helper into the package
 
 The manifest declares `Executable="Helper\McenterLite.Helper.exe"`, so the helper must land in a
-`Helper` folder inside the package. Publish it self-contained:
+`Helper` folder inside the package, published **self-contained** — the package cannot rely on a
+.NET runtime being present on the Claw.
 
-```powershell
-dotnet publish src\Helper\McenterLite.Helper.csproj -c Release -r win-x64 --self-contained -o publish\helper
-```
+**This is automatic.** The `PublishHelper` target in `McenterLite.Package.wapproj` runs
+`dotnet publish` into `src/Package/Helper/` before every package build, and errors out if the
+executable is not there afterwards. Nothing manual is required.
 
-Then add the published output to the packaging project under a `Helper` folder, with
-**Build Action = Content**. Self-contained matters: the package cannot rely on a .NET runtime
-being installed on the target.
+> It used to be a manual `dotnet publish` documented here and enforced nowhere, and it failed the
+> way unenforced manual steps do: the packaged helper went eight hours and five features stale
+> while every build succeeded and every package looked correct. A stale binary is still a valid
+> binary, so nothing warns you — the symptom surfaces only on device, as a card that never
+> populates or an IPC `Function` ordinal the widget and helper disagree about. If you ever suspect
+> it again, check the timestamp of `src/Package/Helper/McenterLite.Helper.exe` against your last
+> helper change.
+
+A ProjectReference cannot replace that target: it would bring in a framework-dependent build, and
+the target device has no runtime.
 
 Verify the path inside the built package matches the manifest exactly. A mismatch here produces
 a package that installs cleanly and whose widget then reports "could not reach the helper"
