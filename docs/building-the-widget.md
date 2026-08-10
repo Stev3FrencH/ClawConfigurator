@@ -327,6 +327,23 @@ focus-trapping is a vertical layout, which this already is: D-pad up/down moves 
 while left/right adjusts the focused slider. Engagement would add an A press per slider for
 nothing.
 
+### The proxyStub manifest entry is REQUIRED — never remove it
+
+`src/Package/Package.appxmanifest` carries a **package-level** `windows.activatableClass.proxyStub`
+extension, copied verbatim from the SDK's `readme.txt`. It registers Metadata Based Marshaling for
+Game Bar's private COM interfaces.
+
+**Without it the widget is completely inert to the controller and the keyboard**, while rendering,
+connecting, resizing and reporting `VisibleChanged` perfectly — so it looks like a focus bug and is
+not one. This cost most of a day: the entry had been missing since the package was first authored,
+so no amount of reverting to "known-good" builds could restore it, and the symptom pointed
+squarely at the wrong layer.
+
+It was originally left out with a comment saying it was "needed only for programmatic widget-bar
+navigation". That was an inference and it was wrong; the SDK documents it as a required step for
+every widget. Re-copy the block from `readme.txt` when the NuGet package is updated — it says it
+can change between versions.
+
 ### Gamepad navigation only breaks in ways a mouse cannot show you
 
 Four separate defects shipped here before anyone drove the widget with a controller, because **a

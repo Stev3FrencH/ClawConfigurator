@@ -51,6 +51,47 @@ Switching works; these two sub-cases were not part of that test and remain open:
    That is why the firmware route matters over software cursor injection. Trigger any elevation
    prompt and try to move the cursor.
 
+## Widget placement in the Game Bar — one open question
+
+OEM widgets (ASUS Armoury, MSI Quick Settings) sit at the **far left of the compact nav bar, ahead
+of Home**. The mechanism is the `GameBarWidget` manifest properties, and Game Bar's parser knows
+exactly this set — recovered from the string table around `IsDeviceWidget` in `GameBar.exe`:
+
+```
+ActivateAfterInstall   CompactModePriorityPlacement   FavoriteAfterInstall   HomeMenuVisible
+IsDeviceWidget         PinningSupported               SettingsSupported      Window/Size/ResizeSupported
+```
+
+We declare all of them except `SettingsSupported` (set in code instead). `IsDeviceWidget` and
+`CompactModePriorityPlacement` are the two that concern placement.
+
+**The value format of `CompactModePriorityPlacement` is unverified.** Every sibling except
+`SettingsSupported` is a plain boolean, so `true` is the obvious shape — but `SettingsSupported`
+takes an attribute instead (`<SettingsSupported AppExtensionId="XboxSettingsWidget" />` in
+`Microsoft.GamingApp`), so a priority integer or attribute form is equally plausible. No widget on
+the dev machine declares it, so there was nothing to copy.
+
+**Settle it on the Claw**, where MSI's widget is installed and demonstrably does this. From any
+PowerShell:
+
+```powershell
+Get-AppxPackage | ForEach-Object {
+  $m = Join-Path $_.InstallLocation 'AppxManifest.xml'
+  if (-not (Test-Path $m)) { return }
+  $t = try { Get-Content $m -Raw -ErrorAction Stop } catch { return }
+  if ($t -match 'gameBarUIExtension') {
+    "=== $($_.Name) ==="
+    [regex]::Match($t, '(?s)<GameBarWidget.*?</GameBarWidget>').Value
+  }
+}
+```
+
+That prints MSI's and ASUS's own declarations verbatim — the exact property names and value forms
+they use to win that slot. Copy whatever they do.
+
+Note the manifest already flags that **MSI's Quick Settings widget also declares `IsDeviceWidget`**,
+so two device widgets may be competing for one slot. The dump above answers that too.
+
 ## Removed features
 
 All three removed 2026-08-08, for the same reason: MSI Center already does them, and does them
@@ -78,10 +119,27 @@ Fan control was the only feature that would have.
 
 ## Gamepad navigation — fixed 2026-08-10, confirmed working
 
-**The widget could not be navigated with a controller at all, only with a mouse.** Found on the
-Claw, then reproduced and fixed on the dev machine with an Xbox controller under
-`--fake-hardware` — the fault is entirely in the widget, so it reproduces anywhere. **Four**
-defects, not one; each alone was enough to break it.
+**The root cause was a missing manifest entry, not any of the widget code below.**
+
+The Game Bar SDK's readme documents a **package-level** `windows.activatableClass.proxyStub`
+extension as a required step for every widget. It registers Metadata Based Marshaling for Game
+Bar's private COM interfaces — `IXboxGameBarWidgetHost1-9`, `IXboxGameBarWidgetPrivate1-6` and
+`IXboxGameBarNavigationKeyCombo`. This project omitted it from the start, with a manifest comment
+claiming it was "needed only for programmatic widget-bar navigation, which is out of scope". That
+was **our own inference and it was wrong** — the SDK states no such limitation.
+
+Without it the widget rendered, connected, resized and reported `VisibleChanged` correctly, and
+was completely inert to the controller AND the keyboard. Adding it fixed navigation immediately.
+
+**It was never version-dependent**, which is why reverting to known-good builds never helped: the
+entry had been missing since the package was first authored. Several hours went into focus code
+before anyone read the SDK's own setup instructions. **Check the SDK readme first** — it is
+regenerated per NuGet version and says so.
+
+### The focus defects found on the way
+
+All four were real bugs, and **none of them was why navigation did not work.** Worth keeping
+because they are all still latent hazards, but they were symptoms, not the cause.
 
 1. **Nothing was ever focused.** `SetInitialFocus` ran in the same dispatcher callback that made
    the cards visible, and XAML defers layout to the next frame — so every candidate still measured
@@ -106,9 +164,29 @@ Initial focus uses `FocusState.Keyboard` rather than `Programmatic`, which is wh
 the focus rectangle. On a device with no cursor, a focused control you cannot see is
 indistinguishable from broken navigation.
 
-**Why every earlier test missed this:** a mouse click sets focus, so it papered over all four. The
+**Why every earlier test missed these:** a mouse click sets focus, so it papered over all four. The
 `--fake-hardware` pass had the same blind spot. Nothing but a controller finds these — worth
 remembering for any future UI change, since none of it is reachable by a unit test either.
+
+**Two presses of Up to leave the widget is NOT a bug.** The first lands on something invisible, the
+second exits to Game Bar. Every Game Bar widget behaves this way, Microsoft's bundled ones
+included, so it is the platform's navigation model. `IsTabStop="False"` on the `ScrollViewer`
+suppresses it and was deliberately not kept — matching every other widget beats saving a press, and
+the mechanism was never confirmed.
+
+### Open risk: the VisibleChanged re-arm still steals focus
+
+`ArmInitialFocus` runs on every `VisibleChanged → true` and unconditionally re-focuses the top
+control. In **compact mode Game Bar toggles `Visible` every two to three seconds** — captured
+directly in the widget trace — so this can drag focus back to Endurance while the user is
+navigating.
+
+It has not bitten since the proxyStub fix, so it is shipped as-is rather than churned again, but it
+is a live hazard. **Symptom to watch for: focus jumping back to the top control on its own after a
+few seconds of no input.** The fix, if it appears, is a guard that makes `ArmInitialFocus` a no-op
+when `FocusManager.GetFocusedElement()` is already inside `RootContent` — tried in 0.1.0.39 and
+reverted, but only because it was bundled with three extra event subscriptions that broke the
+first open. The guard alone was never the problem.
 
 ### Pinning loses focus — accepted, not fixed
 

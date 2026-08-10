@@ -77,6 +77,17 @@
         </Border>
 
         <!-- ── Content ──────────────────────────────────────────────────────────────── -->
+        <!--
+            Pressing Up from the top control takes TWO presses to leave the widget: one lands on
+            something invisible, the second exits to Game Bar. That is NOT a bug in this widget -
+            every Game Bar widget behaves that way, Microsoft's bundled ones included, so it is the
+            platform's own navigation model.
+
+            IsTabStop="False" here does suppress it, and was tried. It is deliberately NOT kept:
+            matching what every other widget does is worth more than saving a press, and the
+            mechanism was never actually confirmed - so it would be an unverified deviation from
+            platform behaviour, which is a bad trade in a widget that has to feel native.
+        -->
         <ScrollViewer Grid.Row="2"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
