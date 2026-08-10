@@ -51,6 +51,7 @@ namespace McenterLite.Probe
                 case "acpi-get": return Commands.WmiExplorer.AcpiGet(rest);
                 case "dump-acpi": return Commands.AcpiDump.Run(rest);
                 case "hid-list": return Commands.HidExplorer.List(rest);
+                case "igcl": return Commands.IgclProbe.Run();
 
                 default:
                     Console.Error.WriteLine($"Unknown command: {args[0]}");
