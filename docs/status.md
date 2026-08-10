@@ -6,10 +6,10 @@ gate-by-gate detail.
 
 ## Current build
 
-**0.1.0.50, Release configuration.**
+**0.2.0.0, Release configuration.** First release build — the baseline for Intel/G6 work.
 
 ```
-src/Package/AppPackages/McenterLite.Package_0.1.0.50_Test/
+src/Package/AppPackages/McenterLite.Package_0.2.0.0_Test/
 ```
 
 Install from the repo, in any PowerShell — the script elevates and re-launches under 5.1 itself:
@@ -230,13 +230,15 @@ reverted build.
 
 ## Needs testing on the Claw
 
-- **Gamepad navigation**, as a re-confirm. Verified on the dev machine with a controller, and the
-  code involved is device-independent, but the Claw is the target.
-- The two controller-mode sub-cases listed under Confirmed working.
+- **UAC secure desktop** — the premise of G5's firmware route, still never tested.
 
 ## Outstanding work
 
-- **Uninstall/restore flow**, end-to-end on the Claw — should put back the captured original power
-  limits. Note controller mode is deliberately *not* restored: the physical button owns that state
-  as much as we do, so replaying an old value would be a guess, not a restore.
-- Intel GPU controls (G6) remain an unimplemented stub.
+- **Intel GPU controls (G6)** remain an unimplemented stub. This is the next piece of work.
+- **Uninstall/restore flow**, never tested end-to-end. Deliberately **not** treated as
+  release-blocking: this widget writes MSI Center's own `ManualPL*` values, MSI Center stays
+  installed, and its UI rewrites all four whenever a limit is changed there — so a user always has
+  a way back to any value they want, through the app that owns the setting. Restoring on uninstall
+  is a courtesy, not a safety net. Controller mode is deliberately not restored at all: the
+  physical button owns that state as much as we do, so replaying an old value would be a guess
+  rather than a restore.
