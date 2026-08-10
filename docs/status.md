@@ -29,12 +29,16 @@ powershell -ExecutionPolicy Bypass -File .\Diagnostics\Start-FakeHelper.ps1
 
 ## Confirmed working on the Claw
 
-- CPU Boost toggle
-- OS Power Mode segmented control (Efficiency / Balanced / Performance), including AC↔DC sync
-- Power Limits (TDP) card: sliders, mode selector (Endurance / User Scenario / AI Engine) as
-  segmented buttons, sliders correctly disabled outside User Scenario
-- Fan percentage: confirmed settable 0–100% via MSI Center's own UI (not yet via this app — fan
-  control is still unimplemented, Gate G2)
+Verified on device, though note the UI has moved on since — the controls below were tested as a
+toggle and a differently-ordered mode row, so the underlying behaviour is confirmed but the
+current layout is not.
+
+- CPU Boost — applies correctly. Now two buttons (Off / On) rather than a toggle.
+- OS Power Mode — Efficiency / Balanced / Performance, including AC↔DC sync, and reflecting
+  changes made from Windows Settings or the taskbar flyout.
+- Power Limits — sliders apply, and the mode selector gates them. The three modes were tested as
+  Endurance / User Scenario / AI Engine; they now read Endurance / AI Engine / **Manual** (the same
+  UserScenario mode, renamed), and the sliders now **hide** outside Manual rather than greying out.
 
 ## Removed features
 
