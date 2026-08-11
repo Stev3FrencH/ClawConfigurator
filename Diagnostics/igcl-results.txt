@@ -1,0 +1,47 @@
+>>
+
+ControlLib.dll  1.2.288.0
+Intel GPU:      Intel(R) Arc(TM) B390 GPU  driver 32.0.101.8801
+Scope:          GLOBAL
+
+ctlInit OK (driver supports version 1.1)
+Adapters:       1
+
+--- adapter [0] ---
+
+
+Feature                      Status              Detail                      Widget
+-------                      ------              ------                      ------
+FRAME_PACING                 UNSUPPORTED_FEATURE
+ENDURANCE_GAMING             UNSUPPORTED_FEATURE                             <--
+FRAME_LIMIT                  SUPPORTED           bool  enable/type=0 value=0
+ANISOTROPIC                  UNSUPPORTED_FEATURE
+CMAA                         DATA_NOT_FOUND
+TEXTURE_FILTERING_QUALITY    UNSUPPORTED_FEATURE
+ADAPTIVE_TESSELLATION        UNSUPPORTED_FEATURE
+SHARPENING_FILTER            UNSUPPORTED_FEATURE
+MSAA                         UNSUPPORTED_FEATURE
+GAMING_FLIP_MODES            SUPPORTED           bool  enable/type=0 value=1
+ADAPTIVE_SYNC_PLUS           UNSUPPORTED_FEATURE
+APP_PROFILES                 DATA_NOT_FOUND
+APP_PROFILE_DETAILS          UNSUPPORTED_FEATURE
+EMULATED_TYPED_64BIT_ATOMICS DATA_NOT_FOUND
+VRR_WINDOWED_BLT             DATA_NOT_FOUND
+GLOBAL_OR_PER_APP            DATA_NOT_FOUND
+LOW_LATENCY                  SUPPORTED           bool  enable/type=0 value=1 <--
+FRAME_GENERATION             SUPPORTED           bool  enable/type=0 value=1 <--
+PREBUILT_SHADER_DOWNLOAD     SUPPORTED           bool  enable/type=0 value=1
+LIVE_STATE                   DATA_NOT_FOUND
+
+
+The three the widget wants:
+  ENDURANCE_GAMING     UNSUPPORTED_FEATURE
+  LOW_LATENCY          SUPPORTED
+  FRAME_GENERATION     SUPPORTED
+
+How to read this:
+  SUPPORTED            usable globally, right now.
+  UNSUPPORTED_FEATURE  not implemented on this adapter. Hide the control.
+  DATA_NOT_FOUND       the driver knows it but has nothing stored at this scope.
+                       NOT the same as unsupported - most likely nothing has been
+                       configured globally yet, and a write would create it.

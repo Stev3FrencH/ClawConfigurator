@@ -84,7 +84,21 @@ public static class Igcl
         public int Value;
     }
 
-    // ctl_3d_feature_getset_t. 48 bytes. The Size field is what the driver validates.
+    // ctl_3d_feature_getset_t as ControlLib 1.2.257 and 1.2.288 expect it: 48 bytes.
+    //
+    // *** THIS STRUCT IS VERSION-DEPENDENT AND THE Size FIELD DOES NOT PROTECT YOU. ***
+    //
+    // The current igcl_api.h on GitHub master defines a LARGER version - it inserts
+    // int8_t ApplicationNameLength and bool bSet between ApplicationName and ValueType, making it
+    // 56 bytes. Sending that to ControlLib 1.2.257 does not return UNSUPPORTED_SIZE. It CRASHES
+    // the call outright. Measured, twice, with both a null and a non-null ApplicationName.
+    //
+    // So the header on master is ahead of the shipping driver, and "the driver validates Size" -
+    // which is true for ctl_init_args_t - is NOT true here. Any future change to this layout must
+    // be tested against the driver it will actually run on, not just checked against the header.
+    //
+    // Consequence for a real implementation: the helper cannot assume one layout. It must either
+    // pin to 48 and accept the older field set, or probe the driver version and pick.
     [StructLayout(LayoutKind.Sequential)]
     public struct FeatureGetSet
     {
@@ -129,6 +143,17 @@ $features = [ordered]@{
 $widgetFeatures = @(1, 16, 17)
 
 $valueTypes = @('bool', 'float', 'int32', 'uint32', 'enum', 'custom')
+
+# ctl_property_value_type_t to request per feature, from the header's own comments:
+#   FRAME_LIMIT      "generic integer type fields ... interpreted as the max FPS"   -> INT32 (2)
+#   LOW_LATENCY      "generic enum type fields"                                     -> ENUM  (4)
+#   FRAME_GENERATION ctl_3d_frame_generation_override_t                             -> ENUM  (4)
+#
+# This matters: the first pass left ValueType at 0 for everything and every supported feature
+# read back as "bool, value=1" - identical across five features that cannot all be booleans. The
+# driver appears to fill Value according to the type the CALLER asks for, so asking for the wrong
+# one returns something meaningless rather than an error.
+$requestedType = @{ 2 = 2; 16 = 4; 17 = 4 }
 
 function Get-CtlResultName([int]$code) {
     switch ($code) {
@@ -192,9 +217,16 @@ if ($result -ne 0) {
 
 Write-Host "ctlInit OK (driver supports version $($args.SupportedVersion -shr 16).$($args.SupportedVersion -band 0xFFFF))" -ForegroundColor Green
 
+# EMPTY STRING is global, quoting the header on ApplicationName: "If this is an empty string then
+# this will get/set global settings for the given adapter."
+#
+# An earlier run appeared to show the opposite - empty string turning SUPPORTED into
+# DATA_NOT_FOUND. That was an artifact of a struct missing ApplicationNameLength and bSet, which
+# shifted every field after it. With the layout correct, follow the header.
+$appName = if ($ApplicationName) { $ApplicationName } else { '' }
 $appNamePtr = [IntPtr]::Zero
 if ($ApplicationName) {
-    $appNamePtr = [System.Runtime.InteropServices.Marshal]::StringToHGlobalAnsi($ApplicationName)
+    $appNamePtr = [System.Runtime.InteropServices.Marshal]::StringToHGlobalAnsi($appName)
 }
 
 try {
@@ -230,7 +262,7 @@ try {
                 $request.Version = 0
                 $request.FeatureType = $id
                 $request.ApplicationName = $appNamePtr
-                $request.ValueType = 0
+                $request.ValueType = if ($requestedType.ContainsKey($id)) { $requestedType[$id] } else { 0 }
                 $request.CustomValueSize = 0
                 $request.pCustomValue = [IntPtr]::Zero
 
