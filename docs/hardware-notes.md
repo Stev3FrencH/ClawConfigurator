@@ -496,7 +496,57 @@ at four points. Ranges and `Pl2MinOffset = 2` match `DeviceCaps` exactly.
 only, under sustained load, and the sustained clock followed. MSI Center's UI updated to match,
 which is the mechanism made visible - it watches these values and pushes them to the EC.
 
-A second, MSI-Center-independent path exists via `MSI_ACPI.Set_Power`, unexercised.
+A second, MSI-Center-independent path exists via `MSI_ACPI` - **not** at `Get_Power`/`Set_Power`
+despite the name. **Measured 2026-08-11:** a `Sweep-MsiAcpi.ps1` run across every `Get_*` method,
+snapshotted at PL1/PL2 = 8W/10W and 25W/27W (both `AC` *and* `DC` registry pairs set together, to
+remove which-pair-is-live ambiguity - `Test-TdpRegistryApply.ps1`'s `Set-PowerLimits` already does
+this for the same reason), found it instead at:
+
+| Fact | Value |
+|---|---|
+| Method | **`Get_SlaveBattery`** (not `Get_Power`) |
+| Sub-function | input byte 0 = `1` |
+| PL1 | output byte 1, watts 1:1 |
+| PL2 | output byte 2, watts 1:1 |
+| Confirmed | two points: `8/10 -> byte1=8,byte2=10` and `25/27 -> byte1=25,byte2=27` |
+
+Same shape as gate G3's discovery that the charge limit lives in `Get_AP`, not the
+identically-plausible `Get_MasterBattery` - the obviously-named method is not reliably the right
+one on this device. A first pass sweeping `Get_Power` alone (selectors 0-7, AC pair only) found
+nothing: sub-function 0 returned a constant `01 07 00...00` regardless of the setting, and no
+other sub-function returned data - `Get_Power` is very likely unrelated to TDP entirely.
+
+**Confirmed 2026-08-11: `Set_SlaveBattery` is the write side, and it works with MSI Center M's
+entire user-mode stack stopped.** `Test-PowerStandalone.ps1` stopped the `MSI_Center_M_Server`
+scheduled task, every MSI Center M process (`Command Center`, `MCMOSDInfo`, `mongMode`,
+`MSIAPService`, `Noise Cancellation M`, `PresentMon-dev-x64`) and the `MSI Foundation Service`,
+then drove PL1/PL2 through `Set_SlaveBattery` alone under sustained CPU load:
+
+| | PL1/PL2 requested | Read back | Sustained `% Processor Performance` |
+|---|---|---|---|
+| A | 8 W / 10 W | 8 / 10 (landed) | 90.9% |
+| B | 25 W / 27 W | 25 / 27 (landed) | 168.1% |
+
+A 77-point clock delta between the two, with MSI Center M completely down - the same oracle
+`Test-TdpRegistryApply.ps1` uses, so this is not merely an accepted-but-inert write. This **answers
+Open question #6: yes**, `MSI_ACPI` works with MSI Center M stopped. See that question below for
+what it does and does not imply.
+
+One byte-shape quirk worth recording so it does not read as a failure later: `Set_SlaveBattery`'s
+own return package (`01 00 00...`) does not echo `Get_SlaveBattery`'s read format (`01 <PL1>
+<PL2>...`) - the same asymmetry the G3 write-format note above already flags as unverified-until-
+tested for `Set_AP`. Restoring the original state therefore always re-reads via `Get_SlaveBattery`
+to confirm, rather than trusting `Set_SlaveBattery`'s own output.
+
+**Correction to the mechanism guess that motivated this test.** `msisadrv.sys` (Boot-start,
+`Running`) was suspected to be an MSI-authored driver backing this independence. It is not: its
+`FileDescription` is "ISA Driver", `Product` is "Microsoft® Windows® Operating System", it is
+signed by Microsoft, and its version matches the OS build - a coincidental name collision with the
+vendor, not their code. The real mechanism is Windows' own native ACPI-to-WMI mapping (part of
+`acpi.sys`, parsing `_WDG` entries in the device's own ACPI firmware tables), which explains *why*
+no MSI process needs to be running: nothing MSI-authored is in this path at all. This also means
+the WMI class registration is not tied to any file MSI Center M's installer places on disk, which
+is suggestive (not yet proof) that it would survive a full uninstall, not just stopped services.
 
 Remaining before M2: confirm it still applies with the MSI Center **window closed** (the run that
 settled this had the UI open), and find out what re-asserts MSI's own values over ours.
@@ -984,9 +1034,21 @@ Ordered by how much they block. The first one decides the architecture.
 5. **Where does MysticLight keep LED effect and colour?** Not in this hive. Either its own store
    or straight to the device.
 
-6. **Does `MSI_ACPI` work with MSI Center stopped?** If yes, the standalone mode ruled out earlier
-   becomes available again, and the MSI Center dependency becomes a choice rather than a
-   constraint.
+6. ~~**Does `MSI_ACPI` work with MSI Center stopped?**~~ **Answered: yes, for TDP.** Measured
+   2026-08-11 with `Test-PowerStandalone.ps1` - see the confirmation under
+   [Gate G1](#gate-g1--tdp). `MSI_ACPI.Set_SlaveBattery` drove PL1/PL2 and the sustained clock
+   followed, with MSI Center M's server task, every per-feature process, and the MSI Foundation
+   Service all stopped. The standalone mode this project moved away from on 2026-08-07 is
+   available again for TDP specifically, and the MSI Center M dependency for TDP is now a choice,
+   not a constraint.
+
+   **What this does NOT answer.** Fan, battery charge limit and LED were descoped 2026-08-08
+   specifically because MSI Center does them better, not because they were technically blocked -
+   if MSI Center M is removed, that reasoning stops applying, but their own gates (G2 fan, G3
+   battery, G4 LED) are still AMBER/unresolved on the byte-format questions each was blocked on.
+   Proving TDP works standalone says nothing about whether those do. Nor does it establish
+   whether `MSI_ACPI` survives an actual **uninstall** of MSI Center M, as opposed to its
+   processes and services merely being stopped - see the note under Gate G1.
 
 7. **What is `MSI Foundation Service` / `MSIAPService`?** Suspected to be the SDK layer the
    per-feature servers call. Worth identifying, because it may be the documented-ish seam.
