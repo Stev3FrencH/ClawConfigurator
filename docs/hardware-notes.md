@@ -532,6 +532,25 @@ A 77-point clock delta between the two, with MSI Center M completely down - the 
 Open question #6: yes**, `MSI_ACPI` works with MSI Center M stopped. See that question below for
 what it does and does not imply.
 
+**Confirmed on DC too, 2026-08-11 (same session).** Re-ran with the Claw genuinely unplugged
+(`(Get-CimInstance -Namespace root\WMI -ClassName BatteryStatus).PowerOnline` = `False`), same
+script, same method, no changes:
+
+| | PL1/PL2 requested | Read back | Sustained `% Processor Performance` |
+|---|---|---|---|
+| A | 8 W / 10 W | 8 / 10 (landed) | 109.9% |
+| B | 25 W / 27 W | 25 / 27 (landed) | 171.4% |
+
+A 61.5-point delta, unplugged, MSI Center M's stack still fully stopped. **There is no separate
+AC/DC method** - `Get_SlaveBattery`/`Set_SlaveBattery` is the one channel regardless of power
+source. This is consistent with the earlier observation that MSI Center's own UI showed the DC
+pair's value while the device was plugged in on AC (see the AC/DC-pair-ambiguity note in
+`Test-TdpRegistryApply.ps1` and the commands used to gather these snapshots): the EC most likely
+holds a single live PL1/PL2 register, and the registry's `AC`/`DC` split is a MSI-Center-side
+bookkeeping convenience for auto-switching presets on a power-source transition, not a
+hardware-level distinction. The 25/27 W high point here sits at DC's own documented ceiling
+(PL1 ≤ 25 W, PL2 ≤ 30 W) and was not exceeded.
+
 One byte-shape quirk worth recording so it does not read as a failure later: `Set_SlaveBattery`'s
 own return package (`01 00 00...`) does not echo `Get_SlaveBattery`'s read format (`01 <PL1>
 <PL2>...`) - the same asymmetry the G3 write-format note above already flags as unverified-until-
