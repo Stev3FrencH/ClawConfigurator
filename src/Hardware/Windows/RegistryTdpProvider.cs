@@ -120,6 +120,16 @@ namespace McenterLite.Hardware.Windows
         {
             if (!Available) return OpResult.Unavailable(_unavailableReason);
 
+            // The widget no longer exposes MSI's Endurance/AI Engine/Manual picker - manual limits
+            // are the only behaviour this app models, so make sure MSI is in the one mode that
+            // honours them before writing. Silent on purpose: this is what the picker used to be
+            // for, and there is no control left for the user to do it with themselves.
+            if (TryReadMode(out var mode) && mode != PerfMode.UserScenario)
+            {
+                var modeResult = ApplyMode(PerfMode.UserScenario);
+                if (!modeResult.Ok) return modeResult;
+            }
+
             // The battery pair is the same choice under a lower ceiling. Derived here rather than
             // asked of the user: a handheld that quietly draws less when unplugged is what people
             // want, and a second slider they have to remember to move is not.
@@ -171,18 +181,6 @@ namespace McenterLite.Hardware.Windows
                 return OpResult.Fail(
                     $"Battery power limits did not stick: asked for {dcPl1}/{dcPl2} W, "
                     + $"found {actualDcPl1}/{actualDcPl2} W.");
-            }
-
-            // Reported, not corrected. The mode is a control of its own (see ApplyMode), so the
-            // user can switch to it deliberately rather than having us do it behind a slider -
-            // which would also move settings unrelated to power, since mode changes affect
-            // lighting too.
-            if (TryReadMode(out var mode) && mode != PerfMode.UserScenario)
-            {
-                return OpResult.Fail(
-                    $"Saved {pl1}/{pl2} W, but MSI Center is in {Describe(mode)} mode and is managing "
-                    + $"power itself. Switch to {Describe(PerfMode.UserScenario)} for these limits "
-                    + "to take effect.");
             }
 
             return OpResult.Success();
@@ -280,17 +278,6 @@ namespace McenterLite.Hardware.Windows
 
             return OpResult.Success();
         }
-
-        // These strings reach the user, so they must match the widget's button labels. MSI's own
-        // name for UserScenario is "User Scenario"; the UI calls it "Manual", and an error telling
-        // someone to switch to a mode with no button of that name is a dead end.
-        private static string Describe(PerfMode mode) => mode switch
-        {
-            PerfMode.Endurance => "Endurance",
-            PerfMode.UserScenario => "Manual",
-            PerfMode.AiEngine => "AI Engine",
-            _ => "an unrecognised",
-        };
 
         // WOW6432Node is already in the path, so the 32-bit view must NOT be requested as well -
         // that would redirect to WOW6432Node\WOW6432Node and silently find nothing.

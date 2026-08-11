@@ -73,9 +73,9 @@ namespace McenterLite.Widget
         /// </para>
         /// <para>
         /// <b>The index is NOT automatically the wire value.</b> It was, when every list happened
-        /// to be ordered like its enum, and two selectors now deliberately are not - see
-        /// <see cref="PerfModeSegmentOrder"/> and <see cref="IntelFpsTierSegmentOrder"/>. Those
-        /// pair label to value in one table so display order can be chosen for the user without
+        /// to be ordered like its enum, and one selector deliberately is not - see
+        /// <see cref="IntelFpsTierSegmentOrder"/>. That pairs label to value in one table so
+        /// display order can be chosen for the user without
         /// changing what gets sent. Where the two orders genuinely coincide the index is passed
         /// straight through, and that is stated at the call site.
         /// </para>
@@ -176,53 +176,18 @@ namespace McenterLite.Widget
         }
 
         /// <summary>
-        /// The perf-mode segments, left to right: what each one says and which
-        /// <see cref="PerfMode"/> it means.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// This exists so the buttons can be arranged for the USER without touching the wire
-        /// contract. They read Endurance → AI Engine → Manual, ordered by how much power the
-        /// device draws, which is not the order of <see cref="PerfMode"/>'s ordinals
-        /// (Endurance 0, UserScenario 1, AiEngine 2).
-        /// </para>
-        /// <para>
-        /// Every other selector in this widget casts its index straight to an enum, so reordering
-        /// one silently changes what the helper is told. This is the one control where display
-        /// order and wire value are decoupled, and this table is the only thing keeping them
-        /// honest - both directions go through it, never a cast.
-        /// </para>
-        /// <para>
-        /// Label and mode are paired in ONE table rather than two arrays kept in step, so
-        /// rearranging the buttons is a matter of moving whole rows and cannot desynchronise what
-        /// a button says from what it does.
-        /// </para>
-        /// <para>
-        /// "Manual" rather than MSI's "User Scenario": their name is meaningless out of context,
-        /// and the thing that matters about the mode is that it is the only one where the sliders
-        /// below do anything.
-        /// </para>
-        /// </remarks>
-        private static readonly (PerfMode Mode, string Label)[] PerfModeSegmentOrder =
-        {
-            (PerfMode.Endurance, "Endurance"),
-            (PerfMode.AiEngine, "AI Engine"),
-            (PerfMode.UserScenario, "Manual"),
-        };
-
-        /// <summary>
         /// The controller-mode segments, left to right: what each says and the wire value it means.
         /// </summary>
         /// <remarks>
         /// <para>
-        /// Same paired-table shape as <see cref="PerfModeSegmentOrder"/>, and for the same reason:
-        /// label and meaning move together, so rearranging the buttons cannot desynchronise what
-        /// one says from what it does.
+        /// Same paired-table shape as <see cref="IntelFpsTierSegmentOrder"/>, and for the same
+        /// reason: label and meaning move together, so rearranging the buttons cannot
+        /// desynchronise what one says from what it does.
         /// </para>
         /// <para>
         /// Gamepad sits first because it is the device's native state - the mode it boots in and
         /// the one the physical button returns to. Reading left to right then runs from "as the
-        /// device ships" to "overridden", matching how the perf-mode segments are ordered.
+        /// device ships" to "overridden".
         /// </para>
         /// </remarks>
         private static readonly (bool DesktopMode, string Label)[] HwMouseSegmentOrder =
@@ -266,7 +231,6 @@ namespace McenterLite.Widget
             (1, "60"),
         };
 
-        private SegmentedControl _perfMode;
         private SegmentedControl _hwMouse;
         private SegmentedControl _cpuBoost;
         private SegmentedControl _powerMode;
@@ -287,13 +251,6 @@ namespace McenterLite.Widget
 
             try
             {
-                // Labels come from the table, so they cannot drift out of step with the modes they
-                // stand for. Everywhere else in this file the index IS the wire value; this
-                // control is the one exception - see PerfModeSegmentOrder.
-                _perfMode = new SegmentedControl(PerfModeSegments,
-                    Array.ConvertAll(PerfModeSegmentOrder, segment => segment.Label));
-                _perfMode.Selected += OnPerfModeSelected;
-
                 _hwMouse = new SegmentedControl(HwMouseSegments,
                     Array.ConvertAll(HwMouseSegmentOrder, segment => segment.Label));
                 _hwMouse.Selected += OnHwMouseSelected;
@@ -663,15 +620,13 @@ namespace McenterLite.Widget
             // and would otherwise be unreachable without a mouse.
             if (!_snapshotApplied && StatusActionButton.Visibility != Visibility.Visible) return;
 
-            // Top-down, so focus starts where the eye does. The mode segments come before the
-            // sliders they gate because they are the top control in the top card AND they are on
-            // screen whenever that card is, where the sliders are hidden outside Manual mode. The
-            // Windows power card is the only one never hidden, so its segments are the guaranteed
-            // fallback - every card above it collapses on an unsupported device.
+            // Top-down, so focus starts where the eye does. Pl1Slider is the top control in the
+            // top card whenever that card is shown - the sliders are no longer gated by a mode.
+            // The Windows power card is the only one never hidden, so its segments are the
+            // guaranteed fallback - every card above it collapses on an unsupported device.
             Control[] candidates =
             {
                 StatusActionButton,
-                _perfMode?.FirstSegment,
                 Pl1Slider,
                 _cpuBoost?.FirstSegment,
                 _powerMode?.FirstSegment,
@@ -767,7 +722,6 @@ namespace McenterLite.Widget
 
         private void ApplyAllValues()
         {
-            ApplyValue(Function.PerfMode);
             ApplyValue(Function.Pl1);
             ApplyValue(Function.Pl2);
             ApplyValue(Function.HwMouseMode);
@@ -782,14 +736,6 @@ namespace McenterLite.Widget
         {
             switch (function)
             {
-                case Function.PerfMode:
-                {
-                    var mode = (PerfMode)_connection.GetInt(
-                        Function.PerfMode, (int)PerfMode.UserScenario);
-                    ApplyPerfMode(mode);
-                    break;
-                }
-
                 case Function.Pl1:
                     Pl1Slider.Value = _connection.GetInt(Function.Pl1, (int)Pl1Slider.Minimum);
                     Pl1ValueText.Text = $"{(int)Pl1Slider.Value} W";
@@ -845,46 +791,6 @@ namespace McenterLite.Widget
 
         // ── User input ──────────────────────────────────────────────────────────
         // Every handler starts with the same guard. See _applyingFromHelper.
-
-        /// <summary>
-        /// Paints the mode selector and shows or hides the sliders it gates.
-        /// </summary>
-        /// <remarks>
-        /// The sliders are HIDDEN outside Manual mode, not greyed. They were greyed at first, on
-        /// the argument that a disabled control next to the mode that disabled it explains itself
-        /// - but on an 8-inch screen it mostly read as clutter, and the three mode buttons sitting
-        /// directly above make "Manual is the one with sliders" obvious after a single press. The
-        /// card collapsing to a single row is also a clearer signal that MSI is driving power than
-        /// a paragraph of warning text was.
-        /// </remarks>
-        private void ApplyPerfMode(PerfMode mode)
-        {
-            bool manual = mode == PerfMode.UserScenario;
-
-            // Unknown is not on the control: MSI reported a mode we do not model, so leave the
-            // selection alone rather than misrepresenting it as one of the three we do.
-            int segment = Array.FindIndex(PerfModeSegmentOrder, s => s.Mode == mode);
-            if (segment >= 0)
-                _perfMode.Show(segment);
-
-            PowerLimitControls.Visibility = manual ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        private async void OnPerfModeSelected(int segment)
-        {
-            if (_applyingFromHelper) return;
-            if (segment < 0 || segment >= PerfModeSegmentOrder.Length) return;
-
-            _perfMode.Show(segment);
-            var mode = PerfModeSegmentOrder[segment].Mode;
-            ApplyPerfMode(mode);
-            await SendAsync(Function.PerfMode, (int)mode);
-
-            // A mode change moves more than the mode: the power limits MSI reports can change with
-            // it. Re-sync everything rather than guessing the blast radius of someone else's state
-            // machine.
-            await _connection.RefreshAsync();
-        }
 
         /// <summary>
         /// Guards the moment one power slider moves the other.

@@ -69,11 +69,12 @@ namespace McenterLite.Hardware
         /// Switches MSI's performance mode.
         /// </summary>
         /// <remarks>
-        /// Exposed as a control of its own rather than something applied silently behind a power
-        /// limit. Only <see cref="PerfMode.UserScenario"/> honours manual limits, so the user needs
-        /// to be able to see which mode they are in and change it deliberately - a hidden switch
-        /// would also move settings that have nothing to do with power, since mode changes affect
-        /// lighting too.
+        /// The widget has no control for this any more - it only ever wants
+        /// <see cref="PerfMode.UserScenario"/>, the one mode that honours a manual limit, and
+        /// <see cref="Apply"/> calls this itself when the device is in a different mode. Kept as
+        /// its own method rather than folded into <see cref="Apply"/> because the two write
+        /// different registry values and the registry-mirror implementation needs to call it from
+        /// more than one place.
         /// </remarks>
         OpResult ApplyMode(PerfMode mode);
     }

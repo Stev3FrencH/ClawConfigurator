@@ -103,48 +103,36 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <FontIcon Grid.Column="0" Glyph="&#xE945;" Style="{StaticResource CardIconStyle}" />
-                            <TextBlock Grid.Column="1" Text="Power limits" Style="{StaticResource CardTitleStyle}" />
+                            <TextBlock Grid.Column="1" Text="TDP Control" Style="{StaticResource CardTitleStyle}" />
                         </Grid>
 
-                        <!-- Mode sits ABOVE the sliders because it gates them: MSI only honours
-                             manual limits in the mode shown here as "Manual" (its own name for it
-                             is User Scenario). Segment order is set in code by PerfModeOrder, and
-                             is deliberately NOT the order of PerfMode's ordinals. -->
-                        <Grid x:Name="PerfModeSegments" Margin="0,12,0,0" />
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Sustained" Style="{StaticResource RowLabelStyle}" />
+                            <TextBlock x:Name="Pl1ValueText" Grid.Column="1" Style="{StaticResource ValueStyle}" />
+                        </Grid>
+                        <Slider x:Name="Pl1Slider"
+                                Style="{StaticResource CardSliderStyle}"
+                                Minimum="8" Maximum="35" StepFrequency="1"
+                                TickFrequency="1"
+                                ValueChanged="Pl1Slider_ValueChanged" />
 
-                        <!-- Both sliders and their labels live in one panel so they collapse
-                             together. MSI only honours manual limits in Manual mode, so in the two
-                             automatic modes there is nothing here to set and the card shrinks to
-                             just the mode row. -->
-                        <StackPanel x:Name="PowerLimitControls" Visibility="Collapsed">
-                            <Grid Margin="0,12,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Sustained" Style="{StaticResource RowLabelStyle}" />
-                                <TextBlock x:Name="Pl1ValueText" Grid.Column="1" Style="{StaticResource ValueStyle}" />
-                            </Grid>
-                            <Slider x:Name="Pl1Slider"
-                                    Style="{StaticResource CardSliderStyle}"
-                                    Minimum="8" Maximum="35" StepFrequency="1"
-                                    TickFrequency="1"
-                                    ValueChanged="Pl1Slider_ValueChanged" />
-
-                            <Grid Margin="0,4,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Boost" Style="{StaticResource RowLabelStyle}" />
-                                <TextBlock x:Name="Pl2ValueText" Grid.Column="1" Style="{StaticResource ValueStyle}" />
-                            </Grid>
-                            <Slider x:Name="Pl2Slider"
-                                    Style="{StaticResource CardSliderStyle}"
-                                    Minimum="10" Maximum="45" StepFrequency="1"
-                                    TickFrequency="1"
-                                    ValueChanged="Pl2Slider_ValueChanged" />
-                        </StackPanel>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Boost" Style="{StaticResource RowLabelStyle}" />
+                            <TextBlock x:Name="Pl2ValueText" Grid.Column="1" Style="{StaticResource ValueStyle}" />
+                        </Grid>
+                        <Slider x:Name="Pl2Slider"
+                                Style="{StaticResource CardSliderStyle}"
+                                Minimum="10" Maximum="45" StepFrequency="1"
+                                TickFrequency="1"
+                                ValueChanged="Pl2Slider_ValueChanged" />
                     </StackPanel>
                 </Border>
 
