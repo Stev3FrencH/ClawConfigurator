@@ -958,6 +958,100 @@ on this device, and that work has not started.
 > captured `0x05` config dump that appears to contain the current per-zone RGB triples. See
 > [What's next](#whats-next--fan-charge-limit-and-rgb).
 
+> **Superseded again, 2026-08-12 — G4 is fully decoded.** See
+> [The lighting protocol](#the-lighting-protocol--decoded-2026-08-12) below. The `0x05` dump was
+> not a config broadcast at all; it is `ReadProfileAck`, the answer to a read we can issue
+> ourselves. Read and write are both proven.
+
+### The lighting protocol — decoded 2026-08-12
+
+**Read from MSI's own code, not guessed.** `C:\Program Files (x86)\MSI\MSI Center M\API_ControlMode.dll`
+is unobfuscated .NET and carries the entire protocol: the `CommandType` enum, the packet framing,
+and a complete parser for the controller's configuration blob. `ilspycmd` decompiles it in seconds,
+and **it needs no elevation to read**.
+
+That also independently confirms everything gate G5 decoded by observation — `0x24` SwitchMode,
+`0x26` ReadGamepadMode, `0x27` GamepadModeAck, and the `0F 00 00 3C` header are all exactly as
+`MsiVendorHidChannel` already builds them. Two derivations, one answer.
+
+#### Lighting is not its own feature
+
+There is no "set colour" command. Lighting is a **slice of the controller's single 1478-byte
+configuration blob** — the same one holding key mappings, macros, stick calibration and rumble.
+Changing the lighting means writing bytes 586..1468 and letting the firmware animate what it finds.
+
+```
+profile blob, 1478 bytes
+  0     custom data, keys, sticks, triggers, macros   NOT OURS - never write this range
+  586   light block, 883 bytes
+        586   active animation index, 0-3
+        587   animation 0    220 bytes
+        807   animation 1    220 bytes
+        1027  animation 2    220 bytes
+        1247  animation 3    220 bytes
+        1467  audio rhythm enable
+        1468  reserved
+
+animation, 220 bytes
+  0     active keyframe count, 1-8
+  1     effect number, always 9
+  2     speed, STORED INVERTED: raw = 20 - speed
+  3     brightness, 0-100
+  4     8 keyframes of 27 bytes each: 9 RGB triples
+
+the 9 LEDs
+  0-3   left stick ring
+  4-7   right stick ring
+  8     ABXY cluster
+```
+
+#### Opcodes
+
+| Op | Name | Direction | Notes |
+|---|---|---|---|
+| `0x04` | ReadProfile | out | `04 00 <offH> <offL> <len>`, len ≤ 55 |
+| `0x05` | ReadProfileAck | in | same header, payload from byte 9 |
+| `0x21` | WriteProfileToRAM | out | `21 00 <offH> <offL> <len> <data…>` |
+| `0x22` | SyncToROM | out | persists across power cycle — **we do not send this** |
+| `0x06` | Ack | in | bare, no payload |
+
+**`0x21` is the write, not `0x03`.** MSI's enum names `WriteProfile = 3` but `GetWriteProfileCommand`
+puts **33** in the opcode byte. Trust the code that builds the packet over the enum that names it;
+`0x21`–`0x24` are the coherent family the firmware actually implements.
+
+We write to RAM and never to ROM. Flash has a write budget and this is driven by a widget the user
+can poke repeatedly; the helper re-applies on start instead, exactly as the charge limit does.
+
+#### Verified on the device, 2026-08-12
+
+`--lighting` read the live block and decoded animation 0 as one keyframe of `#7F00FF` on all nine
+LEDs, brightness 100, speed 17. That matches `Profile_1.cfg`'s `Button_Style_Steady_Color1=127,0,255`
+and MSI's own `SetAsSteadyOp1` speed of 17 — **an independent oracle for the offset arithmetic**,
+which was computed from the parser rather than found by poking.
+
+#### Why the read side had to come from the binary
+
+Controller mode announced itself: the firmware pushes `0x27` on every physical button press, so
+watching input reports revealed the protocol. **Lighting has no physical control, so nothing
+pushes.** Listening while changing lighting in MSI Center M produces only bare `0x06` acks — the
+write is an *output* report, and one process cannot see another's writes. The observable side
+proves *when* but never *what*.
+
+#### Where the three profiles live
+
+**In MSI Center M, not the controller.** `C:\MSI\MSI Center M\Mystic Light\Profile\Profile_{1,2,3}.cfg`
+are plain INI, keyed by `VID_0DB0&PID_1901`. They hold a `StyleSelectIndex` into `EnumStyle`
+(`Off=0, Steady=1, Breath=2, ColorCycle=3, Wave=4, Customize=5, InfoMode=6`) plus per-style colours,
+speed and direction. **They do not survive an uninstall**, so they are archived at
+`Diagnostics/mystic-light-profiles/`.
+
+The controller stores only the flattened *result*: the keyframes MSI computed from a style. So a
+style is a recipe, not a device concept — `LightPresetServices` in `API_ControlMode.dll` is the
+recipe book, and reproducing a profile means re-deriving its keyframes the way that class does.
+
+`SaveDeviceLightinROM()` in `API_MysticLight.dll` is **an empty method**. There is no ROM-backed
+profile store to inherit.
+
 **Decided 2026-08-08: ship on/off now, scope mode/colour/effect out until report `0x0F` is
 decoded.** `RegistryLedProvider` (`src/Hardware/Windows/RegistryLedProvider.cs`) reads and writes
 `LightingBrightness` through the same mirror-and-read-back model already verified for TDP, fan mode

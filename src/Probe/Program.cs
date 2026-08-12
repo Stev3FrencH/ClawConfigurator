@@ -54,6 +54,9 @@ namespace McenterLite.Probe
                 case "dump-acpi": return Commands.AcpiDump.Run(rest);
                 case "hid-list": return Commands.HidExplorer.List(rest);
                 case "hid-watch": return Commands.HidWatcher.Run(rest);
+                case "hid-listen": return Commands.HidRaw.Listen(rest);
+                case "lighting": return Commands.Lighting.Read(rest);
+                case "set-hid-raw": return Commands.HidRaw.Send(rest);
                 case "controller-mode": return Commands.ControllerMode.Read(rest);
                 case "set-controller-mode": return Commands.ControllerMode.Set(rest);
 
@@ -95,6 +98,9 @@ READ
   --hid-watch [secs] [vid]  Watch those interfaces live: arrivals, departures, and every
                             input report on the vendor collection. Press the physical MSI
                             button during a run to see what a mode switch actually does.
+  --hid-listen [secs]       Listen on the vendor command channel only, with no enumeration
+                            polling. Change lighting in MSI Center M during a run to see
+                            what, if anything, the device reports back.
 
   --charge-limit            Read the battery charge limit (MSI_ACPI.Get_AP, byte 5) and dump
                             the whole package, so a change anywhere else is visible.
@@ -109,6 +115,12 @@ WRITE (these change system state)
   --set-controller-mode <desktop|xinput|dinput>
                             Switch controller mode over the vendor HID channel. The physical
                             MSI button changes this too, so we do not own the state.
+  --set-hid-raw <opcode> [args...] [listenSeconds]
+                            Send ONE arbitrary opcode on the vendor HID channel and print
+                            whatever comes back. Hex, with or without 0x.
+                            This is the bluntest command here - the opcode map is not known,
+                            so it is a write to an undocumented controller. Used to find the
+                            lighting opcodes for G4.  e.g.  --set-hid-raw 04
   --set-charge-limit <20-100>
                             Set the battery charge limit via MSI_ACPI.Set_AP. Echoes back the
                             package it just read with only byte 5 changed, and confirms with a
