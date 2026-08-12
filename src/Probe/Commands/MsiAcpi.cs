@@ -97,7 +97,7 @@ namespace McenterLite.Probe.Commands
                 return TryInvoke(instance, methodName, null, out error);
             }
 
-            if (!TryFillParameters(inParams, payload, out error)) return null;
+            if (!TryFillParameters(instance.Scope, inParams, payload, out error)) return null;
 
             return TryInvoke(instance, methodName, inParams, out error);
         }
@@ -128,17 +128,32 @@ namespace McenterLite.Probe.Commands
         /// <summary>
         /// Writes the payload into whichever input parameter can carry it, reporting the choice.
         /// </summary>
+        /// <remarks>
+        /// Three shapes are handled, and the middle one is the one that matters on this class.
+        /// Every <c>MSI_ACPI</c> buffer method takes a single <b>embedded instance</b> - a
+        /// <c>Package_32</c> object whose <c>Bytes</c> property is the actual array - not a bare
+        /// byte array. Treating it as a scalar assigns an integer to an object parameter, and WMI
+        /// rejects that with a bare "Type mismatch" that says nothing about which parameter or why.
+        /// That was this method's behaviour for every method on the class until 2026-08-12; the
+        /// gate-G3 charge-limit discovery happened to be done with <c>Sweep-MsiAcpi.ps1</c>
+        /// instead, so nothing exercised it.
+        /// </remarks>
         private static bool TryFillParameters(
-            ManagementBaseObject inParams, byte[] payload, out string error)
+            ManagementScope scope, ManagementBaseObject inParams, byte[] payload, out string error)
         {
             error = null;
 
             var properties = inParams.Properties.Cast<PropertyData>().ToList();
             if (properties.Count == 0) return true;
 
-            // Prefer a byte array - MSI's buffer methods take a package, not a scalar.
+            // Prefer a byte array, then an embedded package. A bare array is not the shape this
+            // class uses, but it costs nothing to keep supporting and this is discovery tooling.
             var target = properties.FirstOrDefault(p => p.IsArray)
+                      ?? properties.FirstOrDefault(p => p.Type == CimType.Object)
                       ?? properties[0];
+
+            if (target.Type == CimType.Object && !target.IsArray)
+                return TryFillEmbeddedPackage(scope, inParams, target, payload, out error);
 
             if (target.IsArray)
             {
@@ -190,6 +205,97 @@ namespace McenterLite.Probe.Commands
             }
         }
 
+        /// <summary>
+        /// Fills an <c>[EmbeddedInstance]</c> parameter: builds the embedded class, puts the
+        /// payload in its array property, and assigns the whole object.
+        /// </summary>
+        /// <remarks>
+        /// The embedded class name is read from the parameter's own <c>CIMTYPE</c> qualifier
+        /// (<c>object:Package_32</c>) rather than hard-coded, because this is discovery tooling and
+        /// a method taking a different package size should report that rather than fail. The
+        /// shipping providers in <c>src/Hardware</c> deliberately do hard-code it - there the shape
+        /// is an established fact, not something being looked for.
+        /// </remarks>
+        private static bool TryFillEmbeddedPackage(
+            ManagementScope scope, ManagementBaseObject inParams, PropertyData target,
+            byte[] payload, out string error)
+        {
+            error = null;
+
+            var packageClass = EmbeddedClassName(target);
+            if (packageClass == null)
+            {
+                error = $"Input '{target.Name}' is an embedded object but declares no CIMTYPE "
+                      + "class name, so there is nothing to instantiate.";
+                return false;
+            }
+
+            try
+            {
+                using var definition = new ManagementClass(scope, new ManagementPath(packageClass), null);
+                var package = definition.CreateInstance();
+
+                var arrayProperty = FirstArrayProperty(package);
+                if (arrayProperty == null)
+                {
+                    error = $"Embedded class {packageClass} has no array property to carry a payload.";
+                    return false;
+                }
+
+                var buffer = new byte[ConventionalBufferSize];
+                var source = payload ?? Array.Empty<byte>();
+                Array.Copy(source, buffer, Math.Min(source.Length, buffer.Length));
+
+                if (source.Length > buffer.Length)
+                {
+                    Console.WriteLine(
+                        $"  warn   : payload is {source.Length} bytes; only the first "
+                        + $"{buffer.Length} were sent.");
+                }
+
+                package[arrayProperty] = buffer;
+                inParams[target.Name] = package;
+
+                Console.WriteLine(
+                    $"  in     : {target.Name} = {packageClass}.{arrayProperty} = {Hex(buffer)}");
+                return true;
+            }
+            catch (ManagementException ex)
+            {
+                error = $"Could not build embedded input '{target.Name}' of class {packageClass}: "
+                      + ex.Message;
+                return false;
+            }
+        }
+
+        /// <summary>Reads <c>Package_32</c> out of a <c>CIMTYPE</c> qualifier of <c>object:Package_32</c>.</summary>
+        private static string EmbeddedClassName(PropertyData property)
+        {
+            const string Prefix = "object:";
+
+            try
+            {
+                if (property.Qualifiers["CIMTYPE"].Value is not string cimType) return null;
+
+                return cimType.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase)
+                    ? cimType.Substring(Prefix.Length)
+                    : null;
+            }
+            catch (ManagementException)
+            {
+                // No CIMTYPE qualifier at all.
+                return null;
+            }
+        }
+
+        private static string FirstArrayProperty(ManagementBaseObject instance)
+        {
+            foreach (PropertyData property in instance.Properties)
+                if (property.IsArray) return property.Name;
+
+            return null;
+        }
+
         private static Type TypeFromCimType(CimType type)
         {
             switch (type)
@@ -228,6 +334,13 @@ namespace McenterLite.Probe.Commands
                     Console.WriteLine($"  out    : {p.Name} = byte[{bytes.Length}]");
                     DumpIndexedBytes(bytes);
                 }
+                else if (p.Value is ManagementBaseObject embedded)
+                {
+                    // The reply comes back in the same embedded-instance shape as the input, so
+                    // the interesting bytes are one level down. Printing the object itself would
+                    // just show a class path.
+                    DumpEmbedded(p.Name, embedded);
+                }
                 else
                 {
                     Console.WriteLine($"  out    : {p.Name} = {Describe(p.Value)}");
@@ -235,6 +348,55 @@ namespace McenterLite.Probe.Commands
             }
 
             if (!any) Console.WriteLine("  out    : (no properties)");
+        }
+
+        /// <summary>
+        /// Pulls the payload array out of a result, through the embedded instance if there is one.
+        /// </summary>
+        /// <remarks>
+        /// Returns the first array found rather than looking for a name. These methods carry
+        /// exactly one, and a command that has to know it is called <c>Bytes</c> would break on the
+        /// next method that calls it something else - which is the sort of thing this tool exists
+        /// to discover.
+        /// </remarks>
+        public static byte[] ExtractBytes(ManagementBaseObject outParams)
+        {
+            if (outParams == null) return null;
+
+            foreach (PropertyData property in outParams.Properties)
+            {
+                if (property.Value is byte[] direct) return direct;
+
+                if (property.Value is ManagementBaseObject embedded)
+                {
+                    foreach (PropertyData inner in embedded.Properties)
+                        if (inner.Value is byte[] bytes) return bytes;
+                }
+            }
+
+            return null;
+        }
+
+        private static void DumpEmbedded(string name, ManagementBaseObject embedded)
+        {
+            string className;
+            try { className = embedded.ClassPath?.ClassName ?? "object"; }
+            catch (ManagementException) { className = "object"; }
+
+            Console.WriteLine($"  out    : {name} = {className}");
+
+            foreach (PropertyData property in embedded.Properties)
+            {
+                if (property.Value is byte[] bytes)
+                {
+                    Console.WriteLine($"           {property.Name} = byte[{bytes.Length}]");
+                    DumpIndexedBytes(bytes);
+                }
+                else
+                {
+                    Console.WriteLine($"           {property.Name} = {Describe(property.Value)}");
+                }
+            }
         }
 
         private static void DumpIndexedBytes(byte[] bytes)

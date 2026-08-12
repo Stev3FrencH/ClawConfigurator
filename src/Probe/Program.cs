@@ -49,6 +49,8 @@ namespace McenterLite.Probe
                 case "wmi-instances": return Commands.WmiExplorer.DumpInstances(rest);
                 case "wmi-method": return Commands.WmiExplorer.DescribeMethod(rest);
                 case "acpi-get": return Commands.WmiExplorer.AcpiGet(rest);
+                case "charge-limit": return Commands.ChargeLimit.Read(rest);
+                case "set-charge-limit": return Commands.ChargeLimit.Set(rest);
                 case "dump-acpi": return Commands.AcpiDump.Run(rest);
                 case "hid-list": return Commands.HidExplorer.List(rest);
                 case "hid-watch": return Commands.HidWatcher.Run(rest);
@@ -94,6 +96,8 @@ READ
                             input report on the vendor collection. Press the physical MSI
                             button during a run to see what a mode switch actually does.
 
+  --charge-limit            Read the battery charge limit (MSI_ACPI.Get_AP, byte 5) and dump
+                            the whole package, so a change anywhere else is visible.
   --controller-mode         Ask the controller whether it is in gamepad or desktop-mouse mode,
                             over the vendor HID channel. Needs no MSI Center. This one does
                             put bytes on the wire - the channel has no feature report, so a
@@ -105,6 +109,10 @@ WRITE (these change system state)
   --set-controller-mode <desktop|xinput|dinput>
                             Switch controller mode over the vendor HID channel. The physical
                             MSI button changes this too, so we do not own the state.
+  --set-charge-limit <20-100>
+                            Set the battery charge limit via MSI_ACPI.Set_AP. Echoes back the
+                            package it just read with only byte 5 changed, and confirms with a
+                            separate read - Set_* on this class does not echo what was written.
 
 SUGGESTED PHASE-0 ORDER
   1. --device                     confirm the model gate matches
