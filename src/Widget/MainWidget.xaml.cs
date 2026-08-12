@@ -273,6 +273,12 @@ namespace McenterLite.Widget
                     "Off", "On", "On + boost");
                 _intelLowLatency.Selected += OnIntelLowLatencySelected;
 
+                // Created here rather than at the field, because a DispatcherTimer binds to the
+                // dispatcher of the thread that constructs it and this is the one place guaranteed
+                // to be the UI thread.
+                _limitWriteTimer = new DispatcherTimer { Interval = LimitWriteDelay };
+                _limitWriteTimer.Tick += (_, __) => FlushPendingLimits();
+
                 _connection.SnapshotApplied += OnSnapshotApplied;
                 _connection.ValueChanged += OnValueChanged;
                 _connection.ConnectionChanged += OnConnectionChanged;
@@ -321,6 +327,11 @@ namespace McenterLite.Widget
         protected override void OnNavigatedFrom(NavigationEventArgs e)
         {
             LayoutUpdated -= OnLayoutUpdated;
+
+            // The connection is disposed below, so a Tick arriving after this point would try to
+            // send over a dead pipe. Anything the user actually settled on was already flushed when
+            // the widget was hidden, which always precedes navigating away.
+            _limitWriteTimer?.Stop();
 
             if (_widget != null)
             {
@@ -407,6 +418,13 @@ namespace McenterLite.Widget
             try
             {
                 bool visible = sender.Visible;
+
+                // Being hidden ends the gesture. Without this, moving a slider and immediately
+                // dismissing the Game Bar would discard the change - the debounce would still be
+                // counting down when the widget went away, and nothing would ever send it.
+                if (!visible)
+                    await RunOnUiAsync(FlushPendingLimits);
+
                 await _connection.SetVisibleAsync(visible);
 
                 // Being shown again is the moment to put focus back - see ArmInitialFocus.
@@ -797,7 +815,32 @@ namespace McenterLite.Widget
         /// </remarks>
         private bool _syncingLimits;
 
-        private async void Pl1Slider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+        /// <summary>
+        /// How long the sliders must sit still before their value is written to the hardware.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>This exists to protect the embedded controller.</b> A XAML Slider raises ValueChanged
+        /// for every step it passes through, so dragging PL1 from 35 W to 8 W once produced
+        /// twenty-seven write pairs - fifty-four ACPI-WMI calls - as fast as the UI thread could
+        /// dispatch them, every one of them a real write to the EC. The helper was observed dying
+        /// mid-write under exactly that load.
+        /// </para>
+        /// <para>
+        /// Every intermediate value is also worthless: nobody dragging to 8 W wants a moment at
+        /// 34 W. Only the value the user settles on means anything, so only that one is sent.
+        /// </para>
+        /// </remarks>
+        private static readonly TimeSpan LimitWriteDelay = TimeSpan.FromSeconds(1);
+
+        private DispatcherTimer _limitWriteTimer;
+
+        // -1 means "nothing waiting to be written". A sentinel rather than a bool because the pair
+        // and the flag would otherwise have to be kept in step by hand.
+        private int _pendingPl1 = -1;
+        private int _pendingPl2 = -1;
+
+        private void Pl1Slider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
             if (_applyingFromHelper || _syncingLimits) return;
 
@@ -807,10 +850,10 @@ namespace McenterLite.Widget
             int pl2 = (int)Pl2Slider.Value;
             _connection.Caps.ConstrainFromPl1(ref pl1, ref pl2);
 
-            await ApplyLimitPairAsync(pl1, pl2);
+            QueueLimitPair(pl1, pl2);
         }
 
-        private async void Pl2Slider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+        private void Pl2Slider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
             if (_applyingFromHelper || _syncingLimits) return;
 
@@ -818,7 +861,7 @@ namespace McenterLite.Widget
             int pl2 = (int)e.NewValue;
             _connection.Caps.ConstrainFromPl2(ref pl1, ref pl2);
 
-            await ApplyLimitPairAsync(pl1, pl2);
+            QueueLimitPair(pl1, pl2);
         }
 
         /// <summary>
@@ -833,7 +876,22 @@ namespace McenterLite.Widget
         /// PL1 goes first: the helper clamps PL2 to at least PL1 + the firmware headroom, so
         /// raising PL1 before PL2 never transits through a pair that gets clamped and echoed back.
         /// </remarks>
-        private async Task ApplyLimitPairAsync(int pl1, int pl2)
+        private void QueueLimitPair(int pl1, int pl2)
+        {
+            ShowLimitPair(pl1, pl2);
+
+            _pendingPl1 = pl1;
+            _pendingPl2 = pl2;
+
+            // Restart, not start. Each further movement pushes the deadline out again, so the write
+            // happens once the slider has been still for the whole interval rather than once per
+            // step of the drag.
+            _limitWriteTimer.Stop();
+            _limitWriteTimer.Start();
+        }
+
+        /// <summary>Paints a pair without sending it. Never counts as user input.</summary>
+        private void ShowLimitPair(int pl1, int pl2)
         {
             _syncingLimits = true;
             try
@@ -847,6 +905,41 @@ namespace McenterLite.Widget
             {
                 _syncingLimits = false;
             }
+        }
+
+        /// <summary>
+        /// Sends the pair the user settled on, if one is waiting.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Both halves are always sent, whichever slider was touched. Most gestures move only one
+        /// limit, but one CAN still move both - raising PL1 into PL2 carries PL2 up with it - and
+        /// sending only the moved one would leave the helper holding a pair the widget is no longer
+        /// showing.
+        /// </para>
+        /// <para>
+        /// PL1 goes first: the helper clamps PL2 to at least PL1 + the firmware headroom, so raising
+        /// PL1 before PL2 never transits through a pair that gets clamped and echoed back.
+        /// </para>
+        /// <para>
+        /// <c>async void</c> deliberately - this is an event-handler-shaped operation, reached from
+        /// the timer's Tick and from the widget being hidden, neither of which can await.
+        /// </para>
+        /// </remarks>
+        private async void FlushPendingLimits()
+        {
+            _limitWriteTimer.Stop();
+
+            if (_pendingPl1 < 0) return;
+
+            int pl1 = _pendingPl1;
+            int pl2 = _pendingPl2;
+
+            // Cleared BEFORE awaiting, so a second flush arriving mid-send cannot resend the same
+            // pair - the hardware write is the expensive half and this whole mechanism exists to
+            // issue fewer of them.
+            _pendingPl1 = -1;
+            _pendingPl2 = -1;
 
             await SendAsync(Function.Pl1, pl1);
             await SendAsync(Function.Pl2, pl2);
@@ -912,6 +1005,15 @@ namespace McenterLite.Widget
                 ShowStatus(error, showRetry: false);
                 return;
             }
+
+            // A reply is proof the helper is reachable, so any notice still on screen is stale.
+            //
+            // Load-bearing, because nothing else lowers that banner. It was only ever raised, so a
+            // single transient failure - the helper missing its window while the CPU is pinned,
+            // which is exactly what happens while testing a power limit - left the widget reading
+            // "the helper did not respond" permanently, over controls that had already gone back to
+            // working. The stale warning is worse than the momentary failure it describes.
+            HideStatus();
 
             // Re-read from the cache, which now holds the helper's reply. A clamped or refused
             // value snaps the control back to what the hardware actually holds instead of leaving
