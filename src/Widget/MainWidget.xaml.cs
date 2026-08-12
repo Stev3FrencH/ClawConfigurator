@@ -279,6 +279,9 @@ namespace McenterLite.Widget
                 _limitWriteTimer = new DispatcherTimer { Interval = LimitWriteDelay };
                 _limitWriteTimer.Tick += (_, __) => FlushPendingLimits();
 
+                _chargeLimitWriteTimer = new DispatcherTimer { Interval = ChargeLimitWriteDelay };
+                _chargeLimitWriteTimer.Tick += (_, __) => FlushPendingChargeLimit();
+
                 _connection.SnapshotApplied += OnSnapshotApplied;
                 _connection.ValueChanged += OnValueChanged;
                 _connection.ConnectionChanged += OnConnectionChanged;
@@ -332,6 +335,7 @@ namespace McenterLite.Widget
             // send over a dead pipe. Anything the user actually settled on was already flushed when
             // the widget was hidden, which always precedes navigating away.
             _limitWriteTimer?.Stop();
+            _chargeLimitWriteTimer?.Stop();
 
             if (_widget != null)
             {
@@ -423,7 +427,10 @@ namespace McenterLite.Widget
                 // dismissing the Game Bar would discard the change - the debounce would still be
                 // counting down when the widget went away, and nothing would ever send it.
                 if (!visible)
+                {
                     await RunOnUiAsync(FlushPendingLimits);
+                    await RunOnUiAsync(FlushPendingChargeLimit);
+                }
 
                 await _connection.SetVisibleAsync(visible);
 
@@ -724,6 +731,14 @@ namespace McenterLite.Widget
             // cannot see is a value they cannot send, which matters because the pipe is reachable
             // by any app on the machine and the helper is the only real gate.
             TdpCard.Visibility = Visible(_connection.IsAvailable(Function.Pl1));
+            ChargeLimitCard.Visibility = Visible(caps.HasChargeLimit);
+
+            // Bounds come from the device, not from the XAML defaults. Set before any value is
+            // painted, or a snapshot value outside the markup range would be clamped by the
+            // control on the way in and the widget would show a number the device is not at.
+            ChargeLimitSlider.Minimum = caps.MinChargeLimit;
+            ChargeLimitSlider.Maximum = caps.MaxChargeLimit;
+
             HwMouseCard.Visibility = Visible(caps.HasHwMouse);
             IntelCard.Visibility = Visible(caps.HasIgcl && _connection.IsAvailable(Function.IntelFpsTier));
         }
@@ -742,6 +757,7 @@ namespace McenterLite.Widget
         {
             ApplyValue(Function.Pl1);
             ApplyValue(Function.Pl2);
+            ApplyValue(Function.ChargeLimitPercent);
             ApplyValue(Function.HwMouseMode);
             ApplyValue(Function.CpuBoost);
             ApplyValue(Function.OsPowerMode);
@@ -763,6 +779,13 @@ namespace McenterLite.Widget
                     Pl2ValueText.Text = $"{(int)Pl2Slider.Value} W";
                     break;
 
+
+                case Function.ChargeLimitPercent:
+                    // Not pushed on the telemetry tick - nothing outside this widget changes it,
+                    // so there is no echo to race the debounce.
+                    ShowChargeLimit(_connection.GetInt(
+                        Function.ChargeLimitPercent, (int)ChargeLimitSlider.Maximum));
+                    break;
 
                 case Function.HwMouseMode:
                 {
@@ -943,6 +966,84 @@ namespace McenterLite.Widget
 
             await SendAsync(Function.Pl1, pl1);
             await SendAsync(Function.Pl2, pl2);
+        }
+
+        /// <summary>
+        /// Same 1s debounce as the power-limit sliders, for the same reason.
+        /// </summary>
+        /// <remarks>
+        /// A drag raises ValueChanged per step, and every one of these is an ACPI-WMI call that
+        /// read-modify-writes the package. Only the value the user settles on means anything - a
+        /// moment at 45% on the way to 80% is not a setting anybody asked for.
+        /// </remarks>
+        private static readonly TimeSpan ChargeLimitWriteDelay = LimitWriteDelay;
+
+        private DispatcherTimer _chargeLimitWriteTimer;
+
+        // -1 means "nothing waiting", matching _pendingPl1.
+        private int _pendingChargeLimit = -1;
+
+        private void ChargeLimitSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+        {
+            if (_applyingFromHelper || _syncingLimits) return;
+
+            int percent = (int)e.NewValue;
+            _connection.Caps.ClampChargeLimit(ref percent);
+
+            ShowChargeLimit(percent);
+
+            _pendingChargeLimit = percent;
+
+            // Restart rather than start, so the write lands once the slider has been still for the
+            // whole interval instead of once per step.
+            _chargeLimitWriteTimer.Stop();
+            _chargeLimitWriteTimer.Start();
+        }
+
+        /// <summary>Paints the value without sending it. Never counts as user input.</summary>
+        /// <remarks>
+        /// The TEXT is the authoritative reading, not the thumb. The slider steps in tens, so a
+        /// device sitting on something else - a value MSI Center set, or one this app wrote before
+        /// the step changed - snaps the thumb to the nearest step while the text still reports what
+        /// the hardware actually said. Showing a rounded number instead would be the widget lying
+        /// about the device, which is the one thing it must never do.
+        /// </remarks>
+        private void ShowChargeLimit(int percent)
+        {
+            _syncingLimits = true;
+            try
+            {
+                ChargeLimitSlider.Value = percent;
+                ChargeLimitValueText.Text = percent >= (int)ChargeLimitSlider.Maximum
+                    ? "Full"
+                    : $"{percent}%";
+            }
+            finally
+            {
+                _syncingLimits = false;
+            }
+        }
+
+        /// <summary>
+        /// Sends the value the user settled on, if one is waiting.
+        /// </summary>
+        /// <remarks>
+        /// <c>async void</c> deliberately, like <see cref="FlushPendingLimits"/> - reached from the
+        /// timer's Tick and from the widget being hidden, neither of which can await.
+        /// </remarks>
+        private async void FlushPendingChargeLimit()
+        {
+            _chargeLimitWriteTimer.Stop();
+
+            if (_pendingChargeLimit < 0) return;
+
+            int percent = _pendingChargeLimit;
+
+            // Cleared BEFORE awaiting, so a second flush arriving mid-send cannot resend the same
+            // value.
+            _pendingChargeLimit = -1;
+
+            await SendAsync(Function.ChargeLimitPercent, percent);
         }
 
         private async void OnHwMouseSelected(int segment)

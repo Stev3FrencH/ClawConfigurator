@@ -16,6 +16,9 @@ namespace McenterLite.Shared.Tests
             MaxPl2 = 45,
             Pl2MinOffset = 2,
             TdpBackend = TdpBackendKind.Wmi,
+            MinChargeLimit = 50,
+            MaxChargeLimit = 100,
+            HasChargeLimit = true,
             HasHwMouse = true,
             HasIgcl = true,
         };
@@ -31,7 +34,49 @@ namespace McenterLite.Shared.Tests
             Assert.Equal(45, parsed.MaxPl2);
             Assert.Equal(2, parsed.Pl2MinOffset);
             Assert.Equal(TdpBackendKind.Wmi, parsed.TdpBackend);
+            Assert.Equal(50, parsed.MinChargeLimit);
+            Assert.Equal(100, parsed.MaxChargeLimit);
+            Assert.True(parsed.HasChargeLimit);
             Assert.True(parsed.HasIgcl);
+        }
+
+        [Theory]
+        [InlineData(80, 80)]
+        [InlineData(50, 50)]
+        [InlineData(100, 100)]
+        // Out of range in both directions. The helper clamps rather than refusing, because the
+        // pipe is reachable by any app on the box and a refusal there is not a safety property.
+        [InlineData(0, 50)]
+        [InlineData(49, 50)]
+        [InlineData(101, 100)]
+        [InlineData(-5, 50)]
+        public void ClampChargeLimit_HoldsTheOfferedRange(int requested, int expected)
+        {
+            int percent = requested;
+            Claw8Ex().ClampChargeLimit(ref percent);
+
+            Assert.Equal(expected, percent);
+        }
+
+        /// <summary>
+        /// The 50 floor is a PRODUCT choice, not a hardware one - the firmware accepts 20.
+        /// </summary>
+        /// <remarks>
+        /// Asserted explicitly because this exact confusion has already happened once: the retired
+        /// version of this feature offered 60-100, and that floor was repeatedly read back as
+        /// though the firmware imposed it. A caps object carrying a different floor must still
+        /// clamp to its own value, so the number stays a decision rather than becoming folklore.
+        /// </remarks>
+        [Fact]
+        public void ClampChargeLimit_FloorIsAPolicyNotAHardwareLimit()
+        {
+            var firmwareRange = Claw8Ex();
+            firmwareRange.MinChargeLimit = 20;
+
+            int percent = 30;
+            firmwareRange.ClampChargeLimit(ref percent);
+
+            Assert.Equal(30, percent);
         }
 
         [Theory]

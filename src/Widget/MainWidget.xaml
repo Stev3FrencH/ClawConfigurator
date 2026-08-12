@@ -191,6 +191,39 @@
                     </StackPanel>
                 </Border>
 
+                <!-- 3b. Battery charge limit -->
+                <Border x:Name="ChargeLimitCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Grid.Column="0" Glyph="&#xE83E;" Style="{StaticResource CardIconStyle}" />
+                            <TextBlock Grid.Column="1" Text="Battery" Style="{StaticResource CardTitleStyle}" />
+                        </Grid>
+
+                        <!-- Bounds come from DeviceCaps at runtime, not from this markup; the
+                             values here are only what XAML shows before the first snapshot.
+                             50-100 in tens is a deliberate product range - the FIRMWARE accepts
+                             20-100, but nothing below half charge is useful for longevity, so the
+                             travel is spent where the values matter. See DeviceCaps. -->
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Charge to" Style="{StaticResource RowLabelStyle}" />
+                            <TextBlock x:Name="ChargeLimitValueText" Grid.Column="1" Style="{StaticResource ValueStyle}" />
+                        </Grid>
+                        <Slider x:Name="ChargeLimitSlider"
+                                Style="{StaticResource CardSliderStyle}"
+                                Minimum="50" Maximum="100" StepFrequency="10"
+                                TickFrequency="10"
+                                ValueChanged="ChargeLimitSlider_ValueChanged" />
+                    </StackPanel>
+                </Border>
+
                 <!-- 4. Controller -->
                 <Border x:Name="HwMouseCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
                     <StackPanel>

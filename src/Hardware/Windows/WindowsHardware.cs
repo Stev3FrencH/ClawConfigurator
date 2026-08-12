@@ -65,12 +65,21 @@ namespace McenterLite.Hardware.Windows
 
             Caps.HasHwMouse = identity.IsClaw8Ex && hwMouse.Available;
 
+            // Gate G3. Same transport as TDP and the same read-back discipline - Set_AP's reply is
+            // a bare status that does not echo the value, so it proves nothing on its own.
+            var chargeLimit = new WmiChargeLimitProvider();
+            Caps.HasChargeLimit = identity.IsClaw8Ex && chargeLimit.Available;
+
             // A device we do not recognise gets nothing, whatever the registry contains. Every
             // value above is calibrated to one model, and a wrong power limit on a different Claw
             // is a real write to real firmware.
             Tdp = identity.IsClaw8Ex
                 ? tdp
                 : new UnavailableTdp("This device is not an MSI Claw 8 EX AI+.");
+
+            ChargeLimit = identity.IsClaw8Ex
+                ? chargeLimit
+                : new UnavailableChargeLimit("This device is not an MSI Claw 8 EX AI+.");
 
             HwMouse = identity.IsClaw8Ex
                 ? hwMouse
@@ -82,6 +91,7 @@ namespace McenterLite.Hardware.Windows
 
         public DeviceCaps Caps { get; }
         public ITdpProvider Tdp { get; }
+        public IChargeLimitProvider ChargeLimit { get; }
         public IHwMouseProvider HwMouse { get; }
         public IPowerProvider Power { get; }
         public IIgclProvider Igcl { get; }
@@ -120,6 +130,22 @@ namespace McenterLite.Hardware.Windows
         }
 
         public OpResult ApplyMode(PerfMode mode) => OpResult.Unavailable(UnavailableReason);
+    }
+
+    internal sealed class UnavailableChargeLimit : IChargeLimitProvider
+    {
+        public UnavailableChargeLimit(string reason) => UnavailableReason = reason;
+
+        public bool Available => false;
+        public string UnavailableReason { get; }
+
+        public bool TryRead(out int percent)
+        {
+            percent = 0;
+            return false;
+        }
+
+        public OpResult Apply(int percent) => OpResult.Unavailable(UnavailableReason);
     }
 
     internal sealed class UnavailableHwMouse : IHwMouseProvider

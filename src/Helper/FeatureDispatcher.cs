@@ -90,6 +90,11 @@ namespace McenterLite.Helper
                         ? PipeEnvelope.FromEnum(perfMode)
                         : null;
 
+                case Function.ChargeLimitPercent:
+                    return _hw.ChargeLimit.TryRead(out int chargePercent)
+                        ? PipeEnvelope.FromInt(chargePercent)
+                        : null;
+
                 case Function.HwMouseMode:
                     return _hw.HwMouse.TryRead(out bool desktopMode)
                         ? PipeEnvelope.FromBool(desktopMode)
@@ -146,6 +151,9 @@ namespace McenterLite.Helper
                     // re-reads the whole snapshot rather than assuming only this changed.
                     return Apply(request, _hw.Tdp.ApplyMode(request.AsEnum(PerfMode.UserScenario)),
                         () => ReadValue(Function.PerfMode));
+
+                case Function.ChargeLimitPercent:
+                    return SetChargeLimit(request);
 
                 case Function.HwMouseMode:
                     return Apply(request, _hw.HwMouse.Apply(request.AsBool()),
@@ -212,6 +220,37 @@ namespace McenterLite.Helper
             Log.Info($"TDP {request.Fn} -> {pl1}/{pl2} W via {_hw.Tdp.Backend}; hardware reports {actualPl1}/{actualPl2} W.");
 
             return Ok(request, PipeEnvelope.FromInt(request.Fn == Function.Pl1 ? actualPl1 : actualPl2));
+        }
+
+        private PipeEnvelope SetChargeLimit(PipeEnvelope request)
+        {
+            if (!_hw.ChargeLimit.Available)
+                return PipeEnvelope.Failure(request.Id, request.Fn, _hw.ChargeLimit.UnavailableReason);
+
+            if (!_hw.ChargeLimit.TryRead(out int current))
+                return PipeEnvelope.Failure(request.Id, request.Fn, "Could not read the current charge limit.");
+
+            _settings.CaptureOriginal(SettingsKeys.ChargeLimit, PipeEnvelope.FromInt(current));
+
+            int percent = request.AsInt(current);
+            _hw.Caps.ClampChargeLimit(ref percent);
+
+            var result = _hw.ChargeLimit.Apply(percent);
+            if (!result.Ok)
+            {
+                Log.Warn($"Charge limit write FAILED: asked {percent}% - {result.Error}");
+                return PipeEnvelope.Failure(request.Id, request.Fn, result.Error);
+            }
+
+            _settings.SetInt(SettingsKeys.ChargeLimit, percent);
+
+            // Logged on success as well as failure, for the same reason TDP is. This is a hardware
+            // write whose effect is invisible until the battery next reaches the threshold, so
+            // "what did we send" is not reconstructable from the device afterwards.
+            _hw.ChargeLimit.TryRead(out int actual);
+            Log.Info($"Charge limit -> {percent}%; hardware reports {actual}%.");
+
+            return Ok(request, PipeEnvelope.FromInt(actual));
         }
 
         private PipeEnvelope SetCpuBoost(PipeEnvelope request)
@@ -289,8 +328,18 @@ namespace McenterLite.Helper
                 if (!r.Ok) problems.Add($"power limits: {r.Error}");
             }
 
-            // Nothing to restore for the charge limit: the feature was removed, and this app never
-            // wrote a value the user did not set in MSI Center themselves.
+            // Charge limit. Captured on the first write, like the power limits, and restored for
+            // the same reason - it is a setting that persists in firmware and outlives the app.
+            // That matters more once MSI Center M is gone, because then nothing else can put it
+            // back.
+            var originalCharge = _settings.GetOriginal(SettingsKeys.ChargeLimit);
+            if (originalCharge != null && int.TryParse(originalCharge, out int chargePercent)
+                && _hw.ChargeLimit.Available)
+            {
+                _hw.Caps.ClampChargeLimit(ref chargePercent);
+                var r = _hw.ChargeLimit.Apply(chargePercent);
+                if (!r.Ok) problems.Add($"charge limit: {r.Error}");
+            }
 
             var originalBoost = _settings.GetOriginal(SettingsKeys.CpuBoost);
             if (originalBoost != null)
@@ -359,6 +408,7 @@ namespace McenterLite.Helper
             Function.Pl2,
             Function.TdpBackend,
             Function.PerfMode,
+            Function.ChargeLimitPercent,
             Function.HwMouseMode,
             Function.CpuBoost,
             Function.OsPowerMode,

@@ -54,15 +54,15 @@ prove the read reflects hardware rather than MSI Center M's opinion of it.
 
 | Gate | Feature | Standalone path | Confidence | Biggest unknown |
 |---|---|---|---|---|
-| **G3** | Battery charge limit | `MSI_ACPI.Get_AP` / `Set_AP` | **High** | whether `Set_AP` applies, never written |
+| ~~**G3**~~ | ~~Battery charge limit~~ | `MSI_ACPI.Get_AP` / `Set_AP` | **DONE 2026-08-12** | — |
 | **G4** | RGB LED | vendor HID report `0x0F` | **Medium–high** | the LED payload layout |
 | **G2** | Fan control | `MSI_ACPI.Get_Fan` / `Set_Fan`, or EC | **Low** | duty encoding and curve shape |
 
-**G3 is the obvious first pick.** The hard discovery is already done — `Set_AP` sub-function 0,
-byte 5, `percent | 0x80`, measured against MSI Center's own 100/80/60 settings. It is a *read*
-that was measured, though; the write has never been attempted. It is also the smallest UI (one
-value), it changes rarely, and it needs no new transport. Note the firmware accepts **20–100**
-while the old widget offered 60–100 — the 60 floor was a lite-scope choice, not a hardware limit.
+**G3 is done.** It was the obvious first pick and it went the way the confidence suggested: the
+read was already measured, the write turned out to be plain read-modify-write, and it needed no new
+transport. **The firmware range is 20–100**; the widget deliberately offers only 50–100 in steps of
+10, which is a product choice and must not be recorded as a hardware limit — that is precisely the
+error the retired version's 60 floor caused.
 
 **G4 got substantially easier and the notes below understate it.** The G4 section still says report
 `0x0F` is "unverified on this device, and that work has not started" — that is now out of date. G5
@@ -704,7 +704,13 @@ There is no fallback for this one. Without a driver-free method it is cut, not w
 | Parameter encoding | | |
 | Accepted range | | see result — it is not a range |
 
-**Result: AMBER — the registry value is real and round-trips, but does not reliably drive the EC.**
+> **GREEN as of 2026-08-12 — `Set_AP` is verified, and the registry model below is superseded.**
+> The charge limit is written through `MSI_ACPI.Set_AP` and needs nothing from MSI Center M. See
+> [the write verification](#verified-2026-08-12-the-set_ap-write-works) below. The registry
+> material that follows is kept as the device record of how this was chased, and because its two
+> traps are a good illustration of why a round-tripping registry value proves nothing.
+
+**Result (superseded): AMBER — the registry value is real and round-trips, but does not reliably drive the EC.**
 `HKLM\SOFTWARE\WOW6432Node\MSI\MSI Center M\Battery`, value `BatteryLevel`, **REG_SZ**, with
 exactly three states: `"0"` = 100%, `"1"` = 80%, `"2"` = 60%. Confirmed by three transitions
 (100→80, 80→60, 60→100).
@@ -871,11 +877,39 @@ The other nine bytes the diff flagged are the device warming during the capture 
 sub-function 0 byte 1 moved 52 → 54 → 55 and `Get_Thermal` sub-function 3 byte 7 moved 47 → 48 → 50,
 monotonic with elapsed time rather than with the setting. Do not re-chase them.
 
-**Still to establish: the WRITE format.** `Set_AP` takes the same `Package_32`, but whether the
-request mirrors the response layout is unverified. The response's byte 0 = `0x01` reads like a
-status flag, and a status flag on the way out need not mean the same thing on the way in. The
-defensible first attempt is read-modify-write: read sub-function 0, change byte 5 alone, send it
-back — never a hand-built buffer, which would risk zeroing bytes 3 and 4 whose meaning is unknown.
+#### VERIFIED 2026-08-12: the `Set_AP` write works
+
+**Read-modify-write, exactly as this section predicted.** Read sub-function 0, change byte 0 to the
+sub-function and byte 5 to the new value, send the rest back untouched. Implemented as
+`--set-charge-limit` in the Probe.
+
+```
+Before          01 00 00 C6 80 BC        60%
+Sent Set_AP     00 00 00 C6 80 D0        80%
+Set_AP reply    01 00 00 00 00 00        bare ack - does NOT echo the value
+After (Get_AP)  01 00 00 C6 80 D0        80%
+```
+
+**The hardware is the oracle, not the read-back.** The battery sat at 74% and had stopped charging
+against the 60% limit; raising the limit to 80% made it *resume charging*. That is the firmware
+acting on the value. Read-back alone would not have been evidence — `Set_AP`'s own reply is a bare
+`0x01` status with the value zeroed out, the same trap `Set_SlaveBattery` sets in G1.
+
+**Only byte 5 ever moves.** Re-confirmed at three points against MSI Center's own setting on
+2026-08-12 — 60% → `0xBC`, 80% → `0xD0`, 100% → `0xE4` — with bytes 0–4 (`01 00 00 C6 80`)
+identical in all three. That is what makes echoing bytes 3 and 4 back safe rather than hopeful.
+
+**Encoding: `percent | 0x80` and `percent + 0x80` are the same thing here.** Bit 7 is clear for
+every value in the accepted 20–100 range, so the two forms cannot be distinguished and the
+distinction does not matter. Use either.
+
+**MSI Center M did NOT notice.** Its UI still showed 60% afterwards. That is the useful outcome:
+it means `Set_AP` is the live register and MSI Center keeps its own cached copy, rather than both
+reading one source. A value the two agreed on could still have been a shadow.
+
+> **Unverified:** whether MSI Center M re-asserts its own value later — on its next tick, on
+> resume, or when its UI is opened. It has no bearing on the standalone case, which is the one that
+> matters, but it decides whether the two can coexist until the uninstall.
 
 ---
 

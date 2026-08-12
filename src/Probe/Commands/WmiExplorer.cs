@@ -195,8 +195,8 @@ namespace McenterLite.Probe.Commands
             {
                 Console.Error.WriteLine(
                     $"Refusing to call '{methodName}': this command only calls Get_* methods.\n" +
-                    "Writes are restricted to --set-charge-limit, which calls Set_MasterBattery\n" +
-                    "and nothing else. Raw Set_EC writes are deliberately not reachable from here.");
+                    "Every write has its own named command with its own argument checking, so a\n" +
+                    "raw Set_EC is deliberately not reachable from here.");
                 return 64;
             }
 
