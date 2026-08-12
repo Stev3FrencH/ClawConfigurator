@@ -216,19 +216,14 @@
                      better than anything this widget could offer. See docs/hardware-notes.md
                      gates G2, G3 and G4 for the findings, which are kept as a device record. -->
 
-                <!-- Dependency notice.
-                     This warns when MSI Center M is NOT running, which reads backwards until you
-                     know the TDP path: we write MSI Center's own registry model and its service is
-                     what pushes the values to the EC. With the service stopped the write succeeds
-                     and nothing happens - the worst kind of failure, so it gets a banner. -->
-                <Border x:Name="MsiCenterWarning"
-                        Style="{StaticResource NoticeStyle}"
-                        BorderBrush="{StaticResource WarningBrush}"
-                        Margin="0,0,0,4"
-                        Visibility="Collapsed">
-                    <TextBlock Style="{StaticResource NoticeTextStyle}"
-                               Text="MSI Center M is not running. Power limits are applied through it, so they will not take effect until it is started." />
-                </Border>
+                <!-- A banner warning that MSI Center M was NOT running lived here until
+                     2026-08-11. It made sense while the registry mirror was the only TDP path -
+                     MSI's own service was what pushed the values to the EC, so with it stopped the
+                     write succeeded and nothing happened. WmiTdpProvider writes the EC directly and
+                     needs MSI Center M neither running nor installed, so the notice would have
+                     become permanently visible and permanently wrong the moment MSI Center M was
+                     uninstalled - which is the intended end state, and the state of any fresh
+                     Windows install. -->
 
             </StackPanel>
         </ScrollViewer>

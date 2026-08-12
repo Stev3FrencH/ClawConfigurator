@@ -729,7 +729,6 @@ namespace McenterLite.Widget
             ApplyValue(Function.OsPowerMode);
             ApplyValue(Function.IntelFpsTier);
             ApplyValue(Function.IntelLowLatency);
-            ApplyValue(Function.MsiCenterRunning);
         }
 
         private void ApplyValue(Function function)
@@ -781,11 +780,6 @@ namespace McenterLite.Widget
                     _intelLowLatency.Show(Clamp(_connection.GetInt(Function.IntelLowLatency, 0), 0, 2));
                     break;
 
-                case Function.MsiCenterRunning:
-                    // Inverted on purpose. MSI Center M is a dependency, not a rival: its service is
-                    // what applies the power limits we write. Warn when it is MISSING.
-                    MsiCenterWarning.Visibility = Visible(!_connection.GetBool(Function.MsiCenterRunning));
-                    break;
             }
         }
 
