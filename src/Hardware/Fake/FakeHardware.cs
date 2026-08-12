@@ -33,8 +33,6 @@ namespace McenterLite.Hardware.Fake
                 MaxPl1 = 35,
                 MaxPl2 = 45,
                 Pl2MinOffset = 2,
-                MaxPl1Dc = 25,
-                MaxPl2Dc = 30,
                 TdpBackend = simulateClaw8Ex ? TdpBackendKind.Wmi : TdpBackendKind.Unavailable,
                 HasHwMouse = simulateClaw8Ex,
                 HasIgcl = simulateClaw8Ex,
@@ -88,36 +86,23 @@ namespace McenterLite.Hardware.Fake
             _pl1 = pl1;
             _pl2 = pl2;
 
-            // Models the real gate rather than always succeeding: MSI only honours manual limits
-            // in User Scenario. Without this the widget's mode gating is untestable off-device.
-            if (_mode != PerfMode.UserScenario)
-            {
-                // Wording tracks the real provider's, which uses the widget's button labels -
-                // "Manual", not MSI's own "User Scenario".
-                return OpResult.Fail(
-                    $"Saved {pl1}/{pl2} W, but MSI Center is in {_mode} mode and is managing power "
-                    + "itself. Switch to Manual for these limits to take effect.");
-            }
-
+            // No mode gate: this models WmiTdpProvider, the default simulated backend (see
+            // FakeHardware's TdpBackend = TdpBackendKind.Wmi above), which writes the EC directly
+            // and is not gated by MSI's Endurance/AI Engine/Manual triple at all.
             return OpResult.Success();
         }
 
+        // Always reports UserScenario / no-ops on write, matching WmiTdpProvider - see its
+        // TryReadMode remarks for why "the one mode that means limits are honoured" is reported
+        // unconditionally rather than tracking a real mode.
         public bool TryReadMode(out PerfMode mode)
         {
-            mode = _mode;
+            mode = Available ? PerfMode.UserScenario : PerfMode.Unknown;
             return Available;
         }
 
-        public OpResult ApplyMode(PerfMode mode)
-        {
-            if (!Available) return OpResult.Unavailable(UnavailableReason);
-            if (mode == PerfMode.Unknown) return OpResult.Fail("Cannot switch to an unknown performance mode.");
-
-            _mode = mode;
-            return OpResult.Success();
-        }
-
-        private PerfMode _mode = PerfMode.UserScenario;
+        public OpResult ApplyMode(PerfMode mode) =>
+            Available ? OpResult.Success() : OpResult.Unavailable(UnavailableReason);
     }
 
     internal sealed class FakeHwMouse : IHwMouseProvider

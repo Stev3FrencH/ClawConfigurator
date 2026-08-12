@@ -14,9 +14,10 @@ namespace McenterLite.Hardware.Windows
     /// than offering a control that does nothing.
     /// </para>
     /// <para>
-    /// Live today: power limits and controller mode (registry), CPU boost and OS power mode
-    /// (plain Windows APIs). Pending: Intel GPU. Battery charge limit, lighting and fan control
-    /// were all removed - each is better handled in MSI Center itself.
+    /// Live today: power limits (WMI, direct to the EC - see <see cref="WmiTdpProvider"/>, with
+    /// MSI Center's registry model as a fallback), controller mode (registry), CPU boost and OS
+    /// power mode (plain Windows APIs). Pending: Intel GPU. Battery charge limit, lighting and fan
+    /// control were all removed - each is better handled in MSI Center itself.
     /// </para>
     /// </remarks>
     [SupportedOSPlatform("windows")]
@@ -24,24 +25,18 @@ namespace McenterLite.Hardware.Windows
     {
         public WindowsHardware(DeviceDetection.DeviceIdentity identity)
         {
-            // Caps first: the provider needs the battery ceilings to derive the DC pair.
             Caps = new DeviceCaps
             {
                 Model = identity.DisplayName,
                 Supported = identity.IsClaw8Ex,
 
                 // Confirmed on device 2026-08-07 at four captured points, and these are the limits
-                // MSI's own UI offers.
+                // MSI's own UI offers - on AC and on battery alike; there is no lower ceiling
+                // unplugged, confirmed against MSI Center's own UI on 2026-08-11.
                 MinPl1 = 8,
                 MaxPl1 = 35,
                 MaxPl2 = 45,
                 Pl2MinOffset = 2,
-
-                // Battery ceilings. Below the AC limits on purpose: an 8-inch handheld running
-                // 35 W unplugged empties itself fast, and the firmware already keeps a separate
-                // DC pair, so this costs nothing to honour.
-                MaxPl1Dc = 25,
-                MaxPl2Dc = 30,
 
                 HasHwMouse = false,   // set below, once the provider has probed
 
@@ -49,7 +44,11 @@ namespace McenterLite.Hardware.Windows
                 HasIgcl = false,
             };
 
-            var tdp = new RegistryTdpProvider(Caps);
+            // Prefer the WMI path: it writes the EC directly and needs nothing from MSI Center M,
+            // not even that it be installed. Falls back to the registry mirror only if that ever
+            // stops being true on this firmware - see WmiTdpProvider's remarks.
+            var wmiTdp = new WmiTdpProvider();
+            ITdpProvider tdp = wmiTdp.Available ? wmiTdp : new RegistryTdpProvider();
             Caps.TdpBackend = (identity.IsClaw8Ex && tdp.Available)
                 ? tdp.Backend
                 : TdpBackendKind.Unavailable;

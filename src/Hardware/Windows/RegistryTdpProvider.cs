@@ -35,10 +35,10 @@ namespace McenterLite.Hardware.Windows
         private const string KeyPath =
             @"SOFTWARE\WOW6432Node\MSI\MSI Center M\Component\User Scenario";
 
-        // Four values, not two. Which pair is live depends on whether the charger is connected.
-        // MSI's own UI writes both identically; we do NOT - the DC pair is capped to the battery
-        // ceilings, so one user choice yields full power plugged in and a lower limit unplugged
-        // with nothing to remember to switch.
+        // Four values, not two. Which pair is live depends on whether the charger is connected, so
+        // both are written identically on every apply - confirmed there is no lower ceiling MSI
+        // itself enforces on battery, so there is nothing to derive the DC pair from beyond the
+        // AC one.
         private const string Pl1Ac = "ManualPL1AC";
         private const string Pl2Ac = "ManualPL2AC";
         private const string Pl1Dc = "ManualPL1DC";
@@ -63,12 +63,9 @@ namespace McenterLite.Hardware.Windows
         private static readonly (int Mode, int ShiftMode, int GamingEvent) AiEngineTriple = (5, 2, 2);
 
         private readonly string _unavailableReason;
-        private readonly DeviceCaps _caps;
 
-        public RegistryTdpProvider(DeviceCaps caps)
+        public RegistryTdpProvider()
         {
-            _caps = caps;
-
             using var key = OpenRead();
             if (key == null)
             {
@@ -120,11 +117,15 @@ namespace McenterLite.Hardware.Windows
         {
             if (!Available) return OpResult.Unavailable(_unavailableReason);
 
-            // The battery pair is the same choice under a lower ceiling. Derived here rather than
-            // asked of the user: a handheld that quietly draws less when unplugged is what people
-            // want, and a second slider they have to remember to move is not.
-            int dcPl1 = pl1, dcPl2 = pl2;
-            _caps?.ClampPowerLimitsForBattery(ref dcPl1, ref dcPl2);
+            // The widget no longer exposes MSI's Endurance/AI Engine/Manual picker - manual limits
+            // are the only behaviour this app models, so make sure MSI is in the one mode that
+            // honours them before writing. Silent on purpose: this is what the picker used to be
+            // for, and there is no control left for the user to do it with themselves.
+            if (TryReadMode(out var mode) && mode != PerfMode.UserScenario)
+            {
+                var modeResult = ApplyMode(PerfMode.UserScenario);
+                if (!modeResult.Ok) return modeResult;
+            }
 
             try
             {
@@ -138,8 +139,8 @@ namespace McenterLite.Hardware.Windows
 
                 key.SetValue(Pl1Ac, pl1, RegistryValueKind.DWord);
                 key.SetValue(Pl2Ac, pl2, RegistryValueKind.DWord);
-                key.SetValue(Pl1Dc, dcPl1, RegistryValueKind.DWord);
-                key.SetValue(Pl2Dc, dcPl2, RegistryValueKind.DWord);
+                key.SetValue(Pl1Dc, pl1, RegistryValueKind.DWord);
+                key.SetValue(Pl2Dc, pl2, RegistryValueKind.DWord);
             }
             catch (UnauthorizedAccessException)
             {
@@ -166,23 +167,11 @@ namespace McenterLite.Hardware.Windows
             // The battery pair is verified too. It is the one the user is least likely to notice
             // going wrong - nothing on screen reflects it until they unplug.
             if (TryReadDc(out var actualDcPl1, out var actualDcPl2)
-                && (actualDcPl1 != dcPl1 || actualDcPl2 != dcPl2))
+                && (actualDcPl1 != pl1 || actualDcPl2 != pl2))
             {
                 return OpResult.Fail(
-                    $"Battery power limits did not stick: asked for {dcPl1}/{dcPl2} W, "
+                    $"Battery power limits did not stick: asked for {pl1}/{pl2} W, "
                     + $"found {actualDcPl1}/{actualDcPl2} W.");
-            }
-
-            // Reported, not corrected. The mode is a control of its own (see ApplyMode), so the
-            // user can switch to it deliberately rather than having us do it behind a slider -
-            // which would also move settings unrelated to power, since mode changes affect
-            // lighting too.
-            if (TryReadMode(out var mode) && mode != PerfMode.UserScenario)
-            {
-                return OpResult.Fail(
-                    $"Saved {pl1}/{pl2} W, but MSI Center is in {Describe(mode)} mode and is managing "
-                    + $"power itself. Switch to {Describe(PerfMode.UserScenario)} for these limits "
-                    + "to take effect.");
             }
 
             return OpResult.Success();
@@ -280,17 +269,6 @@ namespace McenterLite.Hardware.Windows
 
             return OpResult.Success();
         }
-
-        // These strings reach the user, so they must match the widget's button labels. MSI's own
-        // name for UserScenario is "User Scenario"; the UI calls it "Manual", and an error telling
-        // someone to switch to a mode with no button of that name is a dead end.
-        private static string Describe(PerfMode mode) => mode switch
-        {
-            PerfMode.Endurance => "Endurance",
-            PerfMode.UserScenario => "Manual",
-            PerfMode.AiEngine => "AI Engine",
-            _ => "an unrecognised",
-        };
 
         // WOW6432Node is already in the path, so the 32-bit view must NOT be requested as well -
         // that would redirect to WOW6432Node\WOW6432Node and silently find nothing.

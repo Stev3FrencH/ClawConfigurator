@@ -73,9 +73,9 @@ namespace McenterLite.Widget
         /// </para>
         /// <para>
         /// <b>The index is NOT automatically the wire value.</b> It was, when every list happened
-        /// to be ordered like its enum, and two selectors now deliberately are not - see
-        /// <see cref="PerfModeSegmentOrder"/> and <see cref="IntelFpsTierSegmentOrder"/>. Those
-        /// pair label to value in one table so display order can be chosen for the user without
+        /// to be ordered like its enum, and one selector deliberately is not - see
+        /// <see cref="IntelFpsTierSegmentOrder"/>. That pairs label to value in one table so
+        /// display order can be chosen for the user without
         /// changing what gets sent. Where the two orders genuinely coincide the index is passed
         /// straight through, and that is stated at the call site.
         /// </para>
@@ -176,53 +176,18 @@ namespace McenterLite.Widget
         }
 
         /// <summary>
-        /// The perf-mode segments, left to right: what each one says and which
-        /// <see cref="PerfMode"/> it means.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// This exists so the buttons can be arranged for the USER without touching the wire
-        /// contract. They read Endurance → AI Engine → Manual, ordered by how much power the
-        /// device draws, which is not the order of <see cref="PerfMode"/>'s ordinals
-        /// (Endurance 0, UserScenario 1, AiEngine 2).
-        /// </para>
-        /// <para>
-        /// Every other selector in this widget casts its index straight to an enum, so reordering
-        /// one silently changes what the helper is told. This is the one control where display
-        /// order and wire value are decoupled, and this table is the only thing keeping them
-        /// honest - both directions go through it, never a cast.
-        /// </para>
-        /// <para>
-        /// Label and mode are paired in ONE table rather than two arrays kept in step, so
-        /// rearranging the buttons is a matter of moving whole rows and cannot desynchronise what
-        /// a button says from what it does.
-        /// </para>
-        /// <para>
-        /// "Manual" rather than MSI's "User Scenario": their name is meaningless out of context,
-        /// and the thing that matters about the mode is that it is the only one where the sliders
-        /// below do anything.
-        /// </para>
-        /// </remarks>
-        private static readonly (PerfMode Mode, string Label)[] PerfModeSegmentOrder =
-        {
-            (PerfMode.Endurance, "Endurance"),
-            (PerfMode.AiEngine, "AI Engine"),
-            (PerfMode.UserScenario, "Manual"),
-        };
-
-        /// <summary>
         /// The controller-mode segments, left to right: what each says and the wire value it means.
         /// </summary>
         /// <remarks>
         /// <para>
-        /// Same paired-table shape as <see cref="PerfModeSegmentOrder"/>, and for the same reason:
-        /// label and meaning move together, so rearranging the buttons cannot desynchronise what
-        /// one says from what it does.
+        /// Same paired-table shape as <see cref="IntelFpsTierSegmentOrder"/>, and for the same
+        /// reason: label and meaning move together, so rearranging the buttons cannot
+        /// desynchronise what one says from what it does.
         /// </para>
         /// <para>
         /// Gamepad sits first because it is the device's native state - the mode it boots in and
         /// the one the physical button returns to. Reading left to right then runs from "as the
-        /// device ships" to "overridden", matching how the perf-mode segments are ordered.
+        /// device ships" to "overridden".
         /// </para>
         /// </remarks>
         private static readonly (bool DesktopMode, string Label)[] HwMouseSegmentOrder =
@@ -266,7 +231,6 @@ namespace McenterLite.Widget
             (1, "60"),
         };
 
-        private SegmentedControl _perfMode;
         private SegmentedControl _hwMouse;
         private SegmentedControl _cpuBoost;
         private SegmentedControl _powerMode;
@@ -287,13 +251,6 @@ namespace McenterLite.Widget
 
             try
             {
-                // Labels come from the table, so they cannot drift out of step with the modes they
-                // stand for. Everywhere else in this file the index IS the wire value; this
-                // control is the one exception - see PerfModeSegmentOrder.
-                _perfMode = new SegmentedControl(PerfModeSegments,
-                    Array.ConvertAll(PerfModeSegmentOrder, segment => segment.Label));
-                _perfMode.Selected += OnPerfModeSelected;
-
                 _hwMouse = new SegmentedControl(HwMouseSegments,
                     Array.ConvertAll(HwMouseSegmentOrder, segment => segment.Label));
                 _hwMouse.Selected += OnHwMouseSelected;
@@ -315,6 +272,12 @@ namespace McenterLite.Widget
                 _intelLowLatency = new SegmentedControl(IntelLowLatencySegments,
                     "Off", "On", "On + boost");
                 _intelLowLatency.Selected += OnIntelLowLatencySelected;
+
+                // Created here rather than at the field, because a DispatcherTimer binds to the
+                // dispatcher of the thread that constructs it and this is the one place guaranteed
+                // to be the UI thread.
+                _limitWriteTimer = new DispatcherTimer { Interval = LimitWriteDelay };
+                _limitWriteTimer.Tick += (_, __) => FlushPendingLimits();
 
                 _connection.SnapshotApplied += OnSnapshotApplied;
                 _connection.ValueChanged += OnValueChanged;
@@ -364,6 +327,11 @@ namespace McenterLite.Widget
         protected override void OnNavigatedFrom(NavigationEventArgs e)
         {
             LayoutUpdated -= OnLayoutUpdated;
+
+            // The connection is disposed below, so a Tick arriving after this point would try to
+            // send over a dead pipe. Anything the user actually settled on was already flushed when
+            // the widget was hidden, which always precedes navigating away.
+            _limitWriteTimer?.Stop();
 
             if (_widget != null)
             {
@@ -450,6 +418,13 @@ namespace McenterLite.Widget
             try
             {
                 bool visible = sender.Visible;
+
+                // Being hidden ends the gesture. Without this, moving a slider and immediately
+                // dismissing the Game Bar would discard the change - the debounce would still be
+                // counting down when the widget went away, and nothing would ever send it.
+                if (!visible)
+                    await RunOnUiAsync(FlushPendingLimits);
+
                 await _connection.SetVisibleAsync(visible);
 
                 // Being shown again is the moment to put focus back - see ArmInitialFocus.
@@ -663,15 +638,13 @@ namespace McenterLite.Widget
             // and would otherwise be unreachable without a mouse.
             if (!_snapshotApplied && StatusActionButton.Visibility != Visibility.Visible) return;
 
-            // Top-down, so focus starts where the eye does. The mode segments come before the
-            // sliders they gate because they are the top control in the top card AND they are on
-            // screen whenever that card is, where the sliders are hidden outside Manual mode. The
-            // Windows power card is the only one never hidden, so its segments are the guaranteed
-            // fallback - every card above it collapses on an unsupported device.
+            // Top-down, so focus starts where the eye does. Pl1Slider is the top control in the
+            // top card whenever that card is shown - the sliders are no longer gated by a mode.
+            // The Windows power card is the only one never hidden, so its segments are the
+            // guaranteed fallback - every card above it collapses on an unsupported device.
             Control[] candidates =
             {
                 StatusActionButton,
-                _perfMode?.FirstSegment,
                 Pl1Slider,
                 _cpuBoost?.FirstSegment,
                 _powerMode?.FirstSegment,
@@ -767,7 +740,6 @@ namespace McenterLite.Widget
 
         private void ApplyAllValues()
         {
-            ApplyValue(Function.PerfMode);
             ApplyValue(Function.Pl1);
             ApplyValue(Function.Pl2);
             ApplyValue(Function.HwMouseMode);
@@ -775,21 +747,12 @@ namespace McenterLite.Widget
             ApplyValue(Function.OsPowerMode);
             ApplyValue(Function.IntelFpsTier);
             ApplyValue(Function.IntelLowLatency);
-            ApplyValue(Function.MsiCenterRunning);
         }
 
         private void ApplyValue(Function function)
         {
             switch (function)
             {
-                case Function.PerfMode:
-                {
-                    var mode = (PerfMode)_connection.GetInt(
-                        Function.PerfMode, (int)PerfMode.UserScenario);
-                    ApplyPerfMode(mode);
-                    break;
-                }
-
                 case Function.Pl1:
                     Pl1Slider.Value = _connection.GetInt(Function.Pl1, (int)Pl1Slider.Minimum);
                     Pl1ValueText.Text = $"{(int)Pl1Slider.Value} W";
@@ -835,56 +798,11 @@ namespace McenterLite.Widget
                     _intelLowLatency.Show(Clamp(_connection.GetInt(Function.IntelLowLatency, 0), 0, 2));
                     break;
 
-                case Function.MsiCenterRunning:
-                    // Inverted on purpose. MSI Center M is a dependency, not a rival: its service is
-                    // what applies the power limits we write. Warn when it is MISSING.
-                    MsiCenterWarning.Visibility = Visible(!_connection.GetBool(Function.MsiCenterRunning));
-                    break;
             }
         }
 
         // ── User input ──────────────────────────────────────────────────────────
         // Every handler starts with the same guard. See _applyingFromHelper.
-
-        /// <summary>
-        /// Paints the mode selector and shows or hides the sliders it gates.
-        /// </summary>
-        /// <remarks>
-        /// The sliders are HIDDEN outside Manual mode, not greyed. They were greyed at first, on
-        /// the argument that a disabled control next to the mode that disabled it explains itself
-        /// - but on an 8-inch screen it mostly read as clutter, and the three mode buttons sitting
-        /// directly above make "Manual is the one with sliders" obvious after a single press. The
-        /// card collapsing to a single row is also a clearer signal that MSI is driving power than
-        /// a paragraph of warning text was.
-        /// </remarks>
-        private void ApplyPerfMode(PerfMode mode)
-        {
-            bool manual = mode == PerfMode.UserScenario;
-
-            // Unknown is not on the control: MSI reported a mode we do not model, so leave the
-            // selection alone rather than misrepresenting it as one of the three we do.
-            int segment = Array.FindIndex(PerfModeSegmentOrder, s => s.Mode == mode);
-            if (segment >= 0)
-                _perfMode.Show(segment);
-
-            PowerLimitControls.Visibility = manual ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        private async void OnPerfModeSelected(int segment)
-        {
-            if (_applyingFromHelper) return;
-            if (segment < 0 || segment >= PerfModeSegmentOrder.Length) return;
-
-            _perfMode.Show(segment);
-            var mode = PerfModeSegmentOrder[segment].Mode;
-            ApplyPerfMode(mode);
-            await SendAsync(Function.PerfMode, (int)mode);
-
-            // A mode change moves more than the mode: the power limits MSI reports can change with
-            // it. Re-sync everything rather than guessing the blast radius of someone else's state
-            // machine.
-            await _connection.RefreshAsync();
-        }
 
         /// <summary>
         /// Guards the moment one power slider moves the other.
@@ -897,7 +815,32 @@ namespace McenterLite.Widget
         /// </remarks>
         private bool _syncingLimits;
 
-        private async void Pl1Slider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+        /// <summary>
+        /// How long the sliders must sit still before their value is written to the hardware.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>This exists to protect the embedded controller.</b> A XAML Slider raises ValueChanged
+        /// for every step it passes through, so dragging PL1 from 35 W to 8 W once produced
+        /// twenty-seven write pairs - fifty-four ACPI-WMI calls - as fast as the UI thread could
+        /// dispatch them, every one of them a real write to the EC. The helper was observed dying
+        /// mid-write under exactly that load.
+        /// </para>
+        /// <para>
+        /// Every intermediate value is also worthless: nobody dragging to 8 W wants a moment at
+        /// 34 W. Only the value the user settles on means anything, so only that one is sent.
+        /// </para>
+        /// </remarks>
+        private static readonly TimeSpan LimitWriteDelay = TimeSpan.FromSeconds(1);
+
+        private DispatcherTimer _limitWriteTimer;
+
+        // -1 means "nothing waiting to be written". A sentinel rather than a bool because the pair
+        // and the flag would otherwise have to be kept in step by hand.
+        private int _pendingPl1 = -1;
+        private int _pendingPl2 = -1;
+
+        private void Pl1Slider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
             if (_applyingFromHelper || _syncingLimits) return;
 
@@ -907,10 +850,10 @@ namespace McenterLite.Widget
             int pl2 = (int)Pl2Slider.Value;
             _connection.Caps.ConstrainFromPl1(ref pl1, ref pl2);
 
-            await ApplyLimitPairAsync(pl1, pl2);
+            QueueLimitPair(pl1, pl2);
         }
 
-        private async void Pl2Slider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+        private void Pl2Slider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
             if (_applyingFromHelper || _syncingLimits) return;
 
@@ -918,7 +861,7 @@ namespace McenterLite.Widget
             int pl2 = (int)e.NewValue;
             _connection.Caps.ConstrainFromPl2(ref pl1, ref pl2);
 
-            await ApplyLimitPairAsync(pl1, pl2);
+            QueueLimitPair(pl1, pl2);
         }
 
         /// <summary>
@@ -933,7 +876,22 @@ namespace McenterLite.Widget
         /// PL1 goes first: the helper clamps PL2 to at least PL1 + the firmware headroom, so
         /// raising PL1 before PL2 never transits through a pair that gets clamped and echoed back.
         /// </remarks>
-        private async Task ApplyLimitPairAsync(int pl1, int pl2)
+        private void QueueLimitPair(int pl1, int pl2)
+        {
+            ShowLimitPair(pl1, pl2);
+
+            _pendingPl1 = pl1;
+            _pendingPl2 = pl2;
+
+            // Restart, not start. Each further movement pushes the deadline out again, so the write
+            // happens once the slider has been still for the whole interval rather than once per
+            // step of the drag.
+            _limitWriteTimer.Stop();
+            _limitWriteTimer.Start();
+        }
+
+        /// <summary>Paints a pair without sending it. Never counts as user input.</summary>
+        private void ShowLimitPair(int pl1, int pl2)
         {
             _syncingLimits = true;
             try
@@ -947,6 +905,41 @@ namespace McenterLite.Widget
             {
                 _syncingLimits = false;
             }
+        }
+
+        /// <summary>
+        /// Sends the pair the user settled on, if one is waiting.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Both halves are always sent, whichever slider was touched. Most gestures move only one
+        /// limit, but one CAN still move both - raising PL1 into PL2 carries PL2 up with it - and
+        /// sending only the moved one would leave the helper holding a pair the widget is no longer
+        /// showing.
+        /// </para>
+        /// <para>
+        /// PL1 goes first: the helper clamps PL2 to at least PL1 + the firmware headroom, so raising
+        /// PL1 before PL2 never transits through a pair that gets clamped and echoed back.
+        /// </para>
+        /// <para>
+        /// <c>async void</c> deliberately - this is an event-handler-shaped operation, reached from
+        /// the timer's Tick and from the widget being hidden, neither of which can await.
+        /// </para>
+        /// </remarks>
+        private async void FlushPendingLimits()
+        {
+            _limitWriteTimer.Stop();
+
+            if (_pendingPl1 < 0) return;
+
+            int pl1 = _pendingPl1;
+            int pl2 = _pendingPl2;
+
+            // Cleared BEFORE awaiting, so a second flush arriving mid-send cannot resend the same
+            // pair - the hardware write is the expensive half and this whole mechanism exists to
+            // issue fewer of them.
+            _pendingPl1 = -1;
+            _pendingPl2 = -1;
 
             await SendAsync(Function.Pl1, pl1);
             await SendAsync(Function.Pl2, pl2);
@@ -1012,6 +1005,15 @@ namespace McenterLite.Widget
                 ShowStatus(error, showRetry: false);
                 return;
             }
+
+            // A reply is proof the helper is reachable, so any notice still on screen is stale.
+            //
+            // Load-bearing, because nothing else lowers that banner. It was only ever raised, so a
+            // single transient failure - the helper missing its window while the CPU is pinned,
+            // which is exactly what happens while testing a power limit - left the widget reading
+            // "the helper did not respond" permanently, over controls that had already gone back to
+            // working. The stale warning is worse than the momentary failure it describes.
+            HideStatus();
 
             // Re-read from the cache, which now holds the helper's reply. A clamped or refused
             // value snaps the control back to what the hardware actually holds instead of leaving

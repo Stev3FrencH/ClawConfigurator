@@ -193,13 +193,24 @@ namespace McenterLite.Helper
             _hw.Caps.ClampPowerLimits(ref pl1, ref pl2);
 
             var result = _hw.Tdp.Apply(pl1, pl2);
-            if (!result.Ok) return PipeEnvelope.Failure(request.Id, request.Fn, result.Error);
+            if (!result.Ok)
+            {
+                Log.Warn($"TDP write FAILED: asked {pl1}/{pl2} W via {_hw.Tdp.Backend} - {result.Error}");
+                return PipeEnvelope.Failure(request.Id, request.Fn, result.Error);
+            }
 
             _settings.SetInt(SettingsKeys.Pl1, pl1);
             _settings.SetInt(SettingsKeys.Pl2, pl2);
 
             // Report what the hardware ended up at, which may not be what was asked for.
             _hw.Tdp.TryRead(out int actualPl1, out int actualPl2);
+
+            // Logged on SUCCESS too, not just failure. Log.cs states this file exists for exactly
+            // this - "what did we send and what came back" on a hardware write - and TDP was the
+            // one write that recorded nothing at all, so a slider that appeared not to work left
+            // behind no evidence of whether the value even reached the helper.
+            Log.Info($"TDP {request.Fn} -> {pl1}/{pl2} W via {_hw.Tdp.Backend}; hardware reports {actualPl1}/{actualPl2} W.");
+
             return Ok(request, PipeEnvelope.FromInt(request.Fn == Function.Pl1 ? actualPl1 : actualPl2));
         }
 

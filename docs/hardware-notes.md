@@ -210,19 +210,14 @@ the one the user asked for:
 re-applies the same invariant through `ClampPowerLimits` on every write, since the widget's copy
 is a UX affordance and the helper is the boundary that actually has to hold.
 
-**AC and DC deliberately diverge.** The firmware keeps a separate DC pair, so the battery limit is
-free to honour, and an 8-inch handheld running 35 W unplugged empties itself fast. The user's
-single choice is written to the AC pair as-is and to the DC pair under a lower ceiling —
-**25 W PL1 / 30 W PL2** (`DeviceCaps.MaxPl1Dc` / `MaxPl2Dc`). No second control, nothing to
-remember to switch when the charger comes out.
-
-The DC pair **carries the gap down** rather than capping the two limits independently, so a
-minimum-gap 35/37 becomes 25/27 — the same relationship at a lower ceiling — where independent capping
-would give 25/30 and hand the user boost headroom they never asked for. A deliberately widened
-pair keeps its gap until the PL2 ceiling takes it (35/45 → 25/30). The result then goes through
-the same clamp, so the headroom rule holds on battery too. Both pairs are read back and verified
-after the write; the battery pair especially, since nothing on screen reflects it until the
-charger is unplugged.
+**AC and DC no longer diverge (changed 2026-08-11).** This app used to write a lower ceiling to the
+DC pair — 25 W PL1 / 30 W PL2 — on the theory that an 8-inch handheld running 35 W unplugged
+empties itself fast. Confirmed on device that this was never a firmware limit: MSI Center's own UI
+offers the same PL1/PL2 range on battery as on AC, and `WmiTdpProvider` (the preferred TDP
+backend, see the "Confirmed 2026-08-11" section above) writes a single EC register with no AC/DC
+distinction at all. `RegistryTdpProvider`, now only a fallback, writes the same value to both the
+AC and DC registry pairs rather than deriving a lower one — there is nothing left to derive.
+`DeviceCaps.MaxPl1Dc`/`MaxPl2Dc` and `ClampPowerLimitsForBattery` were removed with it.
 
 ### Fan — the EX model is not the model we implemented
 

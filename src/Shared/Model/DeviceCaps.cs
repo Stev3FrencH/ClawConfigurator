@@ -28,27 +28,6 @@ namespace McenterLite.Shared.Model
         public int MaxPl1 { get; set; } = 30;
         public int MaxPl2 { get; set; } = 37;
 
-        /// <summary>
-        /// Power-limit ceilings applied while running on battery.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// MSI stores four values - <c>ManualPL1AC</c>, <c>ManualPL2AC</c>, <c>ManualPL1DC</c> and
-        /// <c>ManualPL2DC</c> - so the firmware already supports a different limit on battery. This
-        /// is a CEILING on the user's single choice, not a second setting: pick 35 W and the device
-        /// runs 35 W plugged in and <see cref="MaxPl1Dc"/> unplugged, with no second control and
-        /// nothing to remember to change.
-        /// </para>
-        /// <para>
-        /// A ceiling above <see cref="MaxPl1"/> is meaningless and is treated as absent - the DC
-        /// limit can only ever be the same or lower than the AC one.
-        /// </para>
-        /// </remarks>
-        public int MaxPl1Dc { get; set; } = 25;
-
-        /// <summary>Battery ceiling for PL2. See <see cref="MaxPl1Dc"/>.</summary>
-        public int MaxPl2Dc { get; set; } = 30;
-
         /// <summary>Minimum PL2-over-PL1 headroom the platform enforces. 2 on the Claw 8 EX.</summary>
         public int Pl2MinOffset { get; set; } = 1;
 
@@ -69,8 +48,6 @@ namespace McenterLite.Shared.Model
             Append(sb, "minPl1", MinPl1);
             Append(sb, "maxPl1", MaxPl1);
             Append(sb, "maxPl2", MaxPl2);
-            Append(sb, "maxPl1Dc", MaxPl1Dc);
-            Append(sb, "maxPl2Dc", MaxPl2Dc);
             Append(sb, "pl2Off", Pl2MinOffset);
             Append(sb, "tdpBackend", (int)TdpBackend);
             Append(sb, "hwMouse", HasHwMouse ? "1" : "0");
@@ -99,8 +76,6 @@ namespace McenterLite.Shared.Model
                     case "minPl1": caps.MinPl1 = ToInt(value, caps.MinPl1); break;
                     case "maxPl1": caps.MaxPl1 = ToInt(value, caps.MaxPl1); break;
                     case "maxPl2": caps.MaxPl2 = ToInt(value, caps.MaxPl2); break;
-                    case "maxPl1Dc": caps.MaxPl1Dc = ToInt(value, caps.MaxPl1Dc); break;
-                    case "maxPl2Dc": caps.MaxPl2Dc = ToInt(value, caps.MaxPl2Dc); break;
                     case "pl2Off": caps.Pl2MinOffset = ToInt(value, caps.Pl2MinOffset); break;
                     case "tdpBackend":
                         var backend = ToInt(value, (int)Ipc.TdpBackendKind.Unavailable);
@@ -108,8 +83,9 @@ namespace McenterLite.Shared.Model
                             ? (Ipc.TdpBackendKind)backend
                             : Ipc.TdpBackendKind.Unavailable;
                         break;
-                    // "charge", "led", "fan" and "dutyFloor" retired with their features. An older
-                    // helper may still send them, and unknown keys fall through harmlessly.
+                    // "charge", "led", "fan", "dutyFloor", "maxPl1Dc" and "maxPl2Dc" retired with
+                    // their features. An older helper may still send them, and unknown keys fall
+                    // through harmlessly.
                     case "hwMouse": caps.HasHwMouse = value == "1"; break;
                     case "igcl": caps.HasIgcl = value == "1"; break;
                     // Unknown keys are ignored on purpose - forward compatibility.
@@ -126,37 +102,6 @@ namespace McenterLite.Shared.Model
         /// </summary>
         public void ClampPowerLimits(ref int pl1, ref int pl2) =>
             Clamp(ref pl1, ref pl2, MaxPl1, MaxPl2);
-
-        /// <summary>
-        /// Clamps a pair to the battery ceilings, for the <c>ManualPL*DC</c> values.
-        /// </summary>
-        /// <remarks>
-        /// Runs the same clamp with lower ceilings rather than a bare <c>Math.Min</c>, so the
-        /// PL2-over-PL1 headroom rule is re-satisfied after capping. Capping the two independently
-        /// could otherwise produce a DC pair the firmware rejects.
-        /// </remarks>
-        public void ClampPowerLimitsForBattery(ref int pl1, ref int pl2)
-        {
-            // A DC ceiling above the AC one is meaningless; treat it as absent rather than
-            // letting a bad capability value raise the limit on battery.
-            int maxPl1 = Math.Min(MaxPl1Dc, MaxPl1);
-            int maxPl2 = Math.Min(MaxPl2Dc, MaxPl2);
-
-            // Carry the GAP down rather than capping the two independently. A coupled 35/37 pair
-            // becomes 25/27 on battery - the same relationship at a lower ceiling - where capping
-            // separately would give 25/30 and silently hand the user boost headroom they never
-            // asked for. A deliberately widened pair keeps its gap until the PL2 ceiling takes it.
-            int gap = pl2 - pl1;
-            if (gap < Pl2MinOffset) gap = Pl2MinOffset;
-
-            if (pl1 > maxPl1) pl1 = maxPl1;
-            if (pl1 < MinPl1) pl1 = MinPl1;
-
-            pl2 = pl1 + gap;
-            if (pl2 > maxPl2) pl2 = maxPl2;
-
-            Clamp(ref pl1, ref pl2, maxPl1, maxPl2);
-        }
 
         /// <summary>
         /// Recomputes the pair after the user moved the <b>PL1</b> slider.
