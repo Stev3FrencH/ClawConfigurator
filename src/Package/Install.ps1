@@ -160,10 +160,52 @@ if (Test-Path $dependencyDirectory) {
 
 # -ForceUpdateFromAnyVersion permits downgrades, which matters when bisecting a regression on the
 # device. -ForceApplicationShutdown closes anything still holding the old package.
-if ($dependencyPaths) {
-    Add-AppxPackage -Path $PackagePath -DependencyPath $dependencyPaths -ForceApplicationShutdown -ForceUpdateFromAnyVersion
-} else {
-    Add-AppxPackage -Path $PackagePath -ForceApplicationShutdown -ForceUpdateFromAnyVersion
+function Install-Package {
+    if ($dependencyPaths) {
+        Add-AppxPackage -Path $PackagePath -DependencyPath $dependencyPaths -ForceApplicationShutdown -ForceUpdateFromAnyVersion
+    } else {
+        Add-AppxPackage -Path $PackagePath -ForceApplicationShutdown -ForceUpdateFromAnyVersion
+    }
+}
+
+try {
+    Install-Package
+}
+catch [Exception] {
+    # 0x80073CFB: same identity AND same version, different contents. Nothing in this repo bumps
+    # the manifest version between dev builds, so every rebuild-and-reinstall lands here - and
+    # -ForceUpdateFromAnyVersion does NOT cover it, because that governs which VERSIONS may replace
+    # each other, not the case where the version did not move at all. The only way through is to
+    # remove the installed package first.
+    if ($_.Exception.Message -notmatch '0x80073CFB') { throw }
+
+    Write-Host "  same version already installed with different contents; replacing it" -ForegroundColor Yellow
+
+    $installed = Get-AppxPackage -Name 'McenterLite' | Select-Object -First 1
+    if (-not $installed) { throw }
+
+    # Removing the package deletes its LocalCache, and the helper's settings.json lives there -
+    # including the Original_* values captured before this app first touched the hardware. Those
+    # are what a real uninstall replays to put the device back, so losing them to a routine dev
+    # reinstall would silently strand the machine on whatever limits were last set.
+    $settings = Join-Path $env:LOCALAPPDATA "Packages\$($installed.PackageFamilyName)\LocalCache\McenterLite\settings.json"
+    $preserved = $null
+    if (Test-Path $settings) {
+        $preserved = Join-Path $env:TEMP 'McenterLite.settings.preserved.json'
+        Copy-Item $settings $preserved -Force
+        Write-Host "  preserved settings.json (captured original values)" -ForegroundColor DarkGray
+    }
+
+    Remove-AppxPackage -Package $installed.PackageFullName
+    Install-Package
+
+    if ($preserved) {
+        $restoreTo = Join-Path $env:LOCALAPPDATA "Packages\$($installed.PackageFamilyName)\LocalCache\McenterLite"
+        New-Item -ItemType Directory -Path $restoreTo -Force | Out-Null
+        Copy-Item $preserved (Join-Path $restoreTo 'settings.json') -Force
+        Remove-Item $preserved -Force -ErrorAction SilentlyContinue
+        Write-Host "  restored settings.json" -ForegroundColor DarkGray
+    }
 }
 
 Write-Host ""

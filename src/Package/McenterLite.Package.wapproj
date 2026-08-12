@@ -75,7 +75,7 @@
       builds but won't install. Regenerate via New-SelfSignedCertificate if this thumbprint
       goes stale (e.g. a fresh machine); see docs/building-the-widget.md step 6.
     -->
-    <PackageCertificateThumbprint>8CFCFF08075ED1AC7F67877DFF2FF769750832E7</PackageCertificateThumbprint>
+    <PackageCertificateThumbprint>B1A696115DB9CA9B6F952306F266667DEAE1656A</PackageCertificateThumbprint>
     <NoWarn>$(NoWarn);NU1702</NoWarn>
     <EntryPointProjectUniqueName>..\Widget\McenterLite.Widget.csproj</EntryPointProjectUniqueName>
   </PropertyGroup>
@@ -94,14 +94,21 @@
     <Content Include="Assets\SplashScreen.png" />
   </ItemGroup>
 
-  <ItemGroup>
-    <!--
-      Published self contained from src/Helper by the PublishHelper target below. Must land at
-      Helper\McenterLite.Helper.exe to match the Executable path declared in
-      Package.appxmanifest's windows.fullTrustProcess extension.
-    -->
-    <Content Include="Helper\McenterLite.Helper.exe" />
-  </ItemGroup>
+  <!--
+    The published helper is added to the package by AddPublishedHelperToPackage below, NOT by a
+    static Content item here.
+
+    This used to be a single <Content Include="Helper\McenterLite.Helper.exe" />, and it shipped a
+    package containing exactly that one file out of the 196 a self-contained publish produces. The
+    apphost cannot start without hostfxr, hostpolicy and coreclr beside it, so the helper died
+    before any managed code ran - which means before Log.Initialize, so it left no log and no data
+    directory either. From outside it looked identical to the widget simply never launching it: no
+    UAC prompt, no error, and a widget stuck on "could not reach the helper" forever.
+
+    It cannot be a static glob. The Helper folder does not exist on a clean checkout, and MSBuild
+    expands item globs at project-evaluation time - before any target has run - so the glob would
+    match nothing and silently produce the same one-file package minus the exe.
+  -->
 
   <Import Project="$(WapProjPath)\Microsoft.DesktopBridge.targets" />
 
@@ -136,6 +143,32 @@
 
     <Error Condition="!Exists('$(HelperOutput)\McenterLite.Helper.exe')"
            Text="The helper did not publish to $(HelperOutput). The package would ship without it." />
+
+    <!--
+      Self-contained means the runtime ships beside the exe. If this is missing the publish was
+      framework-dependent, and the packaged helper would fail to start on a machine with no .NET -
+      which is every target device. Checked because the failure is silent: the apphost dies before
+      it can log anything.
+    -->
+    <Error Condition="!Exists('$(HelperOutput)\hostfxr.dll')"
+           Text="The helper published WITHOUT the .NET runtime (no hostfxr.dll in $(HelperOutput)). It would not start on a device with no .NET installed." />
+  </Target>
+
+  <!--
+    Package every file the publish produced, not just the executable. Runs after PublishHelper so
+    the folder exists by the time the glob is expanded - see the comment above the ItemGroup that
+    used to do this statically.
+
+    Include is relative to this project's directory, so each file's path inside the package mirrors
+    its path on disk and the exe lands at Helper\McenterLite.Helper.exe, matching the Executable
+    attribute of Package.appxmanifest's windows.fullTrustProcess extension.
+  -->
+  <Target Name="AddPublishedHelperToPackage" AfterTargets="PublishHelper">
+    <ItemGroup>
+      <Content Include="Helper\**\*.*" />
+    </ItemGroup>
+
+    <Message Importance="high" Text="Packaging @(Content->Count()) content files (helper publish included)." />
   </Target>
 
   <ItemGroup>
