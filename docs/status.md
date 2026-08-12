@@ -1,244 +1,221 @@
-# Status — 2026-08-10
+# Status — 2026-08-12
 
-A snapshot for picking this back up: what's built, what's confirmed on the real Claw, what's
-broken, and exactly what to run next. See [`hardware-notes.md`](hardware-notes.md) for the full
-gate-by-gate detail.
+A snapshot for picking this back up: what's built, what's confirmed on the real Claw, and exactly
+what to do next. See [`hardware-notes.md`](hardware-notes.md) for gate-by-gate detail, and its
+[What's next](hardware-notes.md#whats-next--fan-charge-limit-and-rgb) section for the technical
+notes behind the roadmap below.
+
+## The headline
+
+**The MSI Center M dependency is nearly gone.** Both hardware features that shipped now talk to the
+firmware directly and need MSI Center M neither running nor installed:
+
+- **Power limits** via `MSI_ACPI.Set_SlaveBattery` (ACPI-WMI), merged 2026-08-11.
+- **Controller mode** via the controller's vendor HID channel, merged 2026-08-12.
+
+Everything remaining is either the three features that were descoped and are now coming back, or
+cleanup that waits on MSI Center M actually being uninstalled.
 
 ## Current build
 
-**0.2.0.0, Release configuration.** First release build — the baseline for Intel/G6 work.
-
-```
-src/Package/AppPackages/McenterLite.Package_0.2.0.0_Test/
-```
-
-Install from the repo, in any PowerShell — the script elevates and re-launches under 5.1 itself:
+**0.2.0.5, Debug.** Installed and verified on the Claw 2026-08-12.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\src\Package\Install.ps1
 ```
 
-It picks the newest package under `src/Package/AppPackages/` on its own.
+It picks the newest package under `src/Package/AppPackages/` on its own and elevates itself.
 
-To see the whole UI on a machine that is not a Claw (the device gate otherwise hides every
-hardware card):
+To see the whole UI on a machine that is not a Claw:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\Diagnostics\Start-FakeHelper.ps1
 ```
 
+> **The manifest version must be bumped BY HAND** in `src/Package/Package.appxmanifest` before every
+> rebuild. Nothing auto-increments it, and installing two different builds under the same version
+> fails with `0x80073CFB`. Both documented MSBuild overrides
+> (`AppxManifestPackageVersion`, `AppxManifestPackageVersionRevision`) were tried and **neither is
+> honoured by this project template** — do not retry them without new evidence.
+
 ## Confirmed working on the Claw
 
-Verified on device **2026-08-10**, against the current UI rather than an earlier layout.
-
-- **Power limits** — sliders apply, the mode selector gates them, and the two limits move
-  independently under the `PL2 ≥ PL1 + 2` rule.
-- **Windows power** — CPU Boost (Off / On) and OS Power Mode (Efficiency / Balanced / Performance),
-  including AC↔DC sync and reflecting changes made from Windows Settings or the taskbar flyout.
-- **Controller mode (G5)** — switching between Gamepad and Desktop works in both directions from
-  the widget. The physical MSI button does not sync back; see the limitation below.
-- **Gamepad navigation** — confirmed on device 2026-08-10 after the proxyStub fix, in compact mode.
-  Focus stays where the user put it; the `VisibleChanged` focus-steal hazard did not materialise.
+| Feature | Path | Verified |
+|---|---|---|
+| Power limits (PL1/PL2) | `MSI_ACPI.Set_SlaveBattery` | 2026-08-11, against sustained-clock oracle |
+| Controller mode | vendor HID `0x24`/`0x26`/`0x27` | 2026-08-12, both directions + physical button |
+| CPU Boost | documented Win32 | 2026-08-10 |
+| OS Power Mode | documented Win32 | 2026-08-10 |
+| Gamepad navigation | — | 2026-08-10, compact mode |
 
 The Graphics card does not appear on the Claw and is not expected to: `HasIgcl` is hard-coded false
 until G6 is implemented. It is only visible under `--fake-hardware`.
 
-### Known limitation: the physical MSI button does not sync
+### The physical MSI button now syncs — resolved
 
-**Measured on the Claw 2026-08-10.** Widget → hardware works in both directions and stays in sync.
-Hardware → widget does not: pressing the physical MSI button changes the mode and the widget's
-buttons do not follow. Using only the widget keeps everything consistent.
+Earlier versions of this file described this as an accepted limitation. **It is fixed.** The
+firmware owns the button and announces every change on HID input report `0x27`; the helper reads
+the live device rather than MSI Center M's registry mirror, so the widget follows the button.
 
-The helper is not the problem — `Program.RunTelemetryLoopAsync` already pushes `HwMouseMode` once a
-second whenever the pipe is connected and the widget is visible. The open question is whether
-`OsdEditor\ControlModeUserSet` reflects the button at all, and `hardware-notes.md` gate G5 has
-always listed that as unknown.
+The old diagnosis was close but aimed at the wrong layer: the registry value *does* track the
+button, but only because MSI Center M watches the hardware and writes it — and it lags about a
+second doing so. `Diagnostics/Watch-ControlMode.ps1` is kept as a record of how that was chased;
+`Diagnostics/Test-ControllerModeStandalone.ps1` is the one to use now.
 
-**Accepted for now, not being chased.** Using the widget alone is consistent, which is the normal
-case. `Diagnostics/Watch-ControlMode.ps1` is there for whenever it is worth settling: it polls the
-value at 4 Hz and prints every change, and the two outcomes distinguish the causes cleanly —
+## Next up
 
-- **No change when the button is pressed** → the registry is a software-write mirror, not live
-  device state. MSI Center writes it when something asks *it* to change mode; the button talks to
-  firmware directly. Polling cannot fix that, and reading the true state needs the vendor HID
-  channel (opcode `0x04`), which is undecoded. Document the limitation rather than chase it.
-- **It does change** → the fault is ours, most likely the `WidgetVisible` gate on the telemetry
-  loop: Game Bar toggles `Visible` every two to three seconds in compact mode and the loop skips a
-  tick whenever it is false.
+Three features return, in this order. **The gating question for all three is the same: can it be
+driven with MSI Center M absent?** Settle that first in each case — it changed the design of both
+features shipped so far.
 
-Switch mode from the widget during the same run as a control — that path is known to work, so it
-proves the watch itself is functioning.
+### 1. Battery charge limit (G3) — start here
 
-### Still unverified
+Highest confidence and smallest surface. The discovery is already done: `MSI_ACPI.Get_AP` /
+`Set_AP`, sub-function 0, byte 5, encoded `percent | 0x80`, measured against MSI Center's own
+100/80/60 settings.
 
-**The premise of the whole feature:** that desktop mode still works on the UAC secure desktop. That
-is why the firmware route matters over software cursor injection. Trigger any elevation prompt and
-try to move the cursor.
+**But only the read was measured — `Set_AP` has never been written.** That is the first
+experiment. Same transport as TDP, so no new mechanism, and `--acpi-get Get_AP` already reads it.
+
+Firmware accepts **20–100**; the old widget offered 60–100, which was a scope choice rather than a
+hardware limit. Decide deliberately which to ship.
+
+### 2. RGB LED (G4)
+
+**Much closer than the G4 section suggests.** That section still says report `0x0F` is unverified
+and unstarted; G5 has since proven it, established its framing, and shipped `MsiVendorHidChannel`,
+which speaks it. Finding and opening the channel — most of the work — is done.
+
+The concrete lead: with MSI Center M restarting, the controller emits a long multi-frame `0x05`
+dump whose payload is full of plausible RGB triples (`FF 00 00`, `FF A0 00`, `C8 C8 FF`) alongside
+per-zone records. **Capture that dump while changing one colour in MSI Center M, diff it, and that
+is very likely the whole gate.** `--hid-watch` already records it.
+
+### 3. Fan control (G2) — hardest, do last
+
+The only one of the three that would write the embedded controller, and the only one blocked on a
+real contradiction rather than unfinished work: MSI's curve on this device is **six** points, while
+the model implemented here is a five-point 8-byte table taken from a **different machine** (the
+Lunar Lake A2VM). Duty scales were never reconciled.
+
+Start read-only: `MSI_ACPI.Get_Fan` diffed against MSI Center's six-point curve answers the layout
+question without writing anything. Note also that Intel's thermal stack (`ipfsvc`) is an
+independent fan actor here, so "our table is correct" and "the fan behaves" are separate claims.
+
+## Cleanup waiting on the uninstall
+
+- **`RegistryTdpProvider` and `RegistryHwMouseProvider`** are both inert and both provably weaker
+  than the firmware paths that replaced them. Delete once MSI Center M is uninstalled and both
+  firmware paths are confirmed without it. That is also what finally removes `PerfMode`,
+  `TdpBackendKind.RegistryMirror` and `IsMsiCenterRunning`.
+- **Automate the package version bump.** Worth doing *before* three features' worth of install
+  cycles.
+
+## Still unverified
+
+- **That `MSI_ACPI` survives an actual MSI Center M uninstall.** Everything so far was proven with
+  its stack *stopped*, which is not the same thing. **This is the assumption the entire plan rests
+  on**, and the cheapest way to settle it is to uninstall MSI Center M on a spare image, or accept
+  the risk and keep the registry fallbacks until the real uninstall happens.
+- **That desktop mode works on the UAC secure desktop.** This is the whole premise of the firmware
+  route over software cursor injection, and it has never been tested. Trigger any elevation prompt
+  and try to move the cursor.
+- **Uninstall/restore flow**, never tested end-to-end. Lower stakes than it sounds while MSI Center
+  M is still installed, but that changes when it is not: once MSI Center M is gone, this app is the
+  only way back to a default. Controller mode is deliberately never restored — the physical button
+  owns that state as much as we do.
 
 ## Widget placement in the Game Bar — answered
 
-**Measured on the Claw 2026-08-10** with `Diagnostics/Get-GameBarWidgets.ps1`; raw output kept as
+**Measured 2026-08-10** with `Diagnostics/Get-GameBarWidgets.ps1`; raw output in
 `Diagnostics/widget-export.txt`.
 
-Where we land: **left of everything except MSI Quick Settings, Home and Settings.** MSI takes the
-far-left slot with the visual divider.
+We land **left of everything except MSI Quick Settings, Home and Settings.** MSI takes the far-left
+slot with the visual divider, and **there is no manifest property we are missing** — MSI declares
+exactly the placement set we do (`IsDeviceWidget`, `HomeMenuVisible`, `FavoriteAfterInstall`,
+`ActivateAfterInstall`). Notably MSI does *not* declare `CompactModePriorityPlacement`, which had
+been added here on the theory that it was the mechanism; it was removed rather than left in on a
+guess.
 
-**There is no manifest property we are missing.** MSI declares exactly the placement set we do:
+`IsDeviceWidget` is the divider slot, there is evidently only one of it, and MSI wins. The tiebreak
+is not reachable from our manifest, so **the way to take that slot is to remove MSI Quick
+Settings** — which is the plan anyway. Ruled out along the way: Game Bar carries no OEM allowlist.
 
-```
-IsDeviceWidget=true   HomeMenuVisible=true   FavoriteAfterInstall=true   ActivateAfterInstall=true
-```
-
-Notably MSI does **not** declare `CompactModePriorityPlacement`, which had been added here on the
-theory that it was the mechanism. It is a real property — it appears in `GameBar.exe`'s
-manifest-parser string table beside the others — but the widget that actually wins the slot does
-not use it, so it is not the answer. **Removed rather than left in on a guess.**
-
-`IsDeviceWidget` is the divider slot, there is evidently only **one** of it, and MSI wins. This
-settles a question the manifest had carried as unverified since it was written. The tiebreak is not
-reachable from our manifest, so **the way to take that slot is to remove MSI Quick Settings**, which
-is the plan anyway.
-
-Ruled out along the way: Game Bar does **not** carry an OEM allowlist. No MSI or ASUS package
-identity appears anywhere in its binaries. (`Armoury` does appear in `GameBar.exe`, but in the
-game-launcher tile list beside Steam, Epic, GOG and Alienware Command Center — unrelated to
-widgets.)
-
-The full property set Game Bar's parser understands, for future reference:
+Full property set Game Bar's parser understands, for reference:
 
 ```
 ActivateAfterInstall   CompactModePriorityPlacement   FavoriteAfterInstall   HomeMenuVisible
 IsDeviceWidget         PinningSupported               SettingsSupported      Window/Size/ResizeSupported
 ```
 
-## Removed features
+## Gamepad navigation — fixed 2026-08-10
 
-All three removed 2026-08-08, for the same reason: MSI Center already does them, and does them
-better than this widget could. Narrowing scope, not abandoning work.
+**The root cause was a missing manifest entry, not widget code.** The Game Bar SDK documents a
+package-level `windows.activatableClass.proxyStub` extension as a required step for every widget,
+registering Metadata Based Marshaling for Game Bar's private COM interfaces. This project omitted
+it from the start, with a manifest comment claiming it was needed only for programmatic widget-bar
+navigation — **our own inference, and wrong.**
 
-**Fan presets.** Gate G2 never resolved the byte layout — the six-point curve MSI ships could not
-be reconciled with the five-point model the desk research described — so nothing was ever written
-to the EC. `Function` ordinals 20–23 are retired, along with 81 (`IntelThermalCmd`), which existed
-only to stop Intel's thermal stack latching the fan above an EC table we no longer write.
-
-**Battery charge limit.** Set in MSI Center, changes rarely, and the registry path this app could
-reach did not enforce it. `Function` ordinals 30 and 31 are retired.
-
-**RGB LED.** Mode, colour and effect ride a vendor HID report that was never decoded (Gate G4), so
-the most this widget could offer was an on/off toggle sitting next to MSI Center's far richer
-control. `Function` ordinal 40 is retired.
-
-All findings are kept in [`hardware-notes.md`](hardware-notes.md) as a device record rather than
-deleted — the charge limit in particular was eventually traced to `MSI_ACPI.Get_AP` / `Set_AP`,
-sub-function 0, byte 5, encoded `percent | 0x80`, which took several rounds of on-device
-measurement to find.
-
-**A consequence worth noting:** nothing in the app writes to the embedded controller any more.
-Fan control was the only feature that would have.
-
-## Gamepad navigation — fixed 2026-08-10, confirmed working
-
-**The root cause was a missing manifest entry, not any of the widget code below.**
-
-The Game Bar SDK's readme documents a **package-level** `windows.activatableClass.proxyStub`
-extension as a required step for every widget. It registers Metadata Based Marshaling for Game
-Bar's private COM interfaces — `IXboxGameBarWidgetHost1-9`, `IXboxGameBarWidgetPrivate1-6` and
-`IXboxGameBarNavigationKeyCombo`. This project omitted it from the start, with a manifest comment
-claiming it was "needed only for programmatic widget-bar navigation, which is out of scope". That
-was **our own inference and it was wrong** — the SDK states no such limitation.
-
-Without it the widget rendered, connected, resized and reported `VisibleChanged` correctly, and
-was completely inert to the controller AND the keyboard. Adding it fixed navigation immediately.
-
-**It was never version-dependent**, which is why reverting to known-good builds never helped: the
-entry had been missing since the package was first authored. Several hours went into focus code
-before anyone read the SDK's own setup instructions. **Check the SDK readme first** — it is
-regenerated per NuGet version and says so.
+Without it the widget rendered, connected, resized and reported `VisibleChanged` correctly, and was
+completely inert to both controller and keyboard. It was never version-dependent, which is why
+reverting to known-good builds never helped. **Check the SDK readme first** — it is regenerated per
+NuGet version.
 
 ### The focus defects found on the way
 
-All four were real bugs, and **none of them was why navigation did not work.** Worth keeping
-because they are all still latent hazards, but they were symptoms, not the cause.
+All four were real bugs and **none was why navigation did not work.** Kept because they remain
+latent hazards.
 
 1. **Nothing was ever focused.** `SetInitialFocus` ran in the same dispatcher callback that made
-   the cards visible, and XAML defers layout to the next frame — so every candidate still measured
-   `ActualHeight == 0`, the size guard skipped all of them, and focus was never set. Nothing called
-   it again, because the snapshot normally arrives once. With no focused element there is no origin
-   for XY focus navigation, so the D-pad had nothing to move from. `OnLayoutUpdated` now does it,
-   once the sizes are real.
+   the cards visible, and XAML defers layout a frame — every candidate measured `ActualHeight == 0`
+   and the size guard skipped all of them. `OnLayoutUpdated` now does it once sizes are real.
 2. **Selecting a segment threw focus away.** `SegmentedControl.Show` assigned a different `Style`
-   object to each button; assigning `Style` re-applies the control template, and a control that
-   rebuilds its template loses focus. The selected state is now three brushes set in place by
-   `Paint`, so the template is built once and kept.
-3. **Focus landed on the second card.** The first fix left the synchronous `SetInitialFocus()` call
-   in `OnSnapshotApplied`, where the just-unhidden TDP card still measured zero but the
-   never-hidden Windows power card already had a real height — so focus went to CPU boost and
-   latched, and the `LayoutUpdated` retry unsubscribed without reconsidering. That call is gone.
-4. **Dead on every show after the first.** `_initialFocusSet` latched for the session. Game Bar
-   hiding the widget un-focuses the focused element and nothing puts it back, so the second open
-   was indistinguishable from having no focus code at all. `ArmInitialFocus` re-arms on
-   `VisibleChanged → true` — the one moment there is nothing to disturb.
+   per button; assigning `Style` re-applies the control template, and a control that rebuilds its
+   template loses focus. Now three brushes set in place by `Paint`.
+3. **Focus landed on the second card.** A leftover synchronous `SetInitialFocus()` in
+   `OnSnapshotApplied` ran while the TDP card still measured zero but the never-hidden power card
+   did not. That call is gone.
+4. **Dead on every show after the first.** `_initialFocusSet` latched for the session.
+   `ArmInitialFocus` re-arms on `VisibleChanged → true`.
 
-Initial focus uses `FocusState.Keyboard` rather than `Programmatic`, which is what actually reveals
-the focus rectangle. On a device with no cursor, a focused control you cannot see is
-indistinguishable from broken navigation.
+Initial focus uses `FocusState.Keyboard`, not `Programmatic` — that is what reveals the focus
+rectangle. On a device with no cursor, a focused control you cannot see is indistinguishable from
+broken navigation.
 
-**Why every earlier test missed these:** a mouse click sets focus, so it papered over all four. The
-`--fake-hardware` pass had the same blind spot. Nothing but a controller finds these — worth
-remembering for any future UI change, since none of it is reachable by a unit test either.
+**Why every earlier test missed these:** a mouse click sets focus, papering over all four. The
+`--fake-hardware` pass had the same blind spot. Nothing but a controller finds these, and no unit
+test reaches them.
 
-**Two presses of Up to leave the widget is NOT a bug.** The first lands on something invisible, the
-second exits to Game Bar. Every Game Bar widget behaves this way, Microsoft's bundled ones
-included, so it is the platform's navigation model. `IsTabStop="False"` on the `ScrollViewer`
-suppresses it and was deliberately not kept — matching every other widget beats saving a press, and
-the mechanism was never confirmed.
+**Two presses of Up to leave the widget is NOT a bug** — every Game Bar widget behaves that way,
+Microsoft's bundled ones included.
 
 ### Open risk: the VisibleChanged re-arm still steals focus
 
 `ArmInitialFocus` runs on every `VisibleChanged → true` and unconditionally re-focuses the top
-control. In **compact mode Game Bar toggles `Visible` every two to three seconds** — captured
-directly in the widget trace — so this can drag focus back to Endurance while the user is
-navigating.
+control. **In compact mode Game Bar toggles `Visible` every two to three seconds**, so this can
+drag focus back while the user is navigating. It has not bitten since the proxyStub fix, so it
+ships as-is.
 
-It has not bitten since the proxyStub fix, so it is shipped as-is rather than churned again, but it
-is a live hazard. **Symptom to watch for: focus jumping back to the top control on its own after a
-few seconds of no input.** The fix, if it appears, is a guard that makes `ArmInitialFocus` a no-op
-when `FocusManager.GetFocusedElement()` is already inside `RootContent` — tried in 0.1.0.39 and
-reverted, but only because it was bundled with three extra event subscriptions that broke the
-first open. The guard alone was never the problem.
+**Symptom to watch for: focus jumping back to the top control on its own after a few seconds of no
+input.** The fix, if needed, is a guard making `ArmInitialFocus` a no-op when
+`FocusManager.GetFocusedElement()` is already inside `RootContent`. That was tried in 0.1.0.39 and
+reverted — but only because it was bundled with three extra event subscriptions that broke the
+first open. **The guard alone was never the problem**; if this is revisited, test that hypothesis
+before re-adding the subscriptions.
 
 ### Pinning loses focus — accepted, not fixed
 
-Re-arming keys off Game Bar's `VisibleChanged`, and a **pinned** widget stays `Visible` when the
-overlay is dismissed, so that event never fires on the way back. Confirmed on 2026-08-10: focus is
-lost the moment the widget is pinned and does not come back.
+Re-arming keys off `VisibleChanged`, and a pinned widget stays `Visible` when the overlay is
+dismissed, so the event never fires on the way back. **Deliberately not fixed:** this device uses
+compact mode, which has no pinning, so the broken path is unreachable here.
 
-**Deliberately not fixed.** This device uses the Game Bar in **compact mode, which has no pinning**,
-so the broken path is one the user cannot reach. `PinningSupported` stays true in the manifest
-because it costs nothing and Game Bar shows the affordance in desktop mode.
+## History: the three removed features
 
-An attempt was made and **reverted** (0.1.0.39). It made `ArmInitialFocus` refuse to steal focus
-already inside the widget — checking `FocusManager.GetFocusedElement()` against the visual tree —
-so it could safely hang off `PinnedChanged`, `GameBarDisplayModeChanged` and
-`Window.Current.Activated`. That broke navigation on the **first** open of the Game Bar, before
-pinning was involved at all. The cause was never established; the likeliest candidate is that
-something in our tree (the `ScrollViewer` is focusable) holds focus early, so the steal-guard reads
-as "focus is already inside" and suppresses the initial focus that the user actually needs. **If
-this is ever revisited, start by testing that hypothesis** rather than re-adding the same three
-event subscriptions. 0.1.0.40 is 0.1.0.38's navigation code, re-versioned so it installs over the
-reverted build.
+Removed 2026-08-08 on the reasoning that MSI Center did them better. **That reasoning has expired**
+— see [Next up](#next-up). Their `Function` ordinals were retired: 20–23 and 81 (fan), 30–31
+(charge limit), 40 (RGB). Bringing them back means re-adding wire ordinals; reuse the retired
+numbers rather than inventing new ones, and check `src/Shared/Ipc/Function.cs` for what is free.
 
-## Needs testing on the Claw
-
-- **UAC secure desktop** — the premise of G5's firmware route, still never tested.
-
-## Outstanding work
-
-- **Intel GPU controls (G6)** remain an unimplemented stub. This is the next piece of work.
-- **Uninstall/restore flow**, never tested end-to-end. Deliberately **not** treated as
-  release-blocking: this widget writes MSI Center's own `ManualPL*` values, MSI Center stays
-  installed, and its UI rewrites all four whenever a limit is changed there — so a user always has
-  a way back to any value they want, through the app that owns the setting. Restoring on uninstall
-  is a courtesy, not a safety net. Controller mode is deliberately not restored at all: the
-  physical button owns that state as much as we do, so replaying an old value would be a guess
-  rather than a restore.
+A line that used to appear here and in the README — *"nothing in this app writes to the embedded
+controller"* — **is no longer true.** Power limits write it through `MSI_ACPI`, and controller mode
+writes the controller's firmware over HID.

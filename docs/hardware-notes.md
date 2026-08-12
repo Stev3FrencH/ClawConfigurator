@@ -3,7 +3,9 @@
 > **Status: Phase 0 ran on the device on 2026-08-07.** `Diagnostics/device-report.txt` and
 > `Diagnostics/watch-msicenter-transcripts.zip` are the raw evidence, captured on a **fresh Windows
 > install with only MSI Center M present** — no ClawTweaks, so every change observed was made by
-> MSI's own software. **G1 is green. G3, G5 and G6 are green. G2 and G4 are partly answered.**
+> MSI's own software. **G1 and G5 are green AND standalone of MSI Center M. G6 is green on its
+> prerequisite only. G2, G3 and G4 are amber and are the next work — see
+> [What's next](#whats-next--fan-charge-limit-and-rgb).**
 >
 > Measured facts live in [Measured on device](#measured-on-device-2026-08-07) and **supersede**
 > the [desk research](#desk-research-clawtweaks-public-repo-2026-08-07) below, which was taken from
@@ -28,6 +30,82 @@
 3. **Mark anything unverified as unverified.** "Probably" belongs in this file; it does not belong
    in an EC write.
 4. **Re-check after a BIOS update.** Record the BIOS version every fact was established against.
+
+## What's next — fan, charge limit and RGB
+
+**Added 2026-08-12.** Three features were removed on 2026-08-08 because MSI Center M did them
+better. That reasoning expired: MSI Center M is being **uninstalled** once this widget is complete,
+so "set it in MSI Center" stops being an answer. All three come back.
+
+**Every one of them now carries the same gating question, and it is the first thing to settle in
+each case: can it be driven with MSI Center M absent?** Not stopped — absent. Both features shipped
+so far were built by answering exactly that, and in both cases the answer changed the design:
+
+- **G1 / TDP** — the registry model needed MSI Center M's service to *apply* it. `MSI_ACPI` did not.
+- **G5 / controller mode** — the registry value turned out to be a mirror MSI Center M maintained
+  by watching the vendor HID channel. Going to the channel directly removed the dependency and the
+  lag with it.
+
+The lesson both times: **a registry value that round-trips is not evidence of a control surface.**
+It may be a shadow of one. Prove the write reaches hardware with MSI Center M's stack stopped, and
+prove the read reflects hardware rather than MSI Center M's opinion of it.
+
+### The three, in the order they should probably be done
+
+| Gate | Feature | Standalone path | Confidence | Biggest unknown |
+|---|---|---|---|---|
+| **G3** | Battery charge limit | `MSI_ACPI.Get_AP` / `Set_AP` | **High** | whether `Set_AP` applies, never written |
+| **G4** | RGB LED | vendor HID report `0x0F` | **Medium–high** | the LED payload layout |
+| **G2** | Fan control | `MSI_ACPI.Get_Fan` / `Set_Fan`, or EC | **Low** | duty encoding and curve shape |
+
+**G3 is the obvious first pick.** The hard discovery is already done — `Set_AP` sub-function 0,
+byte 5, `percent | 0x80`, measured against MSI Center's own 100/80/60 settings. It is a *read*
+that was measured, though; the write has never been attempted. It is also the smallest UI (one
+value), it changes rarely, and it needs no new transport. Note the firmware accepts **20–100**
+while the old widget offered 60–100 — the 60 floor was a lite-scope choice, not a hardware limit.
+
+**G4 got substantially easier and the notes below understate it.** The G4 section still says report
+`0x0F` is "unverified on this device, and that work has not started" — that is now out of date. G5
+proved `0x0F` is the vendor command channel, established its framing, and shipped a class that
+speaks it (`MsiVendorHidChannel`). LED work no longer needs to find or open a channel, only to
+learn the opcode and payload for lighting.
+
+There is also a concrete lead sitting in the G5 capture: with MSI Center M restarting, the device
+emitted a long multi-frame `0x05` dump whose payload is full of plausible **RGB triples** —
+`FF 00 00`, `FF A0 00`, `C8 C8 FF`, `00 FF 00` — alongside what look like per-zone records. That is
+MSI Center M reading the current lighting configuration out of the controller. **Capturing that
+dump while changing one colour in MSI Center M, and diffing, is very likely the whole of G4.** The
+existing `--hid-watch` already records it.
+
+Known LED model from desk research, still unverified on this device: 3 zones (`Right = 0`,
+`Left = 1`, `Buttons = 2`), modes `Static/Breathing/ColorCycle/Wave` = 0..3, speed 0..2, brightness
+0..100. Only on/off was ever confirmed, via `OsdEditor\LightingBrightness` — a registry value, and
+therefore suspect for the reasons above.
+
+**G2 is the hardest and should be last.** It is the only one of the three that would write the
+embedded controller, it is blocked on a genuine contradiction rather than missing work — MSI's own
+curve on this device is six points while the model implemented here is a five-point 8-byte table
+from a *different machine* (the Lunar Lake A2VM) — and the duty scales have never been reconciled.
+`MSI_ACPI` exposes `Get_Fan`/`Set_Fan` and `Get_Thermal`/`Set_Thermal`, which are the standalone
+candidates and are unexercised. Start by reading `Get_Fan` and diffing it against MSI Center's
+six-point curve; that answers the layout question without writing anything.
+
+Also unresolved for G2: Intel's thermal stack (`ipfsvc`, participant `ACPI\INTC10D6\TFN1`) is an
+independent fan actor on this device, so "our table is correct" and "the fan does what we asked"
+are two different claims.
+
+### Housekeeping that should happen alongside
+
+- **`RegistryTdpProvider` and `RegistryHwMouseProvider` are both inert** while their firmware paths
+  work, and both are provably the weaker option. Delete them once MSI Center M is actually
+  uninstalled and both firmware paths are confirmed on a machine without it. That deletion is also
+  what finally removes `PerfMode`, `TdpBackendKind.RegistryMirror` and `IsMsiCenterRunning`.
+- **The package version is bumped by hand** and nothing catches a missed bump. Both documented
+  MSBuild overrides are proven not to work with this template. Worth solving *before* three
+  features' worth of install cycles, not after.
+- **`MSI_ACPI` surviving an actual uninstall is still unverified.** Everything so far was proven
+  with MSI Center M's stack *stopped*, which is not the same thing. This is the single assumption
+  the whole plan rests on, and it stays unproven until the uninstall happens.
 
 ## Measured on device (2026-08-07)
 
@@ -839,6 +917,12 @@ them elsewhere or writes the device directly. The vendor HID collection is prese
 `HID\VID_0DB0&PID_1901&MI_01` ("HID-compliant vendor-defined device"), so the HID path from the
 desk research remains the plan for mode/colour/effect. Report `0x0F` (64 bytes) is still unverified
 on this device, and that work has not started.
+
+> **Superseded 2026-08-12 — the sentence above is out of date.** G5 verified report `0x0F` on this
+> device, established its framing, and shipped `MsiVendorHidChannel`, which speaks it. The channel
+> is found, opened and proven; only the lighting opcode and payload remain. There is also a
+> captured `0x05` config dump that appears to contain the current per-zone RGB triples. See
+> [What's next](#whats-next--fan-charge-limit-and-rgb).
 
 **Decided 2026-08-08: ship on/off now, scope mode/colour/effect out until report `0x0F` is
 decoded.** `RegistryLedProvider` (`src/Hardware/Windows/RegistryLedProvider.cs`) reads and writes
