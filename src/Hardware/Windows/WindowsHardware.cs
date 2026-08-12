@@ -53,7 +53,16 @@ namespace McenterLite.Hardware.Windows
                 ? tdp.Backend
                 : TdpBackendKind.Unavailable;
 
-            var hwMouse = new RegistryHwMouseProvider();
+            // Same reasoning as TDP above: the firmware path talks to the controller directly and
+            // needs MSI Center M neither running nor installed. The registry value the fallback
+            // reads is in fact a mirror MSI Center M maintains BY WATCHING that same channel, so
+            // the fallback is strictly the weaker of the two - it is kept only until MSI Center M
+            // is actually uninstalled and this path is confirmed on a machine without it.
+            var hidHwMouse = new HidHwMouseProvider();
+            IHwMouseProvider hwMouse = hidHwMouse.Available
+                ? hidHwMouse
+                : new RegistryHwMouseProvider();
+
             Caps.HasHwMouse = identity.IsClaw8Ex && hwMouse.Available;
 
             // A device we do not recognise gets nothing, whatever the registry contains. Every
@@ -64,7 +73,7 @@ namespace McenterLite.Hardware.Windows
                 : new UnavailableTdp("This device is not an MSI Claw 8 EX AI+.");
 
             HwMouse = identity.IsClaw8Ex
-                ? (IHwMouseProvider)hwMouse
+                ? hwMouse
                 : new UnavailableHwMouse("This device is not an MSI Claw 8 EX AI+.");
             Igcl = new UnavailableIgcl("Intel graphics controls are not implemented yet.");
 

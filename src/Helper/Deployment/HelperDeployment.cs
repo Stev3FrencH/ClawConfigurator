@@ -28,6 +28,18 @@ namespace McenterLite.Helper.Deployment
     {
         private const string HelperExeName = "McenterLite.Helper.exe";
 
+        /// <summary>
+        /// Where the managed code actually lives, and so what has to be compared to detect a
+        /// changed build.
+        /// </summary>
+        /// <remarks>
+        /// The <c>.exe</c> beside it is the apphost - a native stub that launches this. It does
+        /// not change when C# changes, so comparing it alone reports a code-only update as
+        /// "UpToDate" and the stale helper keeps running. Observed on 2026-08-12: a new package
+        /// installed, the bootstrap said UpToDate, and the previous build stayed live.
+        /// </remarks>
+        private const string HelperDllName = "McenterLite.Helper.dll";
+
         /// <summary>Where the deployed copy lives.</summary>
         public static string DeployedDirectory =>
             Path.Combine(AppPaths.ResolveDataDirectory(), "Helper");
@@ -72,11 +84,19 @@ namespace McenterLite.Helper.Deployment
         {
             if (!File.Exists(DeployedExecutable)) return State.NotDeployed;
 
-            var sourceExecutable = Path.Combine(AppContext.BaseDirectory, HelperExeName);
-            if (!IsSameBuild(sourceExecutable, DeployedExecutable))
+            // Both, and the DLL is the one that matters - see HelperDllName. The apphost is
+            // checked too because a runtime or publish-settings change can move it without
+            // touching the managed code.
+            foreach (var name in new[] { HelperDllName, HelperExeName })
             {
-                Log.Info("Deployed copy differs from the packaged build.");
-                return State.VersionMismatch;
+                var source = Path.Combine(AppContext.BaseDirectory, name);
+                var deployed = Path.Combine(DeployedDirectory, name);
+
+                if (!IsSameBuild(source, deployed))
+                {
+                    Log.Info($"Deployed copy differs from the packaged build ({name}).");
+                    return State.VersionMismatch;
+                }
             }
 
             var registered = ScheduledTaskRegistrar.GetRegisteredExecutable();
@@ -246,6 +266,12 @@ namespace McenterLite.Helper.Deployment
         /// a real change without hashing a 60+ MB self-contained executable on every single start -
         /// <c>File.Copy</c> preserves the source timestamp, so a genuinely current deployed copy
         /// matches exactly and a stale one does not.
+        ///
+        /// <para>
+        /// Comparing the right FILE turned out to matter as much as comparing it the right way:
+        /// this was pointed at the apphost, which a code-only change never touches. See
+        /// <see cref="HelperDllName"/>.
+        /// </para>
         /// </remarks>
         private static bool IsSameBuild(string sourcePath, string deployedPath)
         {

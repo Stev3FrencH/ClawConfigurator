@@ -51,6 +51,9 @@ namespace McenterLite.Probe
                 case "acpi-get": return Commands.WmiExplorer.AcpiGet(rest);
                 case "dump-acpi": return Commands.AcpiDump.Run(rest);
                 case "hid-list": return Commands.HidExplorer.List(rest);
+                case "hid-watch": return Commands.HidWatcher.Run(rest);
+                case "controller-mode": return Commands.ControllerMode.Read(rest);
+                case "set-controller-mode": return Commands.ControllerMode.Set(rest);
 
                 default:
                     Console.Error.WriteLine($"Unknown command: {args[0]}");
@@ -87,10 +90,21 @@ READ
   --hid-list [vid]          Enumerate HID interfaces (default VID 0x0DB0) with report
                             descriptors. The LED and firmware-mouse endpoint is the vendor
                             collection, usage page >= 0xFF00.
+  --hid-watch [secs] [vid]  Watch those interfaces live: arrivals, departures, and every
+                            input report on the vendor collection. Press the physical MSI
+                            button during a run to see what a mode switch actually does.
+
+  --controller-mode         Ask the controller whether it is in gamepad or desktop-mouse mode,
+                            over the vendor HID channel. Needs no MSI Center. This one does
+                            put bytes on the wire - the channel has no feature report, so a
+                            query is the only way to ask - but it changes nothing.
 
 WRITE (these change system state)
   --set-power-mode <0|1|2>  0 = best efficiency, 1 = balanced, 2 = best performance.
   --set-cpu-boost <on|off>
+  --set-controller-mode <desktop|xinput|dinput>
+                            Switch controller mode over the vendor HID channel. The physical
+                            MSI button changes this too, so we do not own the state.
 
 SUGGESTED PHASE-0 ORDER
   1. --device                     confirm the model gate matches
