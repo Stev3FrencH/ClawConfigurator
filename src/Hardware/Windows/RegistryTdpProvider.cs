@@ -35,10 +35,10 @@ namespace McenterLite.Hardware.Windows
         private const string KeyPath =
             @"SOFTWARE\WOW6432Node\MSI\MSI Center M\Component\User Scenario";
 
-        // Four values, not two. Which pair is live depends on whether the charger is connected.
-        // MSI's own UI writes both identically; we do NOT - the DC pair is capped to the battery
-        // ceilings, so one user choice yields full power plugged in and a lower limit unplugged
-        // with nothing to remember to switch.
+        // Four values, not two. Which pair is live depends on whether the charger is connected, so
+        // both are written identically on every apply - confirmed there is no lower ceiling MSI
+        // itself enforces on battery, so there is nothing to derive the DC pair from beyond the
+        // AC one.
         private const string Pl1Ac = "ManualPL1AC";
         private const string Pl2Ac = "ManualPL2AC";
         private const string Pl1Dc = "ManualPL1DC";
@@ -63,12 +63,9 @@ namespace McenterLite.Hardware.Windows
         private static readonly (int Mode, int ShiftMode, int GamingEvent) AiEngineTriple = (5, 2, 2);
 
         private readonly string _unavailableReason;
-        private readonly DeviceCaps _caps;
 
-        public RegistryTdpProvider(DeviceCaps caps)
+        public RegistryTdpProvider()
         {
-            _caps = caps;
-
             using var key = OpenRead();
             if (key == null)
             {
@@ -130,12 +127,6 @@ namespace McenterLite.Hardware.Windows
                 if (!modeResult.Ok) return modeResult;
             }
 
-            // The battery pair is the same choice under a lower ceiling. Derived here rather than
-            // asked of the user: a handheld that quietly draws less when unplugged is what people
-            // want, and a second slider they have to remember to move is not.
-            int dcPl1 = pl1, dcPl2 = pl2;
-            _caps?.ClampPowerLimitsForBattery(ref dcPl1, ref dcPl2);
-
             try
             {
                 using var key = OpenWrite();
@@ -148,8 +139,8 @@ namespace McenterLite.Hardware.Windows
 
                 key.SetValue(Pl1Ac, pl1, RegistryValueKind.DWord);
                 key.SetValue(Pl2Ac, pl2, RegistryValueKind.DWord);
-                key.SetValue(Pl1Dc, dcPl1, RegistryValueKind.DWord);
-                key.SetValue(Pl2Dc, dcPl2, RegistryValueKind.DWord);
+                key.SetValue(Pl1Dc, pl1, RegistryValueKind.DWord);
+                key.SetValue(Pl2Dc, pl2, RegistryValueKind.DWord);
             }
             catch (UnauthorizedAccessException)
             {
@@ -176,10 +167,10 @@ namespace McenterLite.Hardware.Windows
             // The battery pair is verified too. It is the one the user is least likely to notice
             // going wrong - nothing on screen reflects it until they unplug.
             if (TryReadDc(out var actualDcPl1, out var actualDcPl2)
-                && (actualDcPl1 != dcPl1 || actualDcPl2 != dcPl2))
+                && (actualDcPl1 != pl1 || actualDcPl2 != pl2))
             {
                 return OpResult.Fail(
-                    $"Battery power limits did not stick: asked for {dcPl1}/{dcPl2} W, "
+                    $"Battery power limits did not stick: asked for {pl1}/{pl2} W, "
                     + $"found {actualDcPl1}/{actualDcPl2} W.");
             }
 

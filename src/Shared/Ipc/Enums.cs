@@ -34,25 +34,23 @@ namespace McenterLite.Shared.Ipc
 
     public enum TdpBackendKind
     {
-        /// <summary>
-        /// Prefer <see cref="RegistryMirror"/>; fall back to <see cref="Wmi"/> only if MSI Center
-        /// is absent. The mirror is the primary path by project decision — this app runs alongside
-        /// MSI Center M rather than replacing it, so the MSI-conform route is the supported one.
-        /// </summary>
+        /// <summary>Unused today. Kept so wire values stay stable if an auto-selection value is ever needed.</summary>
         Auto = 0,
 
         /// <summary>
-        /// Call MSI's ACPI-WMI method directly, independent of MSI Center.
-        /// Unimplemented, deliberately: it only matters if we ever want to run without MSI Center M,
-        /// which is no longer a goal. Kept in the enum so wire values stay stable if that changes.
+        /// Call MSI's ACPI-WMI method (<c>MSI_ACPI.Get_SlaveBattery</c>/<c>Set_SlaveBattery</c>)
+        /// directly, independent of MSI Center M. The preferred backend: confirmed 2026-08-11 to
+        /// write the EC with MSI Center M's entire user-mode stack stopped, on both AC and
+        /// battery. See <c>WmiTdpProvider</c> and <c>docs/hardware-notes.md</c>, Gate G1.
         /// </summary>
         Wmi = 1,
 
         /// <summary>
         /// Write MSI Center's own registry model and let its service push the values to the EC.
-        /// Stays MSI-conform, but hard-requires MSI Center M to be installed AND running — with the
-        /// service stopped nothing applies the values and TDP silently does nothing, which is why
-        /// the widget warns when MSI Center is NOT running rather than when it is.
+        /// The fallback when <see cref="Wmi"/> is unavailable. Hard-requires MSI Center M to be
+        /// installed AND running — with the service stopped nothing applies the values and TDP
+        /// silently does nothing, which is why the widget warns when MSI Center is NOT running
+        /// rather than when it is.
         /// </summary>
         RegistryMirror = 2,
 

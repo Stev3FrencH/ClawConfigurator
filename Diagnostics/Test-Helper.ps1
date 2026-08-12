@@ -42,7 +42,7 @@
 .EXAMPLE
     .\Test-Helper.ps1
     .\Test-Helper.ps1 -Tdp 25
-    .\Test-Helper.ps1 -Set PerfMode -Value 1
+    .\Test-Helper.ps1 -Set Pl2 -Value 30
 #>
 
 [CmdletBinding()]
@@ -105,6 +105,39 @@ function Connect-Helper {
     $script:writer.AutoFlush = $true
 }
 
+# Decodes a JSON string body.
+#
+# NOT just -replace '\\"','"' -replace '\\\\','\', which is what this used to do. The snapshot's
+# records are separated by U+001F, and the helper's JSON writer emits that as  - so without
+# \uXXXX handling the whole payload stayed one unsplittable line and the "=== Values ===" section
+# rendered empty every time. Written as a single pass so an escaped backslash cannot be re-read as
+# the start of another escape.
+function ConvertFrom-JsonString {
+    param([string]$s)
+    if ($null -eq $s) { return $null }
+
+    [regex]::Replace($s, '\\(u[0-9a-fA-F]{4}|.)', {
+        param($m)
+        $esc = $m.Groups[1].Value
+        if ($esc.Length -eq 5 -and $esc[0] -eq 'u') {
+            [char][Convert]::ToInt32($esc.Substring(1), 16)
+        }
+        else {
+            switch ($esc) {
+                '"' { '"' }
+                '\' { '\' }
+                '/' { '/' }
+                'n' { "`n" }
+                'r' { "`r" }
+                't' { "`t" }
+                'b' { "`b" }
+                'f' { "`f" }
+                default { $esc }
+            }
+        }
+    })
+}
+
 function Invoke-Helper {
     param([int]$Cmd, [int]$Function, [string]$Val = $null)
 
@@ -121,8 +154,8 @@ function Invoke-Helper {
         if ([int]$Matches[1] -ne $id) { continue }
 
         $cmdOut = if ($line -match '"cmd"\s*:\s*(\d+)') { [int]$Matches[1] } else { -1 }
-        $valOut = if ($line -match '"v"\s*:\s*"((?:[^"\\]|\\.)*)"') { $Matches[1] -replace '\\"', '"' -replace '\\\\', '\' } else { $null }
-        $errOut = if ($line -match '"err"\s*:\s*"((?:[^"\\]|\\.)*)"') { $Matches[1] -replace '\\"', '"' } else { $null }
+        $valOut = if ($line -match '"v"\s*:\s*"((?:[^"\\]|\\.)*)"') { ConvertFrom-JsonString $Matches[1] } else { $null }
+        $errOut = if ($line -match '"err"\s*:\s*"((?:[^"\\]|\\.)*)"') { ConvertFrom-JsonString $Matches[1] } else { $null }
 
         return [pscustomobject]@{ Cmd = $cmdOut; Value = $valOut; Error = $errOut; Raw = $line }
     }
@@ -172,27 +205,33 @@ function Show-TdpRegistry {
     try {
         $k = Get-ItemProperty -Path $path -ErrorAction Stop
         Write-Host ''
-        Write-Host '=== What landed in MSI Center''s model ===' -ForegroundColor Cyan
+        Write-Host '=== MSI Center''s own model ===' -ForegroundColor Cyan
         Write-Host ("  AC  PL1={0}  PL2={1}" -f $k.ManualPL1AC, $k.ManualPL2AC)
-        Write-Host ("  DC  PL1={0}  PL2={1}   <- battery ceiling applies here" -f $k.ManualPL1DC, $k.ManualPL2DC)
-        Write-Host ("  Mode={0}  (4 = User Scenario, the only mode that honours manual limits)" -f $k.Mode)
+        Write-Host ("  DC  PL1={0}  PL2={1}" -f $k.ManualPL1DC, $k.ManualPL2DC)
+        Write-Host ("  Mode={0}" -f $k.Mode)
+        Write-Host ''
+        Write-Host 'Only meaningful when tdpBackend is 2 (RegistryMirror). On tdpBackend 1 (Wmi)' -ForegroundColor DarkGray
+        Write-Host 'the helper writes the EC directly and these values are expected NOT to move.' -ForegroundColor DarkGray
     } catch {
         Write-Warning "Could not read $path"
     }
 }
 
 try {
+    Connect-Helper
+
     if ($PSBoundParameters.ContainsKey('Tdp')) {
         Write-Host ''
         Write-Host "=== Setting PL1 to $Tdp W ===" -ForegroundColor Cyan
         Show-Reply 'Pl1 ->' (Invoke-Helper -Cmd $CmdSet -Function $Fn.Pl1 -Val "$Tdp")
         Show-Reply 'Pl1 (read back)' (Invoke-Helper -Cmd $CmdGet -Function $Fn.Pl1)
         Show-Reply 'Pl2 (read back)' (Invoke-Helper -Cmd $CmdGet -Function $Fn.Pl2)
-        Show-Reply 'PerfMode' (Invoke-Helper -Cmd $CmdGet -Function $Fn.PerfMode)
+        Show-Reply 'TdpBackend' (Invoke-Helper -Cmd $CmdGet -Function $Fn.TdpBackend)
         Show-TdpRegistry
         Write-Host ''
         Write-Host 'PL2 follows PL1 by the firmware headroom, so a different number is correct.' -ForegroundColor DarkGray
-        Write-Host 'If PerfMode is not 1 (User Scenario) the limits are stored but not applied.' -ForegroundColor DarkGray
+        Write-Host 'A read-back only proves the value was stored. To prove the EC obeyed, hold the' -ForegroundColor DarkGray
+        Write-Host 'CPU under load and watch ''% Processor Performance'' across a low/high pair.' -ForegroundColor DarkGray
         return
     }
 
