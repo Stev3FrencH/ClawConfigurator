@@ -54,15 +54,15 @@ prove the read reflects hardware rather than MSI Center M's opinion of it.
 
 | Gate | Feature | Standalone path | Confidence | Biggest unknown |
 |---|---|---|---|---|
-| **G3** | Battery charge limit | `MSI_ACPI.Get_AP` / `Set_AP` | **High** | whether `Set_AP` applies, never written |
+| ~~**G3**~~ | ~~Battery charge limit~~ | `MSI_ACPI.Get_AP` / `Set_AP` | **DONE 2026-08-12** | — |
 | **G4** | RGB LED | vendor HID report `0x0F` | **Medium–high** | the LED payload layout |
 | **G2** | Fan control | `MSI_ACPI.Get_Fan` / `Set_Fan`, or EC | **Low** | duty encoding and curve shape |
 
-**G3 is the obvious first pick.** The hard discovery is already done — `Set_AP` sub-function 0,
-byte 5, `percent | 0x80`, measured against MSI Center's own 100/80/60 settings. It is a *read*
-that was measured, though; the write has never been attempted. It is also the smallest UI (one
-value), it changes rarely, and it needs no new transport. Note the firmware accepts **20–100**
-while the old widget offered 60–100 — the 60 floor was a lite-scope choice, not a hardware limit.
+**G3 is done.** It was the obvious first pick and it went the way the confidence suggested: the
+read was already measured, the write turned out to be plain read-modify-write, and it needed no new
+transport. **The firmware range is 20–100**; the widget deliberately offers only 50–100 in steps of
+10, which is a product choice and must not be recorded as a hardware limit — that is precisely the
+error the retired version's 60 floor caused.
 
 **G4 got substantially easier and the notes below understate it.** The G4 section still says report
 `0x0F` is "unverified on this device, and that work has not started" — that is now out of date. G5

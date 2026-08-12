@@ -67,15 +67,29 @@ namespace McenterLite.Shared.Ipc
         // the desk research described - so nothing was ever written to the EC. Findings kept in
         // docs/hardware-notes.md.
 
-        // ── 3. Battery charge limit — REMOVED ────────────────────────────────────
+        // ── 3. Battery charge limit ──────────────────────────────────────────────
         //
-        // Ordinals 30 (ChargeLimitEnabled) and 31 (ChargeLimitPercent) are RETIRED. Per the rule
-        // at the top of this enum they must never be reused: an old widget meeting a new helper
-        // would otherwise route a stale charge-limit message onto whatever took the number.
-        //
-        // Descoped 2026-08-08. The limit is set in MSI Center, changes rarely, and the registry
-        // path this app could reach did not enforce it. The hardware findings are kept in
-        // docs/hardware-notes.md Gate G3 rather than thrown away.
+        // Ordinals 30 (ChargeLimitEnabled) and 31 (ChargeLimitPercent) are RETIRED and must never
+        // be reused, per the rule at the top of this enum - an old widget meeting a new helper
+        // would otherwise route a stale charge-limit message onto whatever took the number. The
+        // feature came back on 2026-08-12 at a NEW ordinal for exactly that reason.
+
+        /// <summary>
+        /// Stop charging at this percentage. 20-100; 100 means no limit.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// ONE value, not the enabled/percent pair the retired ordinals used. The firmware has a
+        /// single byte and no separate on/off - 100% is how "off" is expressed - so a second flag
+        /// would be a UI concept the hardware does not have, and two functions that can disagree.
+        /// </para>
+        /// <para>
+        /// Applied through <c>MSI_ACPI.Set_AP</c>, which needs nothing from MSI Center M. Note MSI
+        /// Center M does NOT notice changes made this way and keeps showing its own cached value;
+        /// see gate G3 in docs/hardware-notes.md.
+        /// </para>
+        /// </remarks>
+        ChargeLimitPercent = 32,
 
         // ── 4. Lighting — REMOVED ────────────────────────────────────────────────
         //

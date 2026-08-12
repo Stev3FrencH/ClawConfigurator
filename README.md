@@ -28,13 +28,13 @@ AI+ (Panther Lake, `CG3EM` / board `1T91`), delivered as an Xbox Game Bar widget
 
 Eight features were planned. Three were descoped on 2026-08-08 and are being brought back, because
 the reason for dropping them — "MSI Center does it better" — stops applying once MSI Center M is
-uninstalled.
+uninstalled. The charge limit returned on 2026-08-12; fan and RGB are still to come.
 
 | # | Feature | Path | Status |
 |---|---|---|---|
 | 1 | TDP (PL1 / PL2) | `MSI_ACPI.Set_SlaveBattery` | ✅ verified on device, standalone |
 | 2 | Fan control | TBD — `Get_Fan`/`Set_Fan`, or EC | planned, gate G2 (hardest) |
-| 3 | Battery charge limit | `MSI_ACPI.Get_AP`/`Set_AP` | planned, gate G3 (next up) |
+| 3 | Battery charge limit | `MSI_ACPI.Get_AP`/`Set_AP` | ✅ verified on device, standalone |
 | 4 | RGB LED | vendor HID report `0x0F` | planned, gate G4 |
 | 5 | Controller mode — Gamepad / Desktop | vendor HID `0x24`/`0x26`/`0x27` | ✅ verified on device, standalone |
 | 6 | CPU Boost | documented Win32 | ✅ verified on device |

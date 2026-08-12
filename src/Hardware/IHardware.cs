@@ -94,6 +94,19 @@ namespace McenterLite.Hardware
     }
 
     /// <summary>
+    /// The battery charge limit, as a percentage. 100 means charge to full.
+    /// </summary>
+    /// <remarks>
+    /// One value rather than an enabled/percent pair: the firmware has a single byte and expresses
+    /// "off" as 100, so a separate flag would be a UI idea the hardware does not have.
+    /// </remarks>
+    public interface IChargeLimitProvider : IFeatureProvider
+    {
+        bool TryRead(out int percent);
+        OpResult Apply(int percent);
+    }
+
+    /// <summary>
     /// CPU boost and the Windows power-mode overlay.
     /// </summary>
     /// <remarks>
@@ -129,6 +142,7 @@ namespace McenterLite.Hardware
         DeviceCaps Caps { get; }
 
         ITdpProvider Tdp { get; }
+        IChargeLimitProvider ChargeLimit { get; }
         IHwMouseProvider HwMouse { get; }
         IPowerProvider Power { get; }
         IIgclProvider Igcl { get; }

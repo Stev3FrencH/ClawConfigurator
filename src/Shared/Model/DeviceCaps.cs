@@ -36,7 +36,30 @@ namespace McenterLite.Shared.Model
         /// <summary>Which TDP path the helper resolved. <c>Unavailable</c> disables the controls.</summary>
         public Ipc.TdpBackendKind TdpBackend { get; set; } = Ipc.TdpBackendKind.Unavailable;
 
+        // ── Battery charge limit ─────────────────────────────────────────────────
+        /// <summary>
+        /// Lowest charge limit this app OFFERS. 50 - a product choice, not a hardware limit.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>The firmware accepts 20.</b> That was measured (gate G3), and it is recorded in
+        /// <c>docs/hardware-notes.md</c> rather than here, because this number is not it. Nothing
+        /// below about half charge is useful for battery longevity, so the slider stops at 50 and
+        /// spends its travel where the values matter.
+        /// </para>
+        /// <para>
+        /// Kept as a capability rather than a widget constant so the helper clamps to the same
+        /// number the slider offers. The retired version of this feature had the same kind of floor
+        /// at 60, and it was mistaken for a firmware limit more than once - hence the emphasis.
+        /// </para>
+        /// </remarks>
+        public int MinChargeLimit { get; set; } = 50;
+
+        /// <summary>100, i.e. charge to full. This is how "no limit" is expressed.</summary>
+        public int MaxChargeLimit { get; set; } = 100;
+
         // ── Feature availability ─────────────────────────────────────────────────
+        public bool HasChargeLimit { get; set; }
         public bool HasHwMouse { get; set; }
         public bool HasIgcl { get; set; }
 
@@ -50,6 +73,9 @@ namespace McenterLite.Shared.Model
             Append(sb, "maxPl2", MaxPl2);
             Append(sb, "pl2Off", Pl2MinOffset);
             Append(sb, "tdpBackend", (int)TdpBackend);
+            Append(sb, "minCharge", MinChargeLimit);
+            Append(sb, "maxCharge", MaxChargeLimit);
+            Append(sb, "hasCharge", HasChargeLimit ? "1" : "0");
             Append(sb, "hwMouse", HasHwMouse ? "1" : "0");
             Append(sb, "igcl", HasIgcl ? "1" : "0");
             return sb.ToString();
@@ -83,9 +109,14 @@ namespace McenterLite.Shared.Model
                             ? (Ipc.TdpBackendKind)backend
                             : Ipc.TdpBackendKind.Unavailable;
                         break;
-                    // "charge", "led", "fan", "dutyFloor", "maxPl1Dc" and "maxPl2Dc" retired with
-                    // their features. An older helper may still send them, and unknown keys fall
-                    // through harmlessly.
+                    // "led", "fan", "dutyFloor", "maxPl1Dc" and "maxPl2Dc" retired with their
+                    // features. An older helper may still send them, and unknown keys fall through
+                    // harmlessly. So did "charge" - the charge limit came back on 2026-08-12 under
+                    // NEW key names rather than reclaiming that one, because an old helper still
+                    // sends it with the old enabled/percent meaning.
+                    case "minCharge": caps.MinChargeLimit = ToInt(value, caps.MinChargeLimit); break;
+                    case "maxCharge": caps.MaxChargeLimit = ToInt(value, caps.MaxChargeLimit); break;
+                    case "hasCharge": caps.HasChargeLimit = value == "1"; break;
                     case "hwMouse": caps.HasHwMouse = value == "1"; break;
                     case "igcl": caps.HasIgcl = value == "1"; break;
                     // Unknown keys are ignored on purpose - forward compatibility.
@@ -102,6 +133,16 @@ namespace McenterLite.Shared.Model
         /// </summary>
         public void ClampPowerLimits(ref int pl1, ref int pl2) =>
             Clamp(ref pl1, ref pl2, MaxPl1, MaxPl2);
+
+        /// <summary>
+        /// Clamps a requested charge limit into what the firmware accepts. Applied by the HELPER
+        /// on every Set, for the same reason as <see cref="ClampPowerLimits"/>.
+        /// </summary>
+        public void ClampChargeLimit(ref int percent)
+        {
+            if (percent < MinChargeLimit) percent = MinChargeLimit;
+            if (percent > MaxChargeLimit) percent = MaxChargeLimit;
+        }
 
         /// <summary>
         /// Recomputes the pair after the user moved the <b>PL1</b> slider.

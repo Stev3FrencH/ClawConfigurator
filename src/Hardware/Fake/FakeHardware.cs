@@ -34,11 +34,15 @@ namespace McenterLite.Hardware.Fake
                 MaxPl2 = 45,
                 Pl2MinOffset = 2,
                 TdpBackend = simulateClaw8Ex ? TdpBackendKind.Wmi : TdpBackendKind.Unavailable,
+                HasChargeLimit = simulateClaw8Ex,
+                MinChargeLimit = 50,
+                MaxChargeLimit = 100,
                 HasHwMouse = simulateClaw8Ex,
                 HasIgcl = simulateClaw8Ex,
             };
 
             Tdp = new FakeTdp(Caps);
+            ChargeLimit = new FakeChargeLimit(simulateClaw8Ex, Caps);
             HwMouse = new FakeHwMouse(simulateClaw8Ex);
             Igcl = new FakeIgcl(simulateClaw8Ex);
 
@@ -50,6 +54,7 @@ namespace McenterLite.Hardware.Fake
 
         public DeviceCaps Caps { get; }
         public ITdpProvider Tdp { get; }
+        public IChargeLimitProvider ChargeLimit { get; }
         public IHwMouseProvider HwMouse { get; }
         public IPowerProvider Power { get; }
         public IIgclProvider Igcl { get; }
@@ -103,6 +108,40 @@ namespace McenterLite.Hardware.Fake
 
         public OpResult ApplyMode(PerfMode mode) =>
             Available ? OpResult.Success() : OpResult.Unavailable(UnavailableReason);
+    }
+
+    internal sealed class FakeChargeLimit : IChargeLimitProvider
+    {
+        private readonly DeviceCaps _caps;
+
+        // 100 = charge to full, which is the shipping default on a machine nobody has configured.
+        private int _percent = 100;
+
+        public FakeChargeLimit(bool available, DeviceCaps caps)
+        {
+            Available = available;
+            _caps = caps;
+        }
+
+        public bool Available { get; }
+        public string UnavailableReason =>
+            Available ? null : "A battery charge limit is not available on this device.";
+
+        public bool TryRead(out int percent)
+        {
+            percent = _percent;
+            return Available;
+        }
+
+        public OpResult Apply(int percent)
+        {
+            if (!Available) return OpResult.Unavailable(UnavailableReason);
+
+            // Clamps like the real one, so the fake cannot hold a value the device would refuse.
+            _caps.ClampChargeLimit(ref percent);
+            _percent = percent;
+            return OpResult.Success();
+        }
     }
 
     internal sealed class FakeHwMouse : IHwMouseProvider

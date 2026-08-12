@@ -241,6 +241,12 @@ namespace McenterLite.Helper
                 ? $"Controller mode: {DescribeHwMouseBackend(hardware.HwMouse)}."
                 : $"Controller mode unavailable: {hardware.HwMouse.UnavailableReason}");
 
+            // The provider probes with a real read, and an unavailable one hides the widget's
+            // Battery card entirely - which looks identical to a UI bug from the outside. Say so.
+            Log.Info(hardware.ChargeLimit.Available
+                ? "Charge limit: MSI_ACPI Get_AP/Set_AP."
+                : $"Charge limit unavailable: {hardware.ChargeLimit.UnavailableReason}");
+
             return hardware;
         }
 
@@ -465,6 +471,25 @@ namespace McenterLite.Helper
                     Log.Info(result.Ok
                         ? $"Re-applied PL1={pl1}W PL2={pl2}W."
                         : $"Could not re-apply power limits: {result.Error}");
+                }
+            }
+
+            // Charge limit, only if the user has actually set one through this app - GetInt
+            // returns -1 when the key was never written, which is the gate.
+            //
+            // Whether the firmware keeps this across a reboot is UNVERIFIED. Re-applying is cheap
+            // insurance either way, and it also wins back the setting if MSI Center M has asserted
+            // its own cached value in the meantime - it holds one, and does not notice ours.
+            if (hardware.ChargeLimit.Available)
+            {
+                int percent = settings.GetInt(SettingsKeys.ChargeLimit, -1);
+                if (percent > 0)
+                {
+                    hardware.Caps.ClampChargeLimit(ref percent);
+                    var result = hardware.ChargeLimit.Apply(percent);
+                    Log.Info(result.Ok
+                        ? $"Re-applied charge limit = {percent}%."
+                        : $"Could not re-apply the charge limit: {result.Error}");
                 }
             }
 

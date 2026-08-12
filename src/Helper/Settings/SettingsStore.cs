@@ -154,6 +154,8 @@ namespace McenterLite.Helper.Settings
         public const string Pl2 = "Pl2";
         public const string TdpBackend = "TdpBackend";
 
+        public const string ChargeLimit = "ChargeLimit";
+
         public const string CpuBoost = "CpuBoost";
         public const string OsPowerMode = "OsPowerMode";
 
