@@ -7,18 +7,19 @@ notes behind the roadmap below.
 
 ## The headline
 
-**The MSI Center M dependency is nearly gone.** Both hardware features that shipped now talk to the
-firmware directly and need MSI Center M neither running nor installed:
+**The MSI Center M dependency is nearly gone.** All three hardware features that ship now talk to
+the firmware directly and need MSI Center M neither running nor installed:
 
 - **Power limits** via `MSI_ACPI.Set_SlaveBattery` (ACPI-WMI), merged 2026-08-11.
 - **Controller mode** via the controller's vendor HID channel, merged 2026-08-12.
+- **Battery charge limit** via `MSI_ACPI.Set_AP` (ACPI-WMI), merged 2026-08-12.
 
-Everything remaining is either the three features that were descoped and are now coming back, or
+Everything remaining is either the two features still descoped and coming back — RGB then fan — or
 cleanup that waits on MSI Center M actually being uninstalled.
 
 ## Current build
 
-**0.2.0.7, Debug.** Installed and verified on the Claw 2026-08-12.
+**0.2.0.8, Debug.** Installed and verified on the Claw 2026-08-12.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\src\Package\Install.ps1
@@ -71,7 +72,7 @@ features shipped so far.
 
 ### ~~1. Battery charge limit (G3)~~ — DONE 2026-08-12
 
-Shipped in 0.2.0.7 as the widget's **Battery** card, on `MSI_ACPI.Set_AP`, standalone of MSI
+Shipped in 0.2.0.8 as the widget's **Battery** card, on `MSI_ACPI.Set_AP`, standalone of MSI
 Center M. Wire ordinal is `Function.ChargeLimitPercent = 32` — a **new** number, because the
 retired 30/31 must never be reused. **Offers 50–100 in steps of 10**, with a 1 s write debounce
 like the TDP sliders. The firmware accepts **20**–100; the 50 floor is a product choice, because
@@ -95,6 +96,22 @@ The concrete lead: with MSI Center M restarting, the controller emits a long mul
 dump whose payload is full of plausible RGB triples (`FF 00 00`, `FF A0 00`, `C8 C8 FF`) alongside
 per-zone records. **Capture that dump while changing one colour in MSI Center M, diff it, and that
 is very likely the whole gate.** `--hid-watch` already records it.
+
+**Scope, set 2026-08-12:** the widget does *not* need a colour picker. MSI Center M holds **three
+saved profiles**, and those three are the ones to keep. The widget should **cycle between the three
+and turn the lighting off and back on** — four states, no authoring.
+
+That makes the gating question narrower but also sharper: **where do those three profiles live?**
+
+- *If the controller stores them*, this is small — find the "select profile N" command and the
+  on/off command, and nothing needs to be captured at all.
+- *If MSI Center M stores them* and merely pushes the resulting colours down, then the profiles die
+  with the uninstall. In that case each profile must be **captured as its literal payload while MSI
+  Center M is still installed** and replayed by us afterwards. There is no second chance at that
+  capture once MSI Center M is gone.
+
+Settle that question first — it decides whether this feature is a lookup or an archive. Either way,
+**capture all three profiles before uninstalling anything.**
 
 ### 2. Fan control (G2) — hardest, do last
 
