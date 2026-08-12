@@ -8,6 +8,7 @@ using McenterLite.Helper.Deployment;
 using McenterLite.Helper.Ipc;
 using McenterLite.Helper.Settings;
 using McenterLite.Shared.Ipc;
+using McenterLite.Shared.Model;
 
 namespace McenterLite.Helper
 {
@@ -179,11 +180,21 @@ namespace McenterLite.Helper
                 Log.Warn("Unsupported device. Hardware features are disabled.");
             }
 
-            var dispatcher = new FeatureDispatcher(hardware, settings);
+            // Seeded before the dispatcher exists, so the very first snapshot can report real
+            // profile names rather than placeholders. Creates missing files only; an existing
+            // profile is the user's and is never rewritten.
+            var lighting = new LightingProfileStore(Path.Combine(dataDirectory, "Lighting"));
+            if (hardware.Rgb.Available)
+            {
+                lighting.EnsureSeeded(Log.Info);
+                Log.Info($"Lighting profiles: {lighting.Directory}");
+            }
+
+            var dispatcher = new FeatureDispatcher(hardware, settings, lighting);
 
             // Apply persisted settings BEFORE accepting connections, so the widget's first
             // snapshot describes a device already in its intended state.
-            StartupApplier.ApplyAll(hardware, settings);
+            StartupApplier.ApplyAll(hardware, settings, lighting);
 
             using var server = new PipeServer(dispatcher.Handle);
 
@@ -246,6 +257,10 @@ namespace McenterLite.Helper
             Log.Info(hardware.ChargeLimit.Available
                 ? "Charge limit: MSI_ACPI Get_AP/Set_AP."
                 : $"Charge limit unavailable: {hardware.ChargeLimit.UnavailableReason}");
+
+            Log.Info(hardware.Rgb.Available
+                ? "Lighting: vendor HID profile block (RAM)."
+                : $"Lighting unavailable: {hardware.Rgb.UnavailableReason}");
 
             return hardware;
         }
@@ -456,7 +471,7 @@ namespace McenterLite.Helper
     /// <summary>Re-applies persisted settings to the hardware at startup.</summary>
     internal static class StartupApplier
     {
-        public static void ApplyAll(IHardware hardware, SettingsStore settings)
+        public static void ApplyAll(IHardware hardware, SettingsStore settings, LightingProfileStore lighting)
         {
             // TDP: the EC forgets across sleep and power-source changes, so this is re-applied
             // rather than assumed to have survived.
@@ -490,6 +505,27 @@ namespace McenterLite.Helper
                     Log.Info(result.Ok
                         ? $"Re-applied charge limit = {percent}%."
                         : $"Could not re-apply the charge limit: {result.Error}");
+                }
+            }
+
+            // Lighting. Unlike the settings above this is not insurance - it is REQUIRED. The
+            // controller keeps lighting in RAM and forgets it on a power cycle, so without this
+            // the LEDs come back as whatever the firmware defaults to and the widget's own
+            // selection would be a lie. Re-applied even for slot 0, because "off" is a state the
+            // user chose and a power cycle would otherwise silently turn the lights back on.
+            if (hardware.Rgb.Available)
+            {
+                int slot = settings.GetInt(SettingsKeys.LightingProfile, -1);
+                if (slot >= LightingProfileStore.OffSlot && slot <= LightingProfileStore.ProfileCount)
+                {
+                    var profile = slot == LightingProfileStore.OffSlot
+                        ? new LightingProfile { Name = "Off", Style = LightingStyle.Off }
+                        : lighting.Load(slot, Log.Warn);
+
+                    var result = hardware.Rgb.Apply(LightingRenderer.Render(profile));
+                    Log.Info(result.Ok
+                        ? $"Re-applied lighting profile {slot} '{profile.Name}'."
+                        : $"Could not re-apply the lighting: {result.Error}");
                 }
             }
 

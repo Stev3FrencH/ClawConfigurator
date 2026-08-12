@@ -7,15 +7,16 @@ notes behind the roadmap below.
 
 ## The headline
 
-**The MSI Center M dependency is nearly gone.** All three hardware features that ship now talk to
+**The MSI Center M dependency is nearly gone.** All four hardware features that ship now talk to
 the firmware directly and need MSI Center M neither running nor installed:
 
 - **Power limits** via `MSI_ACPI.Set_SlaveBattery` (ACPI-WMI), merged 2026-08-11.
 - **Controller mode** via the controller's vendor HID channel, merged 2026-08-12.
 - **Battery charge limit** via `MSI_ACPI.Set_AP` (ACPI-WMI), merged 2026-08-12.
+- **RGB lighting** via the vendor HID profile block, 2026-08-12.
 
-Everything remaining is either the two features still descoped and coming back — RGB then fan — or
-cleanup that waits on MSI Center M actually being uninstalled.
+**Fan control (G2) is the only feature left**, and then cleanup that waits on MSI Center M actually
+being uninstalled.
 
 ## Current build
 
@@ -39,6 +40,17 @@ powershell -ExecutionPolicy Bypass -File .\Diagnostics\Start-FakeHelper.ps1
 > (`AppxManifestPackageVersion`, `AppxManifestPackageVersionRevision`) were tried and **neither is
 > honoured by this project template** — do not retry them without new evidence.
 
+> **Install through `Install.ps1`, elevated. Do not call `Add-AppxPackage` directly.**
+> The running helper holds `helper.log` open inside the package's LocalCache, and Windows must
+> delete that app-data store to re-register the package. A live helper therefore fails the install
+> with `0x80073CF3` (updating) or `0x80073D05` (after the old package is already gone), and
+> **neither message mentions the helper**. Learned the slow way on 2026-08-12, after `0x80073CF3`
+> was first misread as a missing framework dependency.
+>
+> Killing the process is not enough either: the `McenterLiteHelper` scheduled task owns its
+> lifetime and can restart it mid-install. `Install.ps1` now stops *and disables* the task, then
+> re-enables it in a `finally`. Same supervisor trap as `MSI_Center_M_Server`, on our own code.
+
 ## Confirmed working on the Claw
 
 | Feature | Path | Verified |
@@ -46,6 +58,7 @@ powershell -ExecutionPolicy Bypass -File .\Diagnostics\Start-FakeHelper.ps1
 | Power limits (PL1/PL2) | `MSI_ACPI.Set_SlaveBattery` | 2026-08-11, against sustained-clock oracle |
 | Controller mode | vendor HID `0x24`/`0x26`/`0x27` | 2026-08-12, both directions + physical button |
 | Battery charge limit | `MSI_ACPI.Set_AP` | 2026-08-12, charging resumed past the old limit |
+| RGB lighting | vendor HID `0x04`/`0x05`/`0x21` | 2026-08-12, wave visible on the device |
 | CPU Boost | documented Win32 | 2026-08-10 |
 | OS Power Mode | documented Win32 | 2026-08-10 |
 | Gamepad navigation | — | 2026-08-10, compact mode |
@@ -86,32 +99,31 @@ persisted across a helper restart, and `Get_AP` confirmed every write.
 re-asserts that value later, on its own tick or on resume. It has no bearing on the standalone
 case, but it decides whether the two can coexist until the uninstall.
 
-### 1. RGB LED (G4) — next
+### ~~2. RGB LED (G4)~~ — DONE 2026-08-12
 
-**Much closer than the G4 section suggests.** That section still says report `0x0F` is unverified
-and unstarted; G5 has since proven it, established its framing, and shipped `MsiVendorHidChannel`,
-which speaks it. Finding and opening the channel — most of the work — is done.
+Shipped in 0.2.0.9 as the widget's **Lighting** card, **last** in the card order. Four segments:
+off plus three profiles. `Function.LightingProfile = 41` — a **new** ordinal, because the retired
+40 must never be reused — with `LightingProfileNames = 42` carrying the button labels.
 
-The concrete lead: with MSI Center M restarting, the controller emits a long multi-frame `0x05`
-dump whose payload is full of plausible RGB triples (`FF 00 00`, `FF A0 00`, `C8 C8 FF`) alongside
-per-zone records. **Capture that dump while changing one colour in MSI Center M, diff it, and that
-is very likely the whole gate.** `--hid-watch` already records it.
+**No colour picker.** The three profiles are text files the user edits, seeded to reproduce what
+MSI Center M had configured; see [`lighting-profiles.md`](lighting-profiles.md). The widget only
+chooses between them.
 
-**Scope, set 2026-08-12:** the widget does *not* need a colour picker. MSI Center M holds **three
-saved profiles**, and those three are the ones to keep. The widget should **cycle between the three
-and turn the lighting off and back on** — four states, no authoring.
+**Decoded from MSI's own binary, not by observation.** `API_ControlMode.dll` is unobfuscated .NET
+and carries the whole protocol. That also independently confirmed G5's opcodes. Full detail in
+[`hardware-notes.md`](hardware-notes.md#the-lighting-protocol--decoded-2026-08-12).
 
-That makes the gating question narrower but also sharper: **where do those three profiles live?**
+Two facts worth carrying forward:
 
-- *If the controller stores them*, this is small — find the "select profile N" command and the
-  on/off command, and nothing needs to be captured at all.
-- *If MSI Center M stores them* and merely pushes the resulting colours down, then the profiles die
-  with the uninstall. In that case each profile must be **captured as its literal payload while MSI
-  Center M is still installed** and replayed by us afterwards. There is no second chance at that
-  capture once MSI Center M is gone.
+- **The profiles were MSI Center M's, not the controller's.** They are archived at
+  `Diagnostics/mystic-light-profiles/`. The controller stores only flattened keyframes, which is
+  also why the selected profile is helper state rather than something readable back.
+- **Lighting is written to RAM, never flash.** `SyncToROM` (`0x22`) exists and is deliberately not
+  used. The helper re-applies at startup instead — including "off", so a power cycle cannot quietly
+  turn the lights back on.
 
-Settle that question first — it decides whether this feature is a lookup or an archive. Either way,
-**capture all three profiles before uninstalling anything.**
+Untested: whether MSI Center M re-asserts its own lighting later while both are installed. Same
+open question as the charge limit, and with the same non-bearing on the standalone case.
 
 ### 2. Fan control (G2) — hardest, do last
 

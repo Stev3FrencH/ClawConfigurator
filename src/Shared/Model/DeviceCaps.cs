@@ -61,6 +61,10 @@ namespace McenterLite.Shared.Model
         // ── Feature availability ─────────────────────────────────────────────────
         public bool HasChargeLimit { get; set; }
         public bool HasHwMouse { get; set; }
+
+        /// <summary>The controller's nine RGB LEDs, over the vendor HID channel.</summary>
+        public bool HasRgb { get; set; }
+
         public bool HasIgcl { get; set; }
 
         public string Serialize()
@@ -77,6 +81,7 @@ namespace McenterLite.Shared.Model
             Append(sb, "maxCharge", MaxChargeLimit);
             Append(sb, "hasCharge", HasChargeLimit ? "1" : "0");
             Append(sb, "hwMouse", HasHwMouse ? "1" : "0");
+            Append(sb, "hasRgb", HasRgb ? "1" : "0");
             Append(sb, "igcl", HasIgcl ? "1" : "0");
             return sb.ToString();
         }
@@ -118,6 +123,9 @@ namespace McenterLite.Shared.Model
                     case "maxCharge": caps.MaxChargeLimit = ToInt(value, caps.MaxChargeLimit); break;
                     case "hasCharge": caps.HasChargeLimit = value == "1"; break;
                     case "hwMouse": caps.HasHwMouse = value == "1"; break;
+                    // "hasRgb", not the retired "led": that key meant a brightness on/off flag in
+                    // a registry mirror, and an old helper still sends it with that meaning.
+                    case "hasRgb": caps.HasRgb = value == "1"; break;
                     case "igcl": caps.HasIgcl = value == "1"; break;
                     // Unknown keys are ignored on purpose - forward compatibility.
                 }

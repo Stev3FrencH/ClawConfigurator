@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.Versioning;
+using McenterLite.Shared.Model;
 
 namespace McenterLite.Hardware.Windows
 {
@@ -167,6 +168,51 @@ namespace McenterLite.Hardware.Windows
 
             error = null;
             return true;
+        }
+
+        /// <summary>
+        /// Lays a rendered animation into a light block, leaving everything else untouched.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Takes the block that was just read rather than building one from nothing, and edits
+        /// animation 0 in place. The other three animation slots hold whatever the firmware or MSI
+        /// Center M last left there, and the tail carries an audio-rhythm flag and a reserved byte
+        /// we have no decode for. None of that is ours to clear.
+        /// </para>
+        /// <para>
+        /// Animation 0 specifically, because that is the only slot MSI's own UI ever writes, so it
+        /// is the one slot the firmware is known to animate correctly.
+        /// </para>
+        /// </remarks>
+        public static byte[] BuildLightBlock(byte[] current, LightingAnimation animation)
+        {
+            var block = current != null && current.Length == LightLength
+                ? (byte[])current.Clone()
+                : new byte[LightLength];
+
+            block[ActiveAnimationIndexByte] = 0;
+
+            int start = AnimationStart(0);
+            block[start] = (byte)Math.Clamp(animation.KeyframeCount, 1, MaxKeyframes);
+            block[start + 1] = 9;
+            block[start + 2] = (byte)EncodeSpeed(animation.Speed);
+            block[start + 3] = (byte)Math.Clamp(animation.Brightness, 0, MaxBrightness);
+
+            for (int frame = 0; frame < MaxKeyframes; frame++)
+            {
+                int at = KeyframeStart(0, frame);
+                var leds = animation.Keyframes[frame].Leds;
+
+                for (int led = 0; led < RgbCount; led++)
+                {
+                    block[at + (led * 3)] = leds[led].R;
+                    block[at + (led * 3) + 1] = leds[led].G;
+                    block[at + (led * 3) + 2] = leds[led].B;
+                }
+            }
+
+            return block;
         }
 
         /// <summary>

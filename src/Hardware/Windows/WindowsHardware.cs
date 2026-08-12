@@ -70,6 +70,12 @@ namespace McenterLite.Hardware.Windows
             var chargeLimit = new WmiChargeLimitProvider();
             Caps.HasChargeLimit = identity.IsClaw8Ex && chargeLimit.Available;
 
+            // Gate G4, on the same vendor HID channel as controller mode above. No registry
+            // fallback exists or is wanted: the only thing the registry ever held was a
+            // brightness on/off flag, which is strictly less than this can do.
+            var rgb = new HidRgbProvider();
+            Caps.HasRgb = identity.IsClaw8Ex && rgb.Available;
+
             // A device we do not recognise gets nothing, whatever the registry contains. Every
             // value above is calibrated to one model, and a wrong power limit on a different Claw
             // is a real write to real firmware.
@@ -84,6 +90,10 @@ namespace McenterLite.Hardware.Windows
             HwMouse = identity.IsClaw8Ex
                 ? hwMouse
                 : new UnavailableHwMouse("This device is not an MSI Claw 8 EX AI+.");
+
+            Rgb = identity.IsClaw8Ex
+                ? rgb
+                : new UnavailableRgb("This device is not an MSI Claw 8 EX AI+.");
             Igcl = new UnavailableIgcl("Intel graphics controls are not implemented yet.");
 
             Power = new WindowsPowerProvider();
@@ -93,6 +103,7 @@ namespace McenterLite.Hardware.Windows
         public ITdpProvider Tdp { get; }
         public IChargeLimitProvider ChargeLimit { get; }
         public IHwMouseProvider HwMouse { get; }
+        public IRgbProvider Rgb { get; }
         public IPowerProvider Power { get; }
         public IIgclProvider Igcl { get; }
 
@@ -146,6 +157,17 @@ namespace McenterLite.Hardware.Windows
         }
 
         public OpResult Apply(int percent) => OpResult.Unavailable(UnavailableReason);
+    }
+
+    internal sealed class UnavailableRgb : IRgbProvider
+    {
+        public UnavailableRgb(string reason) => UnavailableReason = reason;
+
+        public bool Available => false;
+        public string UnavailableReason { get; }
+
+        public OpResult Apply(McenterLite.Shared.Model.LightingAnimation animation) =>
+            OpResult.Unavailable(UnavailableReason);
     }
 
     internal sealed class UnavailableHwMouse : IHwMouseProvider

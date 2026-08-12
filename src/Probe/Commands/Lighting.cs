@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using McenterLite.Hardware.Windows;
+using McenterLite.Shared.Model;
 
 namespace McenterLite.Probe.Commands
 {
@@ -59,6 +60,108 @@ namespace McenterLite.Probe.Commands
             Console.WriteLine();
 
             return 0;
+        }
+
+        /// <summary>
+        /// Applies a profile, or turns the lighting off. WRITES to the controller.
+        /// </summary>
+        /// <remarks>
+        /// Read-modify-write, and RAM only. Reading first preserves the three animation slots we
+        /// do not use and the two tail bytes we have no decode for; see
+        /// <see cref="MsiLightingProtocol.BuildLightBlock"/>.
+        /// </remarks>
+        public static int Set(string[] args)
+        {
+            if (args.Length == 0)
+            {
+                Console.Error.WriteLine("Usage: --set-lighting <1|2|3|off> [profileDirectory]");
+                return 64;
+            }
+
+            var directory = args.Length > 1
+                ? args[1]
+                : System.IO.Path.Combine(AppContext.BaseDirectory, "LightingProfiles");
+
+            LightingProfile profile;
+
+            if (args[0].Equals("off", StringComparison.OrdinalIgnoreCase))
+            {
+                profile = new LightingProfile { Name = "Off", Style = LightingStyle.Off };
+            }
+            else
+            {
+                if (!int.TryParse(args[0], out int slot)
+                    || slot < 1 || slot > LightingProfileStore.ProfileCount)
+                {
+                    Console.Error.WriteLine("Profile must be 1, 2, 3 or off.");
+                    return 64;
+                }
+
+                var store = new LightingProfileStore(directory);
+                store.EnsureSeeded(Console.WriteLine);
+                profile = store.Load(slot, Console.WriteLine);
+
+                Console.WriteLine($"Profiles in {store.Directory}");
+            }
+
+            var animation = LightingRenderer.Render(profile);
+
+            Console.WriteLine();
+            Console.WriteLine($"Applying '{profile.Name}': style {profile.Style}, " +
+                              $"{animation.KeyframeCount} keyframe(s), speed {animation.Speed}, " +
+                              $"brightness {animation.Brightness}.");
+
+            using var channel = MsiVendorHidChannel.Open(out var openError);
+            if (channel == null)
+            {
+                Console.Error.WriteLine($"ERROR: {openError}");
+                return 1;
+            }
+
+            if (!MsiLightingProtocol.TryReadLightBlock(channel, out var current, out var readError))
+            {
+                Console.Error.WriteLine($"ERROR: {readError}");
+                return 1;
+            }
+
+            var updated = MsiLightingProtocol.BuildLightBlock(current, animation);
+
+            if (!MsiLightingProtocol.TryWriteLightBlock(channel, updated, out var writeError))
+            {
+                Console.Error.WriteLine($"ERROR: {writeError}");
+                return 1;
+            }
+
+            // The write is not acknowledged with the value, so confirm by reading it back. Same
+            // rule the charge limit learned the hard way: a Set that returns cleanly proves only
+            // that something was sent.
+            if (!MsiLightingProtocol.TryReadLightBlock(channel, out var after, out var confirmError))
+            {
+                Console.Error.WriteLine($"Applied, but could not confirm: {confirmError}");
+                return 1;
+            }
+
+            int mismatch = -1;
+            for (int i = 0; i < updated.Length; i++)
+            {
+                if (updated[i] == after[i]) continue;
+                mismatch = i;
+                break;
+            }
+
+            Console.WriteLine();
+            if (mismatch < 0)
+            {
+                Console.WriteLine("Confirmed: the controller reads back exactly what was written.");
+            }
+            else
+            {
+                Console.WriteLine($"WARNING: read-back differs from offset {mismatch} " +
+                                  $"(wrote 0x{updated[mismatch]:X2}, read 0x{after[mismatch]:X2}).");
+            }
+
+            Console.WriteLine();
+            return mismatch < 0 ? 0 : 1;
         }
 
         private static void DumpAnimation(byte[] light, int index, bool active)

@@ -56,6 +56,7 @@ namespace McenterLite.Probe
                 case "hid-watch": return Commands.HidWatcher.Run(rest);
                 case "hid-listen": return Commands.HidRaw.Listen(rest);
                 case "lighting": return Commands.Lighting.Read(rest);
+                case "set-lighting": return Commands.Lighting.Set(rest);
                 case "set-hid-raw": return Commands.HidRaw.Send(rest);
                 case "controller-mode": return Commands.ControllerMode.Read(rest);
                 case "set-controller-mode": return Commands.ControllerMode.Set(rest);

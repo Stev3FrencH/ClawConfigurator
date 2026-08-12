@@ -244,10 +244,40 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Fan, battery charge limit and RGB lighting all had cards here. All three were
-                     removed 2026-08-08 - each is set in MSI Center, and MSI's own controls are
-                     better than anything this widget could offer. See docs/hardware-notes.md
-                     gates G2, G3 and G4 for the findings, which are kept as a device record. -->
+                <!-- 5. Lighting. LAST on purpose: it is the card least likely to be wanted
+                     mid-game, so it costs the least to be furthest from the top. -->
+                <Border x:Name="LightingCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Grid.Column="0" Glyph="&#xE781;" Style="{StaticResource CardIconStyle}" />
+                            <TextBlock Grid.Column="1" Text="Lighting" Style="{StaticResource CardTitleStyle}" />
+                        </Grid>
+
+                        <!-- Four segments: Off, then the three profiles. There is deliberately no
+                             colour picker - the profiles are text files the user edits, and this
+                             card only chooses between them. The three labels are the profile
+                             NAMES and are filled in from the helper at runtime, because renaming
+                             a profile means editing its file. See LightingProfileStore. -->
+                        <Grid x:Name="LightingSegments" Margin="0,12,0,0" />
+
+                        <TextBlock x:Name="LightingHintText"
+                                   Style="{StaticResource RowLabelStyle}"
+                                   Margin="0,10,0,0"
+                                   TextWrapping="Wrap"
+                                   Text="Edit these profiles in the Lighting folder beside the log." />
+                    </StackPanel>
+                </Border>
+
+                <!-- Fan control had a card here. Removed 2026-08-08 and still absent: gate G2
+                     never reconciled MSI's six-point curve with the five-point model the desk
+                     research described, so nothing was ever written to the EC. The battery
+                     charge limit and RGB lighting were removed alongside it and have both since
+                     come back, on firmware paths rather than MSI Center. See
+                     docs/hardware-notes.md. -->
 
                 <!-- A banner warning that MSI Center M was NOT running lived here until
                      2026-08-11. It made sense while the registry mirror was the only TDP path -

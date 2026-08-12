@@ -23,11 +23,13 @@ namespace McenterLite.Helper
     {
         private readonly IHardware _hw;
         private readonly SettingsStore _settings;
+        private readonly LightingProfileStore _lighting;
 
-        public FeatureDispatcher(IHardware hardware, SettingsStore settings)
+        public FeatureDispatcher(IHardware hardware, SettingsStore settings, LightingProfileStore lighting)
         {
             _hw = hardware ?? throw new ArgumentNullException(nameof(hardware));
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            _lighting = lighting ?? throw new ArgumentNullException(nameof(lighting));
         }
 
         /// <summary>Set by the widget so telemetry is only pushed while anyone is looking.</summary>
@@ -100,6 +102,18 @@ namespace McenterLite.Helper
                         ? PipeEnvelope.FromBool(desktopMode)
                         : null;
 
+                // Answered from settings, not from hardware: the controller stores keyframes and
+                // has no idea which profile produced them. See Function.LightingProfile.
+                case Function.LightingProfile:
+                    return _hw.Rgb.Available
+                        ? PipeEnvelope.FromInt(_settings.GetInt(SettingsKeys.LightingProfile, LightingProfileStore.OffSlot))
+                        : null;
+
+                // Re-read from disk every time rather than cached, so renaming a profile in its
+                // file shows up on the next time the widget opens.
+                case Function.LightingProfileNames:
+                    return _hw.Rgb.Available ? BuildProfileNames() : null;
+
                 case Function.CpuBoost:
                     return _hw.Power.TryReadCpuBoost(out bool boost) ? PipeEnvelope.FromBool(boost) : null;
 
@@ -154,6 +168,9 @@ namespace McenterLite.Helper
 
                 case Function.ChargeLimitPercent:
                     return SetChargeLimit(request);
+
+                case Function.LightingProfile:
+                    return SetLightingProfile(request);
 
                 case Function.HwMouseMode:
                     return Apply(request, _hw.HwMouse.Apply(request.AsBool()),
@@ -251,6 +268,63 @@ namespace McenterLite.Helper
             Log.Info($"Charge limit -> {percent}%; hardware reports {actual}%.");
 
             return Ok(request, PipeEnvelope.FromInt(actual));
+        }
+
+        /// <summary>
+        /// Applies a lighting profile, or turns the lighting off.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The profile file is read HERE, at the moment of the tap, rather than cached at startup.
+        /// That is what makes the files a usable editing surface: save the file, tap the button,
+        /// see the change - with nothing to restart.
+        /// </para>
+        /// <para>
+        /// Nothing is captured for uninstall restore. Unlike the power and charge limits there is
+        /// no prior value to put back: lighting lives in the controller's RAM, so the state before
+        /// we touched it was itself written by whatever ran last, and a power cycle clears it
+        /// regardless. Restoring would mean inventing a value, not returning one.
+        /// </para>
+        /// </remarks>
+        private PipeEnvelope SetLightingProfile(PipeEnvelope request)
+        {
+            if (!_hw.Rgb.Available)
+                return PipeEnvelope.Failure(request.Id, request.Fn, _hw.Rgb.UnavailableReason);
+
+            int slot = request.AsInt(LightingProfileStore.OffSlot);
+            if (slot < LightingProfileStore.OffSlot || slot > LightingProfileStore.ProfileCount)
+                return PipeEnvelope.Failure(request.Id, request.Fn, $"There is no lighting profile {slot}.");
+
+            var profile = slot == LightingProfileStore.OffSlot
+                ? new LightingProfile { Name = "Off", Style = LightingStyle.Off }
+                : _lighting.Load(slot, Log.Warn);
+
+            var result = _hw.Rgb.Apply(LightingRenderer.Render(profile));
+            if (!result.Ok)
+            {
+                Log.Warn($"Lighting write FAILED: profile {slot} '{profile.Name}' - {result.Error}");
+                return PipeEnvelope.Failure(request.Id, request.Fn, result.Error);
+            }
+
+            _settings.SetInt(SettingsKeys.LightingProfile, slot);
+
+            Log.Info($"Lighting -> profile {slot} '{profile.Name}' ({profile.Style}).");
+
+            return Ok(request, PipeEnvelope.FromInt(slot));
+        }
+
+        /// <summary>The three profile names for the widget's buttons, U+001F separated.</summary>
+        private string BuildProfileNames()
+        {
+            var names = new List<string>();
+            foreach (var profile in _lighting.LoadAll())
+            {
+                // A name carrying the separator would split into two buttons and silently shift
+                // every profile after it. The file is hand-edited, so this is reachable.
+                names.Add((profile.Name ?? "Profile").Replace(RecordSeparator, " ").Trim());
+            }
+
+            return string.Join(RecordSeparator, names.ToArray());
         }
 
         private PipeEnvelope SetCpuBoost(PipeEnvelope request)
@@ -410,6 +484,8 @@ namespace McenterLite.Helper
             Function.PerfMode,
             Function.ChargeLimitPercent,
             Function.HwMouseMode,
+            Function.LightingProfile,
+            Function.LightingProfileNames,
             Function.CpuBoost,
             Function.OsPowerMode,
             Function.IntelFpsTier,

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using McenterLite.Shared.Ipc;
 using McenterLite.Shared.Model;
@@ -164,6 +164,25 @@ namespace McenterLite.Widget
                 set { foreach (var segment in _segments) segment.IsEnabled = value; }
             }
 
+            public int Count => _segments.Length;
+
+            /// <summary>
+            /// Retitles one segment, for labels that are not known until the helper answers.
+            /// </summary>
+            /// <remarks>
+            /// Sets <see cref="ContentControl.Content"/> only. That re-renders the content
+            /// presenter but does NOT rebuild the control template, so unlike assigning
+            /// <see cref="FrameworkElement.Style"/> it does not throw focus away - see
+            /// <see cref="Paint"/> for why that distinction matters here.
+            /// </remarks>
+            public void Relabel(int index, string text)
+            {
+                if (index < 0 || index >= _segments.Length) return;
+                if (string.IsNullOrWhiteSpace(text)) return;
+
+                _segments[index].Content = text;
+            }
+
             /// <summary>
             /// The leftmost button, for <see cref="SetInitialFocus"/>.
             /// </summary>
@@ -231,6 +250,27 @@ namespace McenterLite.Widget
             (1, "60"),
         };
 
+        /// <summary>
+        /// The lighting segments, left to right. Index IS the profile slot the helper expects.
+        /// </summary>
+        /// <remarks>
+        /// No mapping table, unlike <see cref="HwMouseSegmentOrder"/> and friends, because here
+        /// the display order and the wire values genuinely coincide: slot 0 is off and slots 1-3
+        /// are the profiles, which is also the order they should read in. The three profile labels
+        /// are placeholders until the helper sends the real names.
+        /// </remarks>
+        private static readonly string[] LightingSegmentLabels = { "Off", "1", "2", "3" };
+
+        /// <summary>
+        /// Separates the packed profile names. Matches the helper's own separator.
+        /// </summary>
+        /// <remarks>
+        /// The snapshot escapes this character on the wire and <c>HelperConnection</c> unescapes
+        /// it, so by the time a value reaches here it is a real U+001F again.
+        /// </remarks>
+        private const char RecordSeparator = '\u001F';
+
+        private SegmentedControl _lighting;
         private SegmentedControl _hwMouse;
         private SegmentedControl _cpuBoost;
         private SegmentedControl _powerMode;
@@ -254,6 +294,9 @@ namespace McenterLite.Widget
                 _hwMouse = new SegmentedControl(HwMouseSegments,
                     Array.ConvertAll(HwMouseSegmentOrder, segment => segment.Label));
                 _hwMouse.Selected += OnHwMouseSelected;
+
+                _lighting = new SegmentedControl(LightingSegments, LightingSegmentLabels);
+                _lighting.Selected += OnLightingSelected;
 
                 _cpuBoost = new SegmentedControl(CpuBoostSegments,
                     Array.ConvertAll(CpuBoostSegmentOrder, segment => segment.Label));
@@ -473,7 +516,7 @@ namespace McenterLite.Widget
             RootContent.Opacity = requested / 100.0;
         }
 
-        // ── Startup ─────────────────────────────────────────────────────────────
+        // â”€â”€ Startup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private async Task StartAsync()
         {
@@ -521,7 +564,7 @@ namespace McenterLite.Widget
             }
         }
 
-        // ── Applying helper state ───────────────────────────────────────────────
+        // â”€â”€ Applying helper state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private async void OnSnapshotApplied()
         {
@@ -740,6 +783,7 @@ namespace McenterLite.Widget
             ChargeLimitSlider.Maximum = caps.MaxChargeLimit;
 
             HwMouseCard.Visibility = Visible(caps.HasHwMouse);
+            LightingCard.Visibility = Visible(caps.HasRgb);
             IntelCard.Visibility = Visible(caps.HasIgcl && _connection.IsAvailable(Function.IntelFpsTier));
         }
 
@@ -759,6 +803,12 @@ namespace McenterLite.Widget
             ApplyValue(Function.Pl2);
             ApplyValue(Function.ChargeLimitPercent);
             ApplyValue(Function.HwMouseMode);
+
+            // Names before the selection: the labels have to exist before a segment is
+            // highlighted, or the highlighted button reads as a placeholder for one frame.
+            ApplyValue(Function.LightingProfileNames);
+            ApplyValue(Function.LightingProfile);
+
             ApplyValue(Function.CpuBoost);
             ApplyValue(Function.OsPowerMode);
             ApplyValue(Function.IntelFpsTier);
@@ -797,6 +847,15 @@ namespace McenterLite.Widget
                     break;
                 }
 
+                case Function.LightingProfileNames:
+                    ShowLightingNames(_connection.Get(Function.LightingProfileNames));
+                    break;
+
+                case Function.LightingProfile:
+                    // The slot index IS the segment index; see LightingSegmentLabels.
+                    _lighting.Show(_connection.GetInt(Function.LightingProfile, 0));
+                    break;
+
                 case Function.CpuBoost:
                 {
                     bool boost = _connection.GetBool(Function.CpuBoost);
@@ -824,7 +883,7 @@ namespace McenterLite.Widget
             }
         }
 
-        // ── User input ──────────────────────────────────────────────────────────
+        // â”€â”€ User input â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // Every handler starts with the same guard. See _applyingFromHelper.
 
         /// <summary>
@@ -1046,6 +1105,40 @@ namespace McenterLite.Widget
             await SendAsync(Function.ChargeLimitPercent, percent);
         }
 
+        /// <summary>
+        /// Relabels the three profile buttons from the helper's names.
+        /// </summary>
+        /// <remarks>
+        /// Segment 0 is "Off" and is never relabelled - it is ours, not a profile. Anything the
+        /// helper does not name keeps its placeholder rather than going blank, so a profile file
+        /// with an empty <c>Name=</c> still leaves a button you can press.
+        /// </remarks>
+        private void ShowLightingNames(string packed)
+        {
+            if (string.IsNullOrEmpty(packed)) return;
+
+            var names = packed.Split(RecordSeparator);
+            for (int i = 0; i < names.Length && i + 1 < _lighting.Count; i++)
+                _lighting.Relabel(i + 1, names[i]);
+        }
+
+        /// <summary>
+        /// Applies a lighting profile.
+        /// </summary>
+        /// <remarks>
+        /// No debounce, unlike the TDP and charge-limit sliders. Those are continuous controls
+        /// that emit a value per pixel of travel; this is four discrete buttons, so every event is
+        /// already a deliberate choice and delaying it would only make the LEDs feel laggy.
+        /// </remarks>
+        private async void OnLightingSelected(int segment)
+        {
+            if (_applyingFromHelper) return;
+            if (segment < 0 || segment >= _lighting.Count) return;
+
+            _lighting.Show(segment);
+            await SendAsync(Function.LightingProfile, segment);
+        }
+
         private async void OnHwMouseSelected(int segment)
         {
             if (_applyingFromHelper) return;
@@ -1090,7 +1183,7 @@ namespace McenterLite.Widget
 
         private async void StatusActionButton_Click(object sender, RoutedEventArgs e) => await StartAsync();
 
-        // ── Plumbing ────────────────────────────────────────────────────────────
+        // â”€â”€ Plumbing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private Task SendAsync(Function function, bool value) => SendAsync(function, value ? "1" : "0");
 

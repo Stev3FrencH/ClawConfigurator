@@ -118,31 +118,56 @@ if ($CertificatePath) {
 }
 
 # ── Stop anything already running ─────────────────────────────────────────────
-# The helper holds hardware handles. Letting an old build stay alive while a new one registers
-# risks two versions writing the same embedded controller at once, which the reference project
-# reports can hard-reset the machine (Kernel-Power 41). We have no ring-0 code, but the EC is
-# still a single shared resource.
+# Two reasons, and the second one is what actually bites.
+#
+# 1. The helper holds hardware handles. Letting an old build stay alive while a new one registers
+#    risks two versions writing the same embedded controller at once, which the reference project
+#    reports can hard-reset the machine (Kernel-Power 41). We have no ring-0 code, but the EC is
+#    still a single shared resource.
+#
+# 2. The helper holds helper.log OPEN inside the package's LocalCache. Windows has to delete that
+#    app-data store to re-register the package, so a live helper fails the install outright -
+#    0x80073CF3 on an update, or 0x80073D05 ("could not delete the existing application data
+#    store") once the old package has already been removed. Neither message mentions the helper.
+#
+# STOP THE SCHEDULED TASK FIRST. Killing the process alone is not enough: the task owns the
+# helper's lifetime and can start it again between the kill and the install, which reproduces the
+# same failure with no sign of why. Same shape as the MSI_Center_M_Server supervisor trap in
+# docs/hardware-notes.md - kill the child, the parent brings it back.
 Write-Host "Stopping any running instance..." -ForegroundColor Cyan
 
-$stopped = $false
-foreach ($name in 'McenterLite.Helper', 'McenterLite.Widget') {
-    Get-Process -Name $name -ErrorAction SilentlyContinue | ForEach-Object {
-        Write-Host "  stopping $($_.ProcessName) (pid $($_.Id))"
-        try { $_.Kill() } catch { Write-Warning "  could not stop pid $($_.Id): $_" }
-        $stopped = $true
-    }
+$taskName = 'McenterLiteHelper'
+$task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+if ($task) {
+    Write-Host "  stopping scheduled task $taskName"
+    try { Stop-ScheduledTask -TaskName $taskName -ErrorAction Stop } catch { Write-Warning "  could not stop the task: $_" }
+
+    # Disabled, not just stopped: a stopped ONLOGON task can still be triggered while the install
+    # is in flight. Re-enabled below whatever happens, so a failed install cannot leave the helper
+    # permanently unable to start.
+    try { Disable-ScheduledTask -TaskName $taskName -ErrorAction Stop | Out-Null } catch { }
 }
 
-if ($stopped) {
-    # Wait for handles to actually close, not just for the processes to disappear.
-    $deadline = (Get-Date).AddSeconds(15)
-    while ((Get-Date) -lt $deadline) {
-        $alive = Get-Process -Name 'McenterLite.Helper', 'McenterLite.Widget' -ErrorAction SilentlyContinue
-        if (-not $alive) { break }
-        Start-Sleep -Milliseconds 300
+try {
+    $stopped = $false
+    foreach ($name in 'McenterLite.Helper', 'McenterLite.Widget') {
+        Get-Process -Name $name -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "  stopping $($_.ProcessName) (pid $($_.Id))"
+            try { $_.Kill() } catch { Write-Warning "  could not stop pid $($_.Id): $_" }
+            $stopped = $true
+        }
     }
-    Start-Sleep -Milliseconds 500
-}
+
+    if ($stopped) {
+        # Wait for handles to actually close, not just for the processes to disappear.
+        $deadline = (Get-Date).AddSeconds(15)
+        while ((Get-Date) -lt $deadline) {
+            $alive = Get-Process -Name 'McenterLite.Helper', 'McenterLite.Widget' -ErrorAction SilentlyContinue
+            if (-not $alive) { break }
+            Start-Sleep -Milliseconds 300
+        }
+        Start-Sleep -Milliseconds 500
+    }
 
 # ── Install ───────────────────────────────────────────────────────────────────
 Write-Host "Installing..." -ForegroundColor Cyan
@@ -205,6 +230,15 @@ catch [Exception] {
         Copy-Item $preserved (Join-Path $restoreTo 'settings.json') -Force
         Remove-Item $preserved -Force -ErrorAction SilentlyContinue
         Write-Host "  restored settings.json" -ForegroundColor DarkGray
+    }
+}
+}
+finally {
+    # Always re-enable, including after a failed install. The helper deploys and re-registers
+    # itself on next run anyway, but leaving a disabled task behind means no hardware control and
+    # no obvious reason for it.
+    if ($task) {
+        try { Enable-ScheduledTask -TaskName $taskName -ErrorAction Stop | Out-Null } catch { }
     }
 }
 
