@@ -80,6 +80,17 @@ function Get-MsiProcesses {
     Get-Process | Where-Object { $_.ProcessName -like 'MSI_Center_M*' }
 }
 
+function Get-ModeName {
+    param([string]$Hex)
+
+    switch ($Hex) {
+        '01' { 'XInput' }
+        '02' { 'DirectInput' }
+        '04' { 'Desktop' }
+        default { "0x$Hex" }
+    }
+}
+
 function Read-Mode {
     $output = & $probe --controller-mode 2>&1
     return ($output | Out-String).Trim()
@@ -97,6 +108,10 @@ function Stop-MsiCenter {
     Start-Sleep -Seconds 1
 
     foreach ($p in Get-MsiProcesses) {
+        # Children exit with their supervisor, so by the time we get here most are already gone.
+        # That is the expected case, not a failure worth warning about.
+        if ($null -eq (Get-Process -Id $p.Id -ErrorAction SilentlyContinue)) { continue }
+
         try { Stop-Process -Id $p.Id -Force -ErrorAction Stop } catch {
             Write-Warning "Could not stop $($p.ProcessName) ($($p.Id)): $($_.Exception.Message)"
         }
@@ -150,25 +165,42 @@ try {
     Write-Host '>>> PRESS THE PHYSICAL MSI BUTTON two or three times now. <<<' -ForegroundColor Yellow
     Write-Host ''
 
-    & $probe --hid-watch $Seconds
+    # Collect while still printing live, so the tester can see frames land as they press.
+    $watchOutput = & $probe --hid-watch $Seconds 2>&1 | ForEach-Object { Write-Host $_; $_ }
 
     $modeAfter = Read-Mode
+
+    # The verdict comes from the 0x27 announcements, NOT from comparing before against after.
+    # An even number of presses lands back where it started, and a before/after comparison reads
+    # that as "nothing happened" - which is exactly how this script drew the wrong conclusion on
+    # 2026-08-12 while the button was demonstrably working.
+    $announced = $watchOutput |
+        Select-String -Pattern '3C 27 ([0-9A-Fa-f]{2})' |
+        ForEach-Object { $_.Matches[0].Groups[1].Value.ToUpperInvariant() }
+
     Write-Host ''
     Write-Host '=== Result ===' -ForegroundColor Cyan
     Write-Host "Mode before presses  : $modeBefore"
     Write-Host "Mode after presses   : $modeAfter"
+    Write-Host "Announcements (0x27) : $(if ($announced) { ($announced | ForEach-Object { Get-ModeName $_ }) -join ' -> ' } else { '(none)' })"
     Write-Host ''
 
-    if ($modeBefore -ne $modeAfter) {
+    if ($announced.Count -gt 0) {
         Write-Host 'THE BUTTON WORKS WITHOUT MSI CENTER M.' -ForegroundColor Green
-        Write-Host 'The firmware owns the button. The helper only needs to listen for 0x27 so the'
+        Write-Host 'The firmware owns the button. The helper only needs to LISTEN for 0x27 so the'
         Write-Host 'widget follows it - there is no press to intercept and no switch to re-issue.'
+
+        $distinct = $announced | Select-Object -Unique
+        if ($distinct -contains '02') {
+            Write-Host ''
+            Write-Host 'NOTE: DirectInput (0x02) was announced. The button is a three-way cycle, and' -ForegroundColor Yellow
+            Write-Host 'IHwMouseProvider''s boolean cannot represent that.' -ForegroundColor Yellow
+        }
     }
     else {
-        Write-Host 'The mode did NOT change.' -ForegroundColor Red
+        Write-Host 'No mode announcement arrived.' -ForegroundColor Red
         Write-Host 'If you definitely pressed the button, MSI Center M was doing the switching, and'
-        Write-Host 'the helper will have to detect the press and send 0x24 itself. Check the watch'
-        Write-Host 'output above for any frame that arrived on a press - that is the press event.'
+        Write-Host 'the helper will have to detect the press and send 0x24 itself.'
     }
 }
 finally {

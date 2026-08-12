@@ -29,6 +29,10 @@
 
   <ItemGroup>
     <PackageReference Include="System.Management" Version="8.0.0" />
+
+    <!-- The controller's vendor HID channel: mode switching now, LED later. Cross-platform, so
+         it does not break the macOS authoring build this project's TFM is chosen to preserve. -->
+    <PackageReference Include="HidSharp" Version="2.1.0" />
   </ItemGroup>
 
   <ItemGroup>

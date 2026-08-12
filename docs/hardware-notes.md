@@ -857,32 +857,76 @@ snapshot after a `PerfMode` change rather than trusting a stale local value.
 The firmware variant, not software cursor injection — that is the whole point, because a real HID
 mouse keeps working on the UAC secure desktop.
 
-- [ ] Write report identified
-- [ ] **Read-back path identified** (the physical MSI button changes this too, so the helper
+- [x] Write report identified
+- [x] **Read-back path identified** (the physical MSI button changes this too, so the helper
       cannot assume it owns the state)
 - [ ] Verified working on the UAC secure desktop
 
-Desk research gives the write path outright: the vendor HID command channel uses opcode `0x24`
-(SwitchMode) with **`0x04` = MODE_DESKTOP (mouse)** and **`0x02` = MODE_DINPUT**. The other
-opcodes on that channel are `0x21` write, `0x04` read, `0x22` SyncROM. What remains is the
-read-back path and the physical-button interaction.
+**Result: GREEN via vendor HID, standalone of MSI Center M (changed 2026-08-12).**
 
-| Fact | Value | Source |
+### The vendor command channel
+
+Interface `VID_0DB0&PID_1901&MI_01`, usage page `0xFFA0` / usage `0x0001`. Two reports, both 64
+bytes: **output `0x0F`** and **input `0x10`**. There is no feature report, so a read is a send
+followed by a listen.
+
+```
+byte 0   report id   0x0F outbound, 0x10 inbound
+byte 1   0x00
+byte 2   0x00
+byte 3   0x3C        60 - payload length, i.e. the 63 report bytes less this header
+byte 4   opcode
+byte 5+  arguments, zero padded to 64
+```
+
+| Opcode | Direction | Meaning |
 |---|---|---|
-| Report to enable | opcode `0x24`, mode `0x04` — **verify on device** | reference RE notes |
-| Report to disable | opcode `0x24`, mode `0x02` — **verify on device** | reference RE notes |
-| How to read current mode | | opcode `0x04` is the read; framing unknown |
-| Physical button behaviour | | the MSI button changes mode behind our back |
+| `0x26` | out | query mode |
+| `0x27` | in | **mode is now `<mode>`** — answers `0x26`, and is *pushed* on a button press |
+| `0x24` | out | switch to `<mode>` |
+| `0x06` | in | follows every mode change; also seen alone. Undecoded, and not needed |
+| `0x05` | in | long multi-frame config dump, including LED colours. Relevant to **G4**, not here |
 
-**Result: GREEN via registry. IMPLEMENTED 2026-08-08.**
-`HKLM\SOFTWARE\WOW6432Node\MSI\MSI Center M\OsdEditor`, value `ControlModeUserSet`, REG_SZ,
-`"XInput"` ↔ `"Desktop"`, confirmed in both directions. Note the same value name also exists
-(empty) under `Component\User Scenario` — writing that one would diff convincingly and do nothing.
-`RegistryHwMouseProvider` hard-codes the `OsdEditor` path for exactly that reason.
+**Modes: `0x01` XInput · `0x02` DirectInput · `0x04` Desktop.** The reference notes had only
+`0x24` with `0x04`/`0x02`, no `0x01`, and no read path at all — which is precisely why this gate
+sat open. The `0x26`/`0x27` pair and `0x01` were established on device by watching the channel
+(`--hid-watch`), not by guessing, and the read was cross-checked against MSI Center's own registry
+value as an independent oracle.
 
-The firmware HID route (`0x24` SwitchMode, `0x04` desktop / `0x02` DInput) remains the fallback,
-and is still the only route that works when MSI Center is not running. Not implemented — the
-registry path is verified and needs no HID handle.
+### The registry was downstream all along
+
+Writing the mode over HID makes MSI Center M update `ControlModeUserSet` to match. It *watches* the
+device and mirrors it; it was never the source of truth. That retires the objection that the
+registry path was "verified" — it was, but it was verifying a shadow.
+
+**And the shadow lags.** Immediately after a HID switch the registry still read `XInput` while the
+device reported `Desktop`, catching up about a second later. The widget polls this at ~1 Hz, so the
+old path could show a mode the device was not in — briefly, but for longer than a frame.
+
+### The firmware owns the physical button
+
+Confirmed 2026-08-12 with the **whole MSI Center M stack stopped** and verified down first —
+`MSI_Center_M_Server` supervises every other server and is a **scheduled task, not a service**, so
+killing a child alone respawns it and stopping the service does nothing. With it genuinely gone the
+button still switched modes, still announced each change on `0x27`, and `0x26` still answered.
+
+**Consequence: there is no button press to intercept and no switch to re-issue.** The helper only
+has to listen so the widget follows the hardware. Repeatable via
+`Diagnostics/Test-ControllerModeStandalone.ps1`.
+
+The button toggles `0x01` ↔ `0x04` only; DirectInput was never observed from it.
+
+### Notes for the implementation
+
+- **No elevation needed**, unlike the ACPI-WMI TDP path, and the collection opens **shared** — it
+  worked alongside a running MSI Center M holding the same handle.
+- **A software `0x24` produces no `0x27`.** Only the button announces. So a write must be confirmed
+  by a `0x26` query; waiting for an announcement that never comes would hang.
+- **Mode does not re-enumerate.** The PID stays `0x1901` across every switch, so the device list is
+  *not* a read-back path. Worth stating because it is the obvious thing to reach for.
+- **Three states, one boolean.** `IHwMouseProvider` models this as `bool desktopMode`, which cannot
+  express DirectInput. Nothing we or the button produce reaches that state today, so the boolean is
+  not wrong — but it is a narrowing, and it is deliberate rather than inherited.
 
 **How the shared-ownership problem is handled.** The physical MSI button switches the same mode, so
 a read can disagree with our last write at any moment through no fault of ours. Two consequences,
