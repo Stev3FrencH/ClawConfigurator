@@ -3,39 +3,48 @@
 A lightweight front-end for the settings MSI's M Center owns, targeting **only** the MSI Claw 8 EX
 AI+ (Panther Lake, `CG3EM` / board `1T91`), delivered as an Xbox Game Bar widget.
 
-> **MSI Center M must stay installed and running.** This is not a replacement for it — power
-> limits are applied *through* it, by writing the model its own service reads. That is the same
-> arrangement ClawTweaks uses, and the reason it works on this device. See
-> [docs/hardware-notes.md](docs/hardware-notes.md#relationship-to-msi-center-m).
+> **The goal is to replace MSI Center M, and it no longer has to be running.** This started as a
+> front-end that drove MSI Center M's own registry model, and both shipped hardware features have
+> since moved off it: power limits go through `MSI_ACPI` (ACPI-WMI) and controller mode through the
+> controller's vendor HID channel. Neither needs MSI Center M running, and neither should need it
+> installed. See [docs/hardware-notes.md](docs/hardware-notes.md).
+>
+> **Not yet proven:** that these paths survive an actual MSI Center M *uninstall*. Everything so far
+> was verified with its stack **stopped**, which is not the same thing. MSI Center M is deliberately
+> kept installed for now, both to compare against and because that assumption is untested.
 
-> **Status: the widget builds, packages, installs, and runs on the real Claw.** CPU Boost, OS Power
-> Mode and the Power Limits card are verified working end-to-end, including reflecting changes made
-> outside the widget (Windows Settings, the taskbar flyout, the physical mode button).
+> **Status: the widget builds, packages, installs, and runs on the real Claw.** Power limits,
+> controller mode, CPU Boost and OS Power Mode are all verified working end-to-end, including
+> reflecting changes made outside the widget — Windows Settings, the taskbar flyout, and the
+> physical MSI mode button.
 >
-> **The scope has narrowed deliberately.** Fan control, battery charge limit and RGB LED were all
-> removed (2026-08-08): each is set in MSI Center, none changes often, and MSI's own controls are
-> better than anything this widget could offer for them. Controller mode (G5) is implemented but
-> not yet tried on the Claw; Intel GPU controls (G6) remain an unimplemented stub. See
-> [docs/hardware-notes.md](docs/hardware-notes.md) for the full gate-by-gate picture, including the
-> findings from the removed features, which are kept as a device record.
->
-> What is left is the part MSI Center is *worse* at: changing power limits quickly, from a
-> controller, without leaving the game.
+> **Scope is widening again.** Fan control, battery charge limit and RGB LED were removed
+> (2026-08-08) on the reasoning that MSI Center did them better. **That reasoning expired** once the
+> plan became to uninstall MSI Center M, so all three are coming back — see
+> [docs/status.md](docs/status.md#next-up) for the order and the open question each one carries.
+> Intel GPU controls (G6) remain an unimplemented stub.
 
 ## Scope
 
-Eight features were planned. Three were removed once it was clear MSI Center does them better:
+Eight features were planned. Three were descoped on 2026-08-08 and are being brought back, because
+the reason for dropping them — "MSI Center does it better" — stops applying once MSI Center M is
+uninstalled.
 
-| # | Feature | Status |
-|---|---|---|
-| 1 | TDP (PL1 / PL2) — via MSI Center's registry model | ✅ verified on device |
-| 2 | ~~Fan presets~~ — **removed**, set it in MSI Center | descoped 2026-08-08 |
-| 3 | ~~Battery charge limit~~ — **removed**, set it in MSI Center | descoped 2026-08-08 |
-| 4 | ~~RGB LED~~ — **removed**, MSI Center's lighting control is far richer | descoped 2026-08-08 |
-| 5 | Controller mode — Gamepad / Desktop (real HID mouse) | ✅ implemented, unverified on device |
-| 6 | CPU Boost | ✅ verified on device |
-| 7 | OS Power Mode | ✅ verified on device |
-| 8 | Intel GPU controls (IGCL) | blocked on gate G6 |
+| # | Feature | Path | Status |
+|---|---|---|---|
+| 1 | TDP (PL1 / PL2) | `MSI_ACPI.Set_SlaveBattery` | ✅ verified on device, standalone |
+| 2 | Fan control | TBD — `Get_Fan`/`Set_Fan`, or EC | planned, gate G2 (hardest) |
+| 3 | Battery charge limit | `MSI_ACPI.Get_AP`/`Set_AP` | planned, gate G3 (next up) |
+| 4 | RGB LED | vendor HID report `0x0F` | planned, gate G4 |
+| 5 | Controller mode — Gamepad / Desktop | vendor HID `0x24`/`0x26`/`0x27` | ✅ verified on device, standalone |
+| 6 | CPU Boost | documented Win32 | ✅ verified on device |
+| 7 | OS Power Mode | documented Win32 | ✅ verified on device |
+| 8 | Intel GPU controls (IGCL) | `ControlLib.dll` | blocked on gate G6 |
+
+Each returning feature carries the same gating question, and it is the first thing to settle in
+each case: **can it be driven with MSI Center M absent?** That question changed the design of both
+features shipped so far — in both, a registry value that round-tripped convincingly turned out to
+be a *mirror* of the real control surface rather than the surface itself.
 
 Live metrics and per-game profiles are out of scope.
 
@@ -43,11 +52,14 @@ Live metrics and per-game profiles are out of scope.
 
 - **No kernel driver.** Only MSI ACPI-WMI, user-mode vendor HID, Intel IGCL, and documented
   Windows APIs. No WinRing0, inpoutx64, PawnIO, kx.exe, MSR or MCHBAR access. This rules out the
-  `kx.exe` MCHBAR route to TDP — which costs nothing, because power limits go through MSI Center's
-  registry model instead.
-- **Runs alongside MSI Center M, not instead of it.** Accepting that dependency is what makes the
-  no-driver constraint affordable. The trade is a real one: TDP rides on an undocumented,
-  MSI-owned registry schema that an MSI Center update can change without warning.
+  `kx.exe` MCHBAR route to TDP — which costs nothing, because `MSI_ACPI` reaches the same register
+  through firmware Windows already exposes.
+- **Independent of MSI Center M, and increasingly so.** The original design accepted MSI Center M
+  as a dependency to make the no-driver constraint affordable. That trade turned out to be
+  unnecessary: both shipped features now drive firmware directly. **Prefer a firmware path over a
+  registry one even when both work** — twice now, the registry value has been a mirror maintained
+  by MSI Center M rather than a control surface, which means it vanishes with MSI Center M and can
+  lag behind the hardware in the meantime.
 - **The helper is authoritative.** Every write is read back and the actual value returned; the
   widget renders that, never its own optimistic value.
 - **Every value is clamped server-side.** The pipe is ACL'd to all app packages, so the widget's
@@ -192,14 +204,20 @@ McenterLite.Helper.exe --fake-hardware
 Discovery and verification, on the Claw, elevated:
 
 ```
-McenterLite.Probe.exe --device        # confirm the model gate
-McenterLite.Probe.exe --power         # CPU boost + power mode (real, works anywhere)
+McenterLite.Probe.exe --device            # confirm the model gate
+McenterLite.Probe.exe --power             # CPU boost + power mode (real, works anywhere)
 McenterLite.Probe.exe --dump-acpi C:\acpi
 McenterLite.Probe.exe --wmi-classes MSI
+McenterLite.Probe.exe --acpi-get Get_AP   # read-only MSI_ACPI call, e.g. the charge limit
 McenterLite.Probe.exe --hid-list
+McenterLite.Probe.exe --hid-watch 120     # live vendor-HID traffic; press the MSI button
+McenterLite.Probe.exe --controller-mode
 ```
 
-Read commands are safe; only `set-*` changes anything.
+Read commands are safe; only `set-*` changes anything. `--hid-watch` is how the controller-mode
+protocol was decoded and is the tool to reach for on the remaining gates — it prints every frame
+the controller emits, which is where the RGB lead in
+[docs/status.md](docs/status.md#next-up) came from.
 
 ## Phase 0 — the hard gate
 
@@ -222,12 +240,21 @@ Do not copy code: ClawTweaks is AGPLv3, and copying it would force the same lice
 
 ## Safety
 
-**Nothing here writes to the embedded controller.** Fan control was the only feature that would
-have, and it was removed — so the EC duty tables, the ≤ 75 clamp, the monotonic-curve rule and the
-Intel IPF escape hatch that used to live here are all gone with it. What remains writes MSI
-Center's own registry model and documented Windows power APIs, nothing lower.
+**This writes real firmware.** An earlier version of this section claimed nothing here touched the
+embedded controller; that was true only for the brief window when power limits went through MSI
+Center's registry model and fan control had been removed. It is **not** true now:
 
-The mitigations that do still apply are structural rather than advisory:
+- **Power limits** go to the EC through `MSI_ACPI.Set_SlaveBattery`.
+- **Controller mode** writes the controller's own firmware over the vendor HID channel.
+
+Both are constrained to registers whose meaning was established by measurement on this exact model,
+and both are read back after every write. Fan control (gate G2) is deliberately still unimplemented
+and is the riskiest of the planned features, since it writes EC duty tables directly — the ≤ 75
+duty clamp this project long assumed is itself
+[contradicted by measurement](docs/hardware-notes.md) and must be re-derived rather than carried
+forward.
+
+The mitigations that apply are structural rather than advisory:
 
 - **Every value is clamped in the helper**, never only in the UI. The pipe is ACL'd to all app
   packages, so slider bounds are a convenience and the helper is the enforcement point.
