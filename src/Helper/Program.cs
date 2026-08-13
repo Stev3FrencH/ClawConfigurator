@@ -213,10 +213,17 @@ namespace McenterLite.Helper
                 Log.Info(problems.Count == 0
                     ? "Restored every feature to its default."
                     : "Some values could not be restored: " + string.Join("; ", problems));
+
+                // Writing the hardware is only half of it. The saved choices have to go too, or
+                // the next helper start reads them and re-applies everything straight back over
+                // the restore - measured on device, six seconds after a successful one.
+                var settings = new SettingsStore(AppPaths.ResolveDataDirectory());
+                settings.Load();
+                settings.ClearFeatureSettings();
             }
             catch (Exception ex)
             {
-                Log.Error("Could not restore defaults during uninstall", ex);
+                Log.Error("Could not restore defaults", ex);
             }
         }
 

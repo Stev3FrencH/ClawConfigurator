@@ -94,6 +94,61 @@ namespace McenterLite.Helper.Settings
             Save();
         }
 
+        /// <summary>
+        /// Forgets every remembered feature choice, so the next start re-applies nothing.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>Restoring the hardware is only half of putting the machine back.</b> Measured on
+        /// device 2026-08-13: <c>--restore</c> wrote all six defaults correctly, and six seconds
+        /// later the helper started, <c>StartupApplier</c> read these keys and re-applied 15/17 W,
+        /// an 80% charge limit and the custom fan curve straight over the top. The restore was
+        /// undone before the user could see it, and reported success on the way.
+        /// </para>
+        /// <para>
+        /// This also protects the gap in a real uninstall, between <c>--uninstall</c> and removing
+        /// the app: opening the Game Bar in that window redeploys the helper, and without this it
+        /// would re-apply everything that was just restored.
+        /// </para>
+        /// </remarks>
+        public void ClearFeatureSettings()
+        {
+            lock (_gate)
+            {
+                foreach (var key in FeatureKeys) _values.Remove(key);
+
+                // Intel settings are written under a prefix rather than at fixed names, so they
+                // have to be found rather than listed.
+                var prefixed = new List<string>();
+                foreach (var key in _values.Keys)
+                {
+                    if (key.StartsWith(SettingsKeys.IntelPrefix, StringComparison.Ordinal))
+                        prefixed.Add(key);
+                }
+
+                foreach (var key in prefixed) _values.Remove(key);
+            }
+
+            Save();
+            Log.Info("Cleared the saved feature settings; nothing will be re-applied at startup.");
+        }
+
+        /// <summary>
+        /// Every key <see cref="StartupApplier"/> reads. Adding a re-applied setting without
+        /// adding it here would leave that one feature reverting after a restore.
+        /// </summary>
+        private static readonly string[] FeatureKeys =
+        {
+            SettingsKeys.Pl1,
+            SettingsKeys.Pl2,
+            SettingsKeys.ChargeLimit,
+            SettingsKeys.LightingProfile,
+            SettingsKeys.FanProfile,
+            SettingsKeys.CpuBoost,
+            SettingsKeys.CpuBoostUserModified,
+            SettingsKeys.OsPowerMode,
+        };
+
         public void SetBool(string key, bool value) => Set(key, value ? "1" : "0");
 
         public void SetInt(string key, int value) => Set(key, value.ToString(CultureInfo.InvariantCulture));

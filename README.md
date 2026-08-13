@@ -204,6 +204,11 @@ package's `LocalCache`, so removing the app first deletes the executable that wo
 That leaves the scheduled task orphaned against a missing file and the device on whatever limits
 were last set, with nothing left able to change them.
 
+> **Don't open the Game Bar between the two steps.** The widget would redeploy the helper and
+> re-register its task, undoing the first step. The restore clears the saved settings as well as
+> writing the hardware, so nothing would be re-applied — but you would be back to having an app to
+> uninstall.
+
 To see what the restore does **without** uninstalling anything, close the Game Bar and run the same
 code path on its own:
 
@@ -211,9 +216,14 @@ code path on its own:
 & "$env:LOCALAPPDATA\Packages\McenterLite_xq4frxrkckec6\LocalCache\McenterLite\Helper\McenterLite.Helper.exe" --restore
 ```
 
-It applies every default and exits, leaving the app installed. (`Test-Helper.ps1 -Restore` sends the
-same message over the pipe, but the pipe serves one client at a time and the widget never releases
-it, so that route only works if the Game Bar has not been opened since the helper started.)
+It applies every default, **forgets your saved choices**, and exits with the app still installed —
+so the next time the helper starts it re-applies nothing and the defaults stand. Treat it as a reset:
+your power limits, charge limit, and fan and lighting selections are cleared, though the profile
+*files* themselves are untouched.
+
+(`Test-Helper.ps1 -Restore` sends the same message over the pipe, but the pipe serves one client at a
+time and the widget never releases it, so that route only works if the Game Bar has not been opened
+since the helper started.)
 
 What the restore puts back — chosen values, not whatever happened to be there before:
 
