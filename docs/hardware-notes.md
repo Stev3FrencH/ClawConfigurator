@@ -696,20 +696,50 @@ since August. Both fans read identically:
 idle 58 | 70 74 76 78 80 84 | ceiling 94
 ```
 
+#### `Set_Fan` proven on device (2026-08-12)
+
+Run with `Diagnostics/Test-SetFan.ps1`; transcript in `Diagnostics/transcripts/`. One fan, one
+byte, upward only — the 78 °C point moved 84 → 90 on fan 1 with the idle duty left at factory, so
+no failure mode could make the device quieter than stock.
+
+| | Baseline | After write to fan 1 | After restore |
+|---|---|---|---|
+| Fan 1 | `58;70;74;76;78;80;84` | **`58;70;74;76;78;80;90`** | `58;70;74;76;78;80;84` |
+| Fan 2 | `58;70;74;76;78;80;84` | **unchanged** | `58;70;74;76;78;80;84` |
+
+- **The write takes**, confirmed by a separate read.
+- **The sub-function is a real per-fan selector.** Fan 2 was never addressed and did not move. This
+  was the control that mattered: if both had moved, the table model would have been wrong.
+- **`Set_Fan` returns a bare status** (`01 00 00 …`), not an echo — same as `Set_SlaveBattery`. Its
+  reply is not evidence, which is why every write here is confirmed by a read.
+- Tachometers held at 134–136 across all three states. Correct, and a useful sanity check: editing
+  the 78 °C point cannot do anything at a 44 °C idle.
+
+#### "Auto" is not a mode — it is the factory table
+
+The test wrote a **non-factory** table while MSI Center M's registry still read `Fan = 1` (Auto),
+and the EC applied it. The firmware does not gate the table behind a mode, and nothing had to be
+switched before writing or after.
+
+**Consequence for the app: applying Auto is a plain write of the factory table**, which the restore
+path does and which has now round-tripped twice. No mode register, no MSI Center involvement. The
+suspected mode flag at `Get_AP|1` byte 1 is therefore *not needed* and remains an unconfirmed
+curiosity rather than a dependency.
+
 #### Still open
 
-- [ ] **`Set_Fan` accepts this package and the write takes** — the only thing between here and a
-      working feature. Read-modify-write, then read back, exactly as `Set_AP` was proven in G3.
 - [ ] Whether byte 1 (idle duty) is independently settable, or whether MSI mirrors the first curve
-      point into it. Both custom snapshots set every entry to the same value, so they cannot
-      distinguish the two.
-- [ ] Whether "Auto" is a *mode* the firmware runs, or simply *the factory table loaded*. If the
-      latter, restoring Auto is a plain write of the table above. Byte 1 of `Get_AP|1` is the
-      evidence to watch.
-- [ ] Whether MSI Center M overwrites a table we wrote, and on what trigger. It is still installed.
+      point into it. Both custom snapshots set every entry to the same value, and the write test
+      left it at factory, so nothing so far distinguishes the two.
+- [ ] Whether MSI Center M overwrites a table we wrote, and on what trigger. It is still installed,
+      and it is an active participant elsewhere — re-read rather than assuming our write still
+      stands.
 - [ ] Whether the write survives with MSI Center M's service stopped — the standing gate question
-      for every feature in this project.
+      for every feature in this project. The write needs no MSI Center to *succeed*; whether it
+      *persists* is a separate claim.
 - [ ] Meaning of `Get_Temperature|1` bytes 2 and 3 (85, 105).
+- [ ] Tachometer units. Idle reads ~135, which is above 100, so it is **not** the duty percentage
+      read back and must not be presented as one.
 
 ---
 
