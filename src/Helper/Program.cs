@@ -729,30 +729,23 @@ namespace McenterLite.Helper
                     : $"Could not apply the fan profile: {result.Error}");
             }
 
-            // Controller mode, on first run ONLY - the one write here that must never repeat.
+            // Controller mode is deliberately NOT applied here, on first run or ever.
             //
-            // The physical MSI button switches the same mode and the firmware handles it alone, so
-            // during normal running this app does not own the state: nothing re-applies it on a
-            // tick or on later startups, and doing so would silently undo the button. But a fresh
-            // install should leave a handheld behaving like one, so the first start puts it in
-            // Gamepad.
+            // It was, briefly, on 2026-08-13: a fresh install put the device in Gamepad, gated on a
+            // marker key so it could not repeat and undo the physical MSI button. Removed the same
+            // day, by the same decision that added it. The device already boots as Gamepad and the
+            // firmware and button own the state between them, so the write was asserting something
+            // that was almost always already true - and it came with a marker key, a once-only
+            // gate, and a failure mode of its own purely to avoid fighting the button.
             //
-            // Gated on a marker rather than a stored mode, because there deliberately is no stored
-            // mode. The marker records that this happened, not what the device is.
-            if (hardware.HwMouse.Available
-                && !settings.GetBool(SettingsKeys.HwMouseFirstRunApplied, false))
-            {
-                var result = hardware.HwMouse.Apply(FeatureDefaults.HwMouseDesktopMode);
-
-                // Recorded even on failure. Retrying every start is how a once-ever write turns
-                // into the recurring one this is built to avoid - and by then the user may have
-                // pressed the button themselves.
-                settings.SetBool(SettingsKeys.HwMouseFirstRunApplied, true);
-
-                Log.Info(result.Ok
-                    ? "First run: applied controller mode = Gamepad."
-                    : $"Could not apply the first-run controller mode: {result.Error}");
-            }
+            // It also failed on the single occasion it ran, reporting "Switched the controller mode
+            // but could not read it back" at startup timing, while the widget's toggle through the
+            // same Apply worked reliably. That is not why it was removed - one unreproduced flake
+            // is thin evidence - but it is a fair illustration of the cost.
+            //
+            // Uninstall still sets Gamepad. See FeatureDefaults.HwMouseDesktopMode: leaving the
+            // machine in desktop-mouse mode with the app that switched it now gone is a real harm,
+            // where a fresh install inheriting the mode the user was already in is not.
 
             // CPU boost is only re-applied once the user has actually chosen a value. Writing a
             // default here would silently overwrite a system-wide setting we do not own and were

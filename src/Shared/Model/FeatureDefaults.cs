@@ -63,24 +63,24 @@ namespace McenterLite.Shared.Model
         public const OsPowerMode PowerMode = OsPowerMode.Balanced;
 
         /// <summary>
-        /// Controller mode, on both first run and uninstall. <c>false</c> is Gamepad.
+        /// Controller mode <b>on uninstall only</b>. <c>false</c> is Gamepad.
         /// </summary>
         /// <remarks>
         /// <para>
-        /// <b>Applied at exactly two moments, and never in between.</b> The physical MSI button
-        /// switches the same mode, and the firmware handles that entirely on its own, so this app
-        /// does not own the state during normal running — nothing re-asserts it on a tick or on
-        /// ordinary startups. Doing so would silently undo the button.
+        /// <b>Uninstall is the only moment this app asserts a controller mode.</b> The physical MSI
+        /// button switches the same state and the firmware handles that entirely on its own, so
+        /// nothing here re-applies it on a tick, at startup, or on a fresh install. The one thing
+        /// that justifies overriding the button is removal: leaving the machine in desktop-mouse
+        /// mode with the app that switched it now gone strands the user in the one state where a
+        /// handheld does not behave like one.
         /// </para>
         /// <para>
-        /// It is applied on <b>first run</b>, because Gamepad is what the device boots as and what a
-        /// handheld should be when a handheld app has just been installed; and on <b>uninstall</b>,
-        /// because leaving the machine in desktop-mouse mode with the app that switched it now gone
-        /// strands the user in the one state where a handheld does not behave like one.
-        /// </para>
-        /// <para>
-        /// The first-run write is gated by <c>SettingsKeys.HwMouseFirstRunApplied</c> rather than by
-        /// a stored mode — there is no stored mode, precisely because the button owns it.
+        /// A <b>first-run</b> write of Gamepad was added and removed on 2026-08-13. The device
+        /// already boots as Gamepad, so it asserted what was usually already true, and it needed a
+        /// marker key and a once-only gate purely to keep from fighting the button on every start —
+        /// machinery whose entire job was to limit the damage of the feature it enabled. An install
+        /// inheriting the mode the user was already in is not a harm; an uninstall abandoning them
+        /// in it is.
         /// </para>
         /// </remarks>
         public const bool HwMouseDesktopMode = false;

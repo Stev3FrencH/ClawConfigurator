@@ -164,10 +164,6 @@ namespace McenterLite.Helper.Settings
             SettingsKeys.CpuBoost,
             SettingsKeys.CpuBoostUserModified,
             SettingsKeys.OsPowerMode,
-
-            // Cleared so a restored install re-applies Gamepad on its next start, matching what
-            // the restore itself just wrote. Harmless if it does: the restore set the same value.
-            SettingsKeys.HwMouseFirstRunApplied,
         };
 
         public void SetBool(string key, bool value) => Set(key, value ? "1" : "0");
@@ -248,18 +244,14 @@ namespace McenterLite.Helper.Settings
         public const string CpuBoost = "CpuBoost";
         public const string OsPowerMode = "OsPowerMode";
 
-        /// <summary>
-        /// Set once the first-run controller mode has been applied. Never read as a mode.
-        /// </summary>
-        /// <remarks>
-        /// Controller mode is the one feature with no stored value, because the physical MSI button
-        /// owns it as much as we do and a remembered mode would fight the button on every start.
-        /// A fresh install still puts the device in Gamepad — see
-        /// <see cref="FeatureDefaults.HwMouseDesktopMode"/> — so this marker is what makes that a
-        /// once-ever write rather than a recurring one. It records that something happened, not
-        /// what the device is.
-        /// </remarks>
-        public const string HwMouseFirstRunApplied = "HwMouseFirstRunApplied";
+        // HwMouseFirstRunApplied existed for a few hours on 2026-08-13, gating a first-run write of
+        // Gamepad so it could not repeat and undo the physical MSI button. Both went the same day:
+        // the device already boots as Gamepad, so the write asserted what was usually already true
+        // and needed a marker key and a once-only gate purely to stay out of the button's way.
+        //
+        // Controller mode remains the one feature with NO stored value, which is the point - the
+        // button owns it, and a remembered mode would fight it on every start. Uninstall still sets
+        // Gamepad, from FeatureDefaults, with no marker involved.
 
         public const string IntelPrefix = "Intel_";
 

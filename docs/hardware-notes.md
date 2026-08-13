@@ -1393,12 +1393,19 @@ both deliberate:
   this state during normal running, so reasserting it would overwrite whatever the user or the
   button last chose.
 
-  **Two exceptions, added 2026-08-13, both once-only.** A fresh install applies **Gamepad** — what
-  the device boots as, and what a handheld should be when a handheld app has just been installed —
-  gated on a marker key rather than a stored mode, so it can never repeat. And an uninstall applies
-  Gamepad, because leaving the machine in desktop-mouse mode with the app that switched it now gone
-  strands the user in the one state where a handheld does not behave like one. Neither is a claim
-  of ownership; between those two moments the button wins.
+  **One exception, added 2026-08-13: uninstall applies Gamepad.** Leaving the machine in
+  desktop-mouse mode with the app that switched it now gone strands the user in the one state where
+  a handheld does not behave like one. That is not a claim of ownership — it is the last thing this
+  app does before it stops existing.
+
+  A **first-run** write of Gamepad was added and removed the same day. The device already boots as
+  Gamepad, so it asserted what was usually already true, and it needed a marker key and a once-only
+  gate purely to avoid undoing the button on every start. It also failed the single time it ran —
+  `Switched the controller mode but could not read it back`, at startup timing — while the widget's
+  toggle through the same `Apply` worked reliably before and after. **That read-back failure is
+  unexplained and unreproduced**, and worth remembering if it recurs: `Apply` queries on the same
+  handle it switched on, which would be the first thing to suspect if a mode change re-enumerates
+  the device.
 - **The helper pushes the mode on its ~1 Hz telemetry tick** while the widget is visible, so the
   buttons follow the hardware. Without that the widget would show whatever was true at connect
   time and silently disagree with the device after one button press.
