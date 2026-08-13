@@ -22,6 +22,23 @@ notes behind the roadmap below.
 >
 > Verify on device rather than trusting a clean build: the cards, the fans by ear, one power-limit
 > change.
+>
+> ### Then: install and uninstall for other people
+>
+> Queued behind the Release build, not before it. Documentation plus a script, so someone who did
+> not build this can install and remove it.
+>
+> **The hard part is the signing certificate, not the script.** The package is signed with a
+> self-signed `CN=msi-mcenter-lite` living in this device's `CurrentUser\My`. Any other machine
+> refuses the sideload until that certificate is exported (public key only — a `.cer`, never the
+> `.pfx`) and imported into `LocalMachine\TrustedPeople`, which needs elevation. Decide deliberately
+> whether the answer is shipping a `.cer` with an import step, or getting a properly trusted
+> certificate. A script also has to cover sideloading being permitted at all, and should state the
+> device gate up front rather than let someone install this on a non-Claw and find an empty widget.
+>
+> The uninstall half is mostly already prose in the README — the counter-intuitive order, the
+> non-zero exit that is not a failure, not opening the Game Bar between the steps, and the profile
+> files that go with `LocalCache`. The script is what makes that not need reading.
 
 ## The headline
 
