@@ -28,11 +28,18 @@ them, so every write stored, read back and logged as a success while the firmwar
 its own curve. 0.2.0.23 writes the flag, drops the Apply button so the Auto/Custom press applies
 directly, and reports which profile is running from the flag rather than by comparing tables.
 
-**The flag itself is proven on device (2026-08-12)**, through the probe and by ear: a full-duty
-table written with the flag clear is silent, and setting the flag alone — tables untouched — makes
-both fans go loud. **The widget is not yet verified on the Claw**, and the check that matters there
-is also by ear, because the log was never wrong about what it sent. 0.2.0.21 was verified on
-2026-08-12 for lighting, gamepad and keyboard navigation, and the charge-limit slider.
+**Verified on the Claw, 2026-08-12**, through the probe and then through the widget, by ear both
+times. A full-duty table written with the flag clear is silent; setting the flag alone — tables
+untouched — makes both fans go loud. Auto and Custom are both audible from the card. 0.2.0.21 was
+verified the same day for lighting, gamepad and keyboard navigation, and the charge-limit slider.
+
+**MSI Center M did not follow along**, which is the fourth time its UI has been shown to be a cache
+rather than a view of the device. More interesting: setting MSI Center M to Auto while the widget
+was on Custom did **not** flip the widget back. Two readings, not yet separated — either MSI Center
+M leaves the flag alone (so the card is right), or the widget never re-read it. **The second is
+true regardless**: `FanProfile` is only in the connect-time snapshot, and the telemetry loop pushes
+just the power mode and controller mode, so a fan change made by anything else cannot reach an open
+widget. See [Next up](#next-up).
 
 > **This device only ever runs the widget in compact mode.** Pinning is not a case to design for —
 > see the focus notes below, where that fact is what makes the re-arm guard safe.

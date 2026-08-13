@@ -801,6 +801,10 @@ visible without writing anything.
 #### Still open
 
 - [x] ~~Whether the flag makes the curve audible.~~ **Proven on device 2026-08-12.** See below.
+- [ ] **Whether MSI Center M ever clears the flag.** Setting it to Auto while we held Custom did not
+      flip the widget back — but the widget only reads the flag at connect, so this is currently
+      untestable from the card. Settle it with `--fan` before and after, which reads the flag
+      directly: if the flag is still set, MSI Center M does not touch it and we own the fans.
 - [ ] Whether byte 1 (idle duty) is independently settable, or whether MSI mirrors the first curve
       point into it. Both custom snapshots set every entry to the same value, and the write test
       left it at factory, so nothing so far distinguishes the two.
