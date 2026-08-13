@@ -40,9 +40,11 @@ proved it, not the card** — the card stayed on Custom too, but a card that nev
 exactly the same, which is the same "stored vs obeyed" shape that cost 0.2.0.22 a build. Narrow
 claim: one trigger, its own control, its service running.
 
-**The tick itself is still unproven.** That test cannot prove it, for the reason above. What proves
-it is making the flag move underneath an open widget — `--set-fan-control auto` from the probe,
-watching the card flip on its own within ~5 s.
+**The tick itself is proven separately, 2026-08-13.** The MSI Center M test above could not prove
+it — a card that never re-read looks the same as one agreeing with the device — so it was proven by
+making the flag move underneath an open widget instead: card on Custom, `--set-fan-control auto`
+from the probe, and the card went to Auto on its own a few seconds later. That is the whole path in
+one observation: firmware flag → helper read → pipe event → card.
 
 **0.2.0.23, verified on the Claw, 2026-08-12**, through the probe and then through the widget, by
 ear both times. 0.2.0.22 had written the duty tables but never set the flag that tells the EC to
@@ -235,9 +237,11 @@ other selector. The stopped-fan warning moved with it: it used to appear once Cu
 which worked while there was still a press left in which to read it, and now shows whenever the
 profile on disk contains a zero.
 
-**The card is a live readout, from 0.2.0.24.** The helper pushes `FanProfile` every fifth telemetry
-tick while the widget is visible, read from the flag rather than echoed from what we last wrote — so
-a curve something else took back shows on the card instead of only in the noise.
+**The card is a live readout, from 0.2.0.24 — verified 2026-08-13.** The helper pushes `FanProfile`
+every fifth telemetry tick while the widget is visible, read from the flag rather than echoed from
+what we last wrote, so a curve something else took back shows on the card instead of only in the
+noise. Proven by moving the flag underneath an open widget with `--set-fan-control auto` and
+watching the card follow unaided.
 
 Still open, and both about *persistence* rather than mechanism:
 
