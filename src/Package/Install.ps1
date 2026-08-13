@@ -75,15 +75,16 @@ if (-not $PackagePath) {
     #
     # Newest by LastWriteTime, not by name: version strings sort as text, so 0.1.0.9 would beat
     # 0.1.0.31 and quietly install a months-old build.
+    #
+    # Both extensions in ONE ranking, never bundles-then-msix as a fallback chain. Whether a build
+    # produces a .msixbundle or a bare .msix depends on how it was invoked (AppxBundle / a pinned
+    # Platform), so the two kinds interleave in AppPackages over time. Preferring bundles meant the
+    # newest .msix lost to the newest bundle no matter how old the bundle was - which silently
+    # installed 0.2.0.8 over 0.2.0.9 and looked exactly like a build that had not picked up its
+    # changes.
     $candidate =
-        Get-ChildItem -Path $scriptDirectory -Filter '*.msixbundle' -Recurse -ErrorAction SilentlyContinue |
+        Get-ChildItem -Path $scriptDirectory -Include '*.msixbundle', '*.msix' -Recurse -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTime -Descending | Select-Object -First 1
-
-    if (-not $candidate) {
-        $candidate =
-            Get-ChildItem -Path $scriptDirectory -Filter '*.msix' -Recurse -ErrorAction SilentlyContinue |
-            Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    }
 
     if (-not $candidate) {
         throw ("No .msixbundle or .msix found under $scriptDirectory. Build one with the " +
@@ -118,31 +119,64 @@ if ($CertificatePath) {
 }
 
 # ── Stop anything already running ─────────────────────────────────────────────
-# The helper holds hardware handles. Letting an old build stay alive while a new one registers
-# risks two versions writing the same embedded controller at once, which the reference project
-# reports can hard-reset the machine (Kernel-Power 41). We have no ring-0 code, but the EC is
-# still a single shared resource.
+# Two reasons, and the second one is what actually bites.
+#
+# 1. The helper holds hardware handles. Letting an old build stay alive while a new one registers
+#    risks two versions writing the same embedded controller at once, which the reference project
+#    reports can hard-reset the machine (Kernel-Power 41). We have no ring-0 code, but the EC is
+#    still a single shared resource.
+#
+# 2. The helper holds helper.log OPEN inside the package's LocalCache. Windows has to delete that
+#    app-data store to re-register the package, so a live helper fails the install outright -
+#    0x80073CF3 on an update, or 0x80073D05 ("could not delete the existing application data
+#    store") once the old package has already been removed. Neither message mentions the helper.
+#
+# STOP THE SCHEDULED TASK FIRST. Killing the process alone is not enough: the task owns the
+# helper's lifetime and can start it again between the kill and the install, which reproduces the
+# same failure with no sign of why. Same shape as the MSI_Center_M_Server supervisor trap in
+# docs/hardware-notes.md - kill the child, the parent brings it back.
 Write-Host "Stopping any running instance..." -ForegroundColor Cyan
 
-$stopped = $false
-foreach ($name in 'McenterLite.Helper', 'McenterLite.Widget') {
-    Get-Process -Name $name -ErrorAction SilentlyContinue | ForEach-Object {
-        Write-Host "  stopping $($_.ProcessName) (pid $($_.Id))"
-        try { $_.Kill() } catch { Write-Warning "  could not stop pid $($_.Id): $_" }
-        $stopped = $true
-    }
+$taskName = 'McenterLiteHelper'
+$task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+if ($task) {
+    # -TaskPath is REQUIRED here and comes from the task we just found. The helper registers itself
+    # under \McenterLite\, and while Get-ScheduledTask searches every folder, Stop- and
+    # Disable-ScheduledTask default to the root and fail with "The system cannot find the file
+    # specified" - a warning that looks like the task is simply absent. Both calls then quietly did
+    # nothing, leaving the task free to restart the helper mid-install, which is the exact failure
+    # this block exists to prevent.
+    $taskPath = $task.TaskPath
+    Write-Host "  stopping scheduled task $taskPath$taskName"
+    try { Stop-ScheduledTask -TaskName $taskName -TaskPath $taskPath -ErrorAction Stop }
+    catch { Write-Warning "  could not stop the task: $_" }
+
+    # Disabled, not just stopped: a stopped ONLOGON task can still be triggered while the install
+    # is in flight. Re-enabled below whatever happens, so a failed install cannot leave the helper
+    # permanently unable to start.
+    try { Disable-ScheduledTask -TaskName $taskName -TaskPath $taskPath -ErrorAction Stop | Out-Null } catch { }
 }
 
-if ($stopped) {
-    # Wait for handles to actually close, not just for the processes to disappear.
-    $deadline = (Get-Date).AddSeconds(15)
-    while ((Get-Date) -lt $deadline) {
-        $alive = Get-Process -Name 'McenterLite.Helper', 'McenterLite.Widget' -ErrorAction SilentlyContinue
-        if (-not $alive) { break }
-        Start-Sleep -Milliseconds 300
+try {
+    $stopped = $false
+    foreach ($name in 'McenterLite.Helper', 'McenterLite.Widget') {
+        Get-Process -Name $name -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "  stopping $($_.ProcessName) (pid $($_.Id))"
+            try { $_.Kill() } catch { Write-Warning "  could not stop pid $($_.Id): $_" }
+            $stopped = $true
+        }
     }
-    Start-Sleep -Milliseconds 500
-}
+
+    if ($stopped) {
+        # Wait for handles to actually close, not just for the processes to disappear.
+        $deadline = (Get-Date).AddSeconds(15)
+        while ((Get-Date) -lt $deadline) {
+            $alive = Get-Process -Name 'McenterLite.Helper', 'McenterLite.Widget' -ErrorAction SilentlyContinue
+            if (-not $alive) { break }
+            Start-Sleep -Milliseconds 300
+        }
+        Start-Sleep -Milliseconds 500
+    }
 
 # ── Install ───────────────────────────────────────────────────────────────────
 Write-Host "Installing..." -ForegroundColor Cyan
@@ -205,6 +239,15 @@ catch [Exception] {
         Copy-Item $preserved (Join-Path $restoreTo 'settings.json') -Force
         Remove-Item $preserved -Force -ErrorAction SilentlyContinue
         Write-Host "  restored settings.json" -ForegroundColor DarkGray
+    }
+}
+}
+finally {
+    # Always re-enable, including after a failed install. The helper deploys and re-registers
+    # itself on next run anyway, but leaving a disabled task behind means no hardware control and
+    # no obvious reason for it.
+    if ($task) {
+        try { Enable-ScheduledTask -TaskName $taskName -TaskPath $task.TaskPath -ErrorAction Stop | Out-Null } catch { }
     }
 }
 

@@ -192,6 +192,35 @@ To uninstall: remove the app from *Settings > Apps*, then run the deployed helpe
 This only applies to the MSI Claw 8 EX AI+ (see [Scope](#scope)) — on any other device the
 hardware-specific cards stay hidden, and only CPU Boost and OS Power Mode do anything.
 
+### Editing the lighting profiles
+
+The **Lighting** card has four buttons: **Off**, and three profiles. There is no colour picker in
+the widget on purpose — the profiles are plain text files you edit outside it. Paste this into the
+Explorer address bar:
+
+```
+%LOCALAPPDATA%\Packages\McenterLite_xq4frxrkckec6\LocalCache\McenterLite\Lighting
+```
+
+`McenterLite_xq4frxrkckec6` is the package family name. It is a hash of the `Identity` name and
+publisher in `src/Package/Package.appxmanifest`, so it is the same on every machine and across
+versions — but if you have changed either, `(Get-AppxPackage McenterLite).PackageFamilyName` prints
+yours. `helper.log` is one folder up, in `McenterLite\`.
+
+The folder contains `Profile_1.txt`, `Profile_2.txt`, `Profile_3.txt` and a `README.txt` with the
+full reference. Edit a profile, then tap it in the widget — **the file is read at the moment you
+tap**, so nothing needs restarting, and tapping a profile that is already selected re-reads it.
+`Name` becomes the button label.
+
+**To undo a bad edit: delete the file — or empty it and save — then tap that profile.** The default
+comes back and the file is rewritten, with nothing to restart. Nothing you can type here breaks the
+widget or the controller: a setting that cannot be read is skipped and the previous value kept, and
+`helper.log` one folder up names everything it ignored.
+
+The three defaults reproduce the profiles MSI Center M had configured, so the lights look the same
+after switching over. Full syntax, the colour formats, and what the hardware actually stores are in
+[docs/lighting-profiles.md](docs/lighting-profiles.md).
+
 ## Running
 
 For development and discovery, without installing the packaged app — against simulated hardware,

@@ -156,6 +156,17 @@ namespace McenterLite.Helper.Settings
 
         public const string ChargeLimit = "ChargeLimit";
 
+        /// <summary>
+        /// Which lighting profile is selected: 0 = off, 1-3 = that profile.
+        /// </summary>
+        /// <remarks>
+        /// Persisted because the hardware cannot answer the question. The controller stores
+        /// flattened keyframes with no profile number in them, so this setting is the only record
+        /// of what the user chose - and it is what startup re-applies, since lighting is written
+        /// to the controller's RAM and does not survive a power cycle.
+        /// </remarks>
+        public const string LightingProfile = "LightingProfile";
+
         public const string CpuBoost = "CpuBoost";
         public const string OsPowerMode = "OsPowerMode";
 

@@ -107,6 +107,28 @@ namespace McenterLite.Hardware
     }
 
     /// <summary>
+    /// The controller's nine RGB LEDs.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Write-only, and that is not an oversight.</b> Every other provider here can read its
+    /// value back, but the controller stores flattened keyframes rather than a profile number -
+    /// so "which of the three profiles is selected" is a question the hardware cannot answer. Two
+    /// profiles could even render to the same bytes. The selected slot is therefore the helper's
+    /// state, kept in settings alongside the other persisted values.
+    /// </para>
+    /// <para>
+    /// Takes a rendered <see cref="LightingAnimation"/> rather than a <c>LightingProfile</c>: the
+    /// style-to-keyframe recipes are portable logic that belongs in Shared where it can be tested
+    /// without a controller, and the hardware layer only needs the result.
+    /// </para>
+    /// </remarks>
+    public interface IRgbProvider : IFeatureProvider
+    {
+        OpResult Apply(LightingAnimation animation);
+    }
+
+    /// <summary>
     /// CPU boost and the Windows power-mode overlay.
     /// </summary>
     /// <remarks>
@@ -144,6 +166,7 @@ namespace McenterLite.Hardware
         ITdpProvider Tdp { get; }
         IChargeLimitProvider ChargeLimit { get; }
         IHwMouseProvider HwMouse { get; }
+        IRgbProvider Rgb { get; }
         IPowerProvider Power { get; }
         IIgclProvider Igcl { get; }
 

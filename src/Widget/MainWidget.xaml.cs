@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using McenterLite.Shared.Ipc;
 using McenterLite.Shared.Model;
@@ -6,10 +6,12 @@ using McenterLite.Widget.Ipc;
 using Microsoft.Gaming.XboxGameBar;
 using Windows.ApplicationModel;
 using Windows.Foundation;
+using Windows.System;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
+using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
 
@@ -22,6 +24,22 @@ namespace McenterLite.Widget
     /// A pure view over helper state. It persists nothing and assumes nothing: controls are
     /// populated from the helper's snapshot, and every write adopts the value the helper reports
     /// back rather than the value that was requested.
+    /// </para>
+    /// <para>
+    /// <b>This widget does not place focus. Game Bar does.</b> It used to grab focus onto its top
+    /// control as soon as layout ran, and again on every <c>VisibleChanged</c> - which in compact
+    /// mode, the only mode this device uses, is every two to three seconds. That pre-empted Game
+    /// Bar's own "press Down to enter the widget", because focus was already inside; and it parked
+    /// focus on a Slider, which consumes all four arrow keys, so nothing could move off it. The
+    /// symptom presented as "moving a card broke keyboard navigation" and cost five builds chasing
+    /// the card order, XY keyboard navigation and the focus-candidate list - none of which were the
+    /// cause. See docs/status.md.
+    /// </para>
+    /// <para>
+    /// The model is: <b>arrow keys move between widgets at the Game Bar level, Tab moves between
+    /// controls inside one.</b> Do not add code that calls <c>Focus()</c> on load, on show, or on a
+    /// snapshot. Sliders rely on <c>IsFocusEngagementEnabled</c> (see <c>CardSliderStyle</c> in
+    /// App.xaml) so they can be navigated past rather than trapping the arrows.
     /// </para>
     /// </summary>
     public sealed partial class MainWidget : Page
@@ -164,15 +182,24 @@ namespace McenterLite.Widget
                 set { foreach (var segment in _segments) segment.IsEnabled = value; }
             }
 
+            public int Count => _segments.Length;
+
             /// <summary>
-            /// The leftmost button, for <see cref="SetInitialFocus"/>.
+            /// Retitles one segment, for labels that are not known until the helper answers.
             /// </summary>
             /// <remarks>
-            /// The segments are created in code, so they have no <c>x:Name</c> to reference from
-            /// the focus-candidate list. Without this the only candidate left is a slider whose
-            /// card hides on an unsupported device, and nothing would take focus at all.
+            /// Sets <see cref="ContentControl.Content"/> only. That re-renders the content
+            /// presenter but does NOT rebuild the control template, so unlike assigning
+            /// <see cref="FrameworkElement.Style"/> it does not throw focus away - see
+            /// <see cref="Paint"/> for why that distinction matters here.
             /// </remarks>
-            public Control FirstSegment => _segments.Length > 0 ? _segments[0] : null;
+            public void Relabel(int index, string text)
+            {
+                if (index < 0 || index >= _segments.Length) return;
+                if (string.IsNullOrWhiteSpace(text)) return;
+
+                _segments[index].Content = text;
+            }
         }
 
         /// <summary>
@@ -231,6 +258,27 @@ namespace McenterLite.Widget
             (1, "60"),
         };
 
+        /// <summary>
+        /// The lighting segments, left to right. Index IS the profile slot the helper expects.
+        /// </summary>
+        /// <remarks>
+        /// No mapping table, unlike <see cref="HwMouseSegmentOrder"/> and friends, because here
+        /// the display order and the wire values genuinely coincide: slot 0 is off and slots 1-3
+        /// are the profiles, which is also the order they should read in. The three profile labels
+        /// are placeholders until the helper sends the real names.
+        /// </remarks>
+        private static readonly string[] LightingSegmentLabels = { "Off", "1", "2", "3" };
+
+        /// <summary>
+        /// Separates the packed profile names. Matches the helper's own separator.
+        /// </summary>
+        /// <remarks>
+        /// The snapshot escapes this character on the wire and <c>HelperConnection</c> unescapes
+        /// it, so by the time a value reaches here it is a real U+001F again.
+        /// </remarks>
+        private const char RecordSeparator = '\u001F';
+
+        private SegmentedControl _lighting;
         private SegmentedControl _hwMouse;
         private SegmentedControl _cpuBoost;
         private SegmentedControl _powerMode;
@@ -254,6 +302,9 @@ namespace McenterLite.Widget
                 _hwMouse = new SegmentedControl(HwMouseSegments,
                     Array.ConvertAll(HwMouseSegmentOrder, segment => segment.Label));
                 _hwMouse.Selected += OnHwMouseSelected;
+
+                _lighting = new SegmentedControl(LightingSegments, LightingSegmentLabels);
+                _lighting.Selected += OnLightingSelected;
 
                 _cpuBoost = new SegmentedControl(CpuBoostSegments,
                     Array.ConvertAll(CpuBoostSegmentOrder, segment => segment.Label));
@@ -312,10 +363,6 @@ namespace McenterLite.Widget
             if (_widget != null)
                 _widget.VisibleChanged += OnWidgetVisibleChanged;
 
-            // Must be subscribed before the snapshot can arrive: it is what retries the initial
-            // focus once the cards have real sizes. See OnLayoutUpdated.
-            LayoutUpdated += OnLayoutUpdated;
-
             try
             {
                 await StartAsync();
@@ -329,8 +376,6 @@ namespace McenterLite.Widget
 
         protected override void OnNavigatedFrom(NavigationEventArgs e)
         {
-            LayoutUpdated -= OnLayoutUpdated;
-
             // The connection is disposed below, so a Tick arriving after this point would try to
             // send over a dead pipe. Anything the user actually settled on was already flushed when
             // the widget was hidden, which always precedes navigating away.
@@ -432,11 +477,9 @@ namespace McenterLite.Widget
                     await RunOnUiAsync(FlushPendingChargeLimit);
                 }
 
+                // Focus is DELIBERATELY not touched here. This used to re-place it on every show,
+                // which in compact mode means every two to three seconds. See the class remarks.
                 await _connection.SetVisibleAsync(visible);
-
-                // Being shown again is the moment to put focus back - see ArmInitialFocus.
-                if (visible)
-                    await RunOnUiAsync(ArmInitialFocus);
             }
             catch (Exception ex)
             {
@@ -473,7 +516,7 @@ namespace McenterLite.Widget
             RootContent.Opacity = requested / 100.0;
         }
 
-        // ── Startup ─────────────────────────────────────────────────────────────
+        // â”€â”€ Startup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private async Task StartAsync()
         {
@@ -521,7 +564,7 @@ namespace McenterLite.Widget
             }
         }
 
-        // ── Applying helper state ───────────────────────────────────────────────
+        // â”€â”€ Applying helper state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private async void OnSnapshotApplied()
         {
@@ -540,150 +583,42 @@ namespace McenterLite.Widget
                 }
 
                 App.Log("OnSnapshotApplied: _applyingFromHelper set false");
-
-                // Gates the focus attempt: before the first snapshot the cards' visibility is not
-                // known, and focusing a control that is about to be hidden is worse than waiting.
-                //
-                // Focus is NOT set here. ApplyCaps has just unhidden the cards and layout has not
-                // run yet, so every control inside a newly-shown card still measures zero while the
-                // never-hidden Windows power card already has a real height - focusing from here
-                // reliably skipped the top card and landed on CPU boost. OnLayoutUpdated does it
-                // once the sizes are real.
-                _snapshotApplied = true;
             });
         }
 
         /// <summary>
-        /// Retries <see cref="SetInitialFocus"/> once layout has actually run.
+        /// Lets Escape release an engaged slider instead of closing the Game Bar.
         /// </summary>
         /// <remarks>
         /// <para>
-        /// <b>This is what makes the widget usable with a gamepad at all.</b> The focus attempt in
-        /// <see cref="OnSnapshotApplied"/> runs in the same dispatcher callback that made the cards
-        /// visible, and XAML defers layout to the next frame - so every candidate still measured
-        /// <c>ActualHeight == 0</c>, the size guard skipped all of them, and nothing was focused.
-        /// Nothing called it again either, because the snapshot normally arrives once.
+        /// Deliberately narrow: Escape only, and only while actually engaged. Every other key is
+        /// left alone, so Escape still closes the Game Bar from anywhere else.
         /// </para>
         /// <para>
-        /// With no focused element there is no origin for XY focus navigation, so the D-pad had
-        /// nothing to move from and the widget could only be driven with a mouse - which sets focus
-        /// on click, hiding the bug completely on a desktop.
+        /// <b>This only ever fires for gamepad engagement.</b> <c>IsFocusEngagementEnabled</c>
+        /// applies to gamepad and remote input, never the keyboard, so <c>IsFocusEngaged</c> is
+        /// false on a keyboard path and this returns immediately. A keyboard therefore cannot leave
+        /// a slider with the arrows - Tab is the way off.
         /// </para>
         /// <para>
-        /// <see cref="FrameworkElement.LayoutUpdated"/> fires after each layout pass, so the first
-        /// one following the snapshot has real sizes. It unsubscribes as soon as focus lands, since
-        /// it fires often and there is nothing left to do.
+        /// <b>That is accepted, not an oversight.</b> 0.2.0.19 replaced this with an Up/Down
+        /// handler that redirected through <see cref="FocusManager"/> to make the arrows walk past
+        /// sliders. It was reverted unused: other Game Bar widgets behave the same way, so matching
+        /// the platform is worth more than the extra code. Do not re-add it without new evidence.
         /// </para>
         /// </remarks>
-        private void OnLayoutUpdated(object sender, object e)
+        private void Slider_KeyDown(object sender, KeyRoutedEventArgs e)
         {
-            SetInitialFocus();
+            if (e.Key != VirtualKey.Escape) return;
 
-            if (_initialFocusSet)
-                LayoutUpdated -= OnLayoutUpdated;
+            var slider = sender as Control;
+            if (slider == null || !slider.IsFocusEngaged) return;
+
+            slider.RemoveFocusEngagement();
+            e.Handled = true;
         }
 
         /// <summary>
-        /// Re-arms focus selection after Game Bar shows the widget again.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// Focus is a property of the live visual tree, not something the widget owns: when Game
-        /// Bar hides us the focused element stops being focused, and nothing puts it back. Without
-        /// this the very first show worked and every subsequent one was dead - the same symptom as
-        /// having no focus code at all, because <see cref="_initialFocusSet"/> latched true on that
-        /// first success and made <see cref="SetInitialFocus"/> a no-op forever after.
-        /// </para>
-        /// <para>
-        /// Only ever triggered by BECOMING VISIBLE, never on a snapshot or a value change. Focus is
-        /// the user's cursor on a device with no cursor, and moving it while they are working is
-        /// worse than leaving it alone. Being re-shown is the one moment there is nothing to
-        /// disturb.
-        /// </para>
-        /// </remarks>
-        private void ArmInitialFocus()
-        {
-            _initialFocusSet = false;
-
-            // Unsubscribe first: this can run many times over a session and handlers otherwise
-            // stack up, one per show.
-            LayoutUpdated -= OnLayoutUpdated;
-            LayoutUpdated += OnLayoutUpdated;
-
-            // Usually lands right here - on a re-show the tree is already laid out and the sizes
-            // are real. The subscription above is for the first show, where they are not.
-            SetInitialFocus();
-        }
-
-        /// <summary>
-        /// Puts gamepad focus on the first control the user is likely to act on.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// Game Bar's guidance is to focus the first element the user would take action on, near
-        /// the top-left. With a gamepad there is no cursor, so without this the first D-pad press
-        /// goes somewhere arbitrary and the user has to hunt for the focus rectangle.
-        /// </para>
-        /// <para>
-        /// It walks a list rather than naming one control because cards are HIDDEN when the helper
-        /// reports the feature unavailable - on a machine with no MSI hardware the power card does
-        /// not exist, and focusing it would focus nothing. Runs after the snapshot for the same
-        /// reason: before that, visibility is not yet known.
-        /// </para>
-        /// <para>
-        /// Set once per SHOW, not once per session, and never on a snapshot - re-focusing when a
-        /// value arrives would yank focus out from under someone mid-adjustment.
-        /// <see cref="ArmInitialFocus"/> owns the re-arming and explains the distinction.
-        /// </para>
-        /// </remarks>
-        private void SetInitialFocus()
-        {
-            if (_initialFocusSet) return;
-
-            // Nothing worth focusing until the helper has told us which cards exist - except the
-            // banner's Retry button, which is the only control on screen when the helper is down
-            // and would otherwise be unreachable without a mouse.
-            if (!_snapshotApplied && StatusActionButton.Visibility != Visibility.Visible) return;
-
-            // Top-down, so focus starts where the eye does. Pl1Slider is the top control in the
-            // top card whenever that card is shown - the sliders are no longer gated by a mode.
-            // The Windows power card is the only one never hidden, so its segments are the
-            // guaranteed fallback - every card above it collapses on an unsupported device.
-            Control[] candidates =
-            {
-                StatusActionButton,
-                Pl1Slider,
-                _cpuBoost?.FirstSegment,
-                _powerMode?.FirstSegment,
-            };
-
-            foreach (var control in candidates)
-            {
-                // A collapsed parent card leaves the control itself Visible, so the ancestor has
-                // to be consulted - a non-zero size is the reliable signal here. It is also why
-                // this cannot run before a layout pass; see OnLayoutUpdated.
-                if (control == null) continue;
-                if (control.Visibility != Visibility.Visible) continue;
-                if (!control.IsEnabled) continue;
-                if (control.ActualHeight <= 0) continue;
-
-                // Keyboard, not Programmatic. Programmatic focus does not reveal the focus
-                // rectangle, so on a device with no cursor the user gets a focused control they
-                // cannot see and no way to tell navigation is working. This device is driven with
-                // a stick; showing where focus is IS the feature.
-                if (control.Focus(FocusState.Keyboard))
-                {
-                    _initialFocusSet = true;
-                    return;
-                }
-            }
-        }
-
-        /// <summary>True once the helper's first snapshot has been applied and cards are settled.</summary>
-        private bool _snapshotApplied;
-
-        private bool _initialFocusSet;
-
         private async void OnValueChanged(Function function, string value)
         {
             await RunOnUiAsync(() =>
@@ -740,6 +675,7 @@ namespace McenterLite.Widget
             ChargeLimitSlider.Maximum = caps.MaxChargeLimit;
 
             HwMouseCard.Visibility = Visible(caps.HasHwMouse);
+            LightingCard.Visibility = Visible(caps.HasRgb);
             IntelCard.Visibility = Visible(caps.HasIgcl && _connection.IsAvailable(Function.IntelFpsTier));
         }
 
@@ -759,6 +695,12 @@ namespace McenterLite.Widget
             ApplyValue(Function.Pl2);
             ApplyValue(Function.ChargeLimitPercent);
             ApplyValue(Function.HwMouseMode);
+
+            // Names before the selection: the labels have to exist before a segment is
+            // highlighted, or the highlighted button reads as a placeholder for one frame.
+            ApplyValue(Function.LightingProfileNames);
+            ApplyValue(Function.LightingProfile);
+
             ApplyValue(Function.CpuBoost);
             ApplyValue(Function.OsPowerMode);
             ApplyValue(Function.IntelFpsTier);
@@ -797,6 +739,15 @@ namespace McenterLite.Widget
                     break;
                 }
 
+                case Function.LightingProfileNames:
+                    ShowLightingNames(_connection.Get(Function.LightingProfileNames));
+                    break;
+
+                case Function.LightingProfile:
+                    // The slot index IS the segment index; see LightingSegmentLabels.
+                    _lighting.Show(_connection.GetInt(Function.LightingProfile, 0));
+                    break;
+
                 case Function.CpuBoost:
                 {
                     bool boost = _connection.GetBool(Function.CpuBoost);
@@ -824,7 +775,7 @@ namespace McenterLite.Widget
             }
         }
 
-        // ── User input ──────────────────────────────────────────────────────────
+        // â”€â”€ User input â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // Every handler starts with the same guard. See _applyingFromHelper.
 
         /// <summary>
@@ -1046,6 +997,40 @@ namespace McenterLite.Widget
             await SendAsync(Function.ChargeLimitPercent, percent);
         }
 
+        /// <summary>
+        /// Relabels the three profile buttons from the helper's names.
+        /// </summary>
+        /// <remarks>
+        /// Segment 0 is "Off" and is never relabelled - it is ours, not a profile. Anything the
+        /// helper does not name keeps its placeholder rather than going blank, so a profile file
+        /// with an empty <c>Name=</c> still leaves a button you can press.
+        /// </remarks>
+        private void ShowLightingNames(string packed)
+        {
+            if (string.IsNullOrEmpty(packed)) return;
+
+            var names = packed.Split(RecordSeparator);
+            for (int i = 0; i < names.Length && i + 1 < _lighting.Count; i++)
+                _lighting.Relabel(i + 1, names[i]);
+        }
+
+        /// <summary>
+        /// Applies a lighting profile.
+        /// </summary>
+        /// <remarks>
+        /// No debounce, unlike the TDP and charge-limit sliders. Those are continuous controls
+        /// that emit a value per pixel of travel; this is four discrete buttons, so every event is
+        /// already a deliberate choice and delaying it would only make the LEDs feel laggy.
+        /// </remarks>
+        private async void OnLightingSelected(int segment)
+        {
+            if (_applyingFromHelper) return;
+            if (segment < 0 || segment >= _lighting.Count) return;
+
+            _lighting.Show(segment);
+            await SendAsync(Function.LightingProfile, segment);
+        }
+
         private async void OnHwMouseSelected(int segment)
         {
             if (_applyingFromHelper) return;
@@ -1090,7 +1075,7 @@ namespace McenterLite.Widget
 
         private async void StatusActionButton_Click(object sender, RoutedEventArgs e) => await StartAsync();
 
-        // ── Plumbing ────────────────────────────────────────────────────────────
+        // â”€â”€ Plumbing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         private Task SendAsync(Function function, bool value) => SendAsync(function, value ? "1" : "0");
 

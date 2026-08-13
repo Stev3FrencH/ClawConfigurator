@@ -91,15 +91,42 @@ namespace McenterLite.Shared.Ipc
         /// </remarks>
         ChargeLimitPercent = 32,
 
-        // ── 4. Lighting — REMOVED ────────────────────────────────────────────────
+        // ── 4. Lighting ──────────────────────────────────────────────────────────
         //
         // Ordinal 40 (LedEnabled) is RETIRED and must never be reused, for the same reason as
-        // 30/31 above.
+        // 30/31 above. The feature came back on 2026-08-12 at a NEW ordinal.
         //
-        // Descoped 2026-08-08. MSI Center's own lighting control is far more capable than the
-        // on/off switch this app could offer - mode, colour and effect all ride a vendor HID
-        // report that was never decoded (Gate G4). A toggle next to that is not worth the
-        // surface. Findings kept in docs/hardware-notes.md.
+        // The 2026-08-08 reasoning for dropping it - "mode, colour and effect all ride a vendor
+        // HID report that was never decoded" - expired when G4 decoded that report.
+
+        /// <summary>
+        /// Which lighting profile is selected: 0 = off, 1-3 = the profile of that number.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// A slot number rather than a colour, because the widget deliberately has no colour
+        /// picker: the three profiles are text files the user edits, and the widget only chooses
+        /// between them. See <c>LightingProfileStore</c>.
+        /// </para>
+        /// <para>
+        /// <b>This value is the helper's, not the device's.</b> The controller stores flattened
+        /// keyframes with no profile number in them, so there is nothing to read back - two
+        /// profiles could even render identically. The helper persists the slot and re-applies it
+        /// at startup, and a <see cref="Snapshot"/> reports what the helper last set.
+        /// </para>
+        /// </remarks>
+        LightingProfile = 41,
+
+        /// <summary>
+        /// Helper -> widget. The three profile names, joined by U+001F, for the buttons.
+        /// </summary>
+        /// <remarks>
+        /// Read-only and re-read from disk on every <see cref="Snapshot"/>, because the user
+        /// renames a profile by editing its file - so this cannot live in <see cref="DeviceCaps"/>
+        /// with the values that never change. U+001F is safe inside the payload: the envelope
+        /// escapes control characters when it serializes.
+        /// </remarks>
+        LightingProfileNames = 42,
 
         // ── 5. Controller mode ───────────────────────────────────────────────────
         /// <summary>

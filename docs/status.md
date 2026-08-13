@@ -7,19 +7,24 @@ notes behind the roadmap below.
 
 ## The headline
 
-**The MSI Center M dependency is nearly gone.** All three hardware features that ship now talk to
+**The MSI Center M dependency is nearly gone.** All four hardware features that ship now talk to
 the firmware directly and need MSI Center M neither running nor installed:
 
 - **Power limits** via `MSI_ACPI.Set_SlaveBattery` (ACPI-WMI), merged 2026-08-11.
 - **Controller mode** via the controller's vendor HID channel, merged 2026-08-12.
 - **Battery charge limit** via `MSI_ACPI.Set_AP` (ACPI-WMI), merged 2026-08-12.
+- **RGB lighting** via the vendor HID profile block, 2026-08-12.
 
-Everything remaining is either the two features still descoped and coming back — RGB then fan — or
-cleanup that waits on MSI Center M actually being uninstalled.
+**Fan control (G2) is the only feature left**, and then cleanup that waits on MSI Center M actually
+being uninstalled.
 
 ## Current build
 
-**0.2.0.8, Debug.** Installed and verified on the Claw 2026-08-12.
+**0.2.0.21, Debug.** Verified on the Claw 2026-08-12 — lighting, gamepad and keyboard navigation,
+and the charge-limit slider.
+
+> **This device only ever runs the widget in compact mode.** Pinning is not a case to design for —
+> see the focus notes below, where that fact is what makes the re-arm guard safe.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\src\Package\Install.ps1
@@ -39,6 +44,52 @@ powershell -ExecutionPolicy Bypass -File .\Diagnostics\Start-FakeHelper.ps1
 > (`AppxManifestPackageVersion`, `AppxManifestPackageVersionRevision`) were tried and **neither is
 > honoured by this project template** — do not retry them without new evidence.
 
+> **Install through `Install.ps1`, elevated. Do not call `Add-AppxPackage` directly.**
+> The running helper holds `helper.log` open inside the package's LocalCache, and Windows must
+> delete that app-data store to re-register the package. A live helper therefore fails the install
+> with `0x80073CF3` (updating) or `0x80073D05` (after the old package is already gone), and
+> **neither message mentions the helper**. Learned the slow way on 2026-08-12, after `0x80073CF3`
+> was first misread as a missing framework dependency.
+>
+> Killing the process is not enough either: the `McenterLiteHelper` scheduled task owns its
+> lifetime and can restart it mid-install. `Install.ps1` now stops *and disables* the task, then
+> re-enables it in a `finally`. Same supervisor trap as `MSI_Center_M_Server`, on our own code.
+
+> **Build the package as a `.msixbundle`, the way step 7 of `building-the-widget.md` says.**
+> Driving MSBuild directly with `/p:Platform=x64` and no bundle properties produces a bare `.msix`
+> instead, and that cost a whole install cycle twice over on 2026-08-12. Once because `Install.ps1`
+> ranked *any* bundle above *any* `.msix` and so reinstalled a version-older bundle while printing
+> the file it chose (fixed — one ranking across both extensions now); and again because replacing an
+> installed bundle with a bare `.msix` of the same identity fails `0x80073CF3`. The command that
+> reproduces the documented shape:
+>
+> ```powershell
+> & $msbuild .\src\Package\McenterLite.Package.wapproj /p:Configuration=Debug /p:Platform=x64 `
+>   /p:AppxBundlePlatforms=x64 /p:AppxBundle=Always /p:UapAppxPackageBuildMode=SideloadOnly `
+>   /p:AppxPackageSigningEnabled=true
+> ```
+>
+> **Read the `Found package:` line `Install.ps1` prints.** It names the file and its timestamp, and
+> it is the only place a wrong-package install announces itself.
+
+## A slider needs BOTH StepFrequency and SmallChange
+
+Fixed 2026-08-12, verified on device. The Battery card's slider declared `StepFrequency="10"` and
+still moved in ones.
+
+**They govern different inputs, and only one of them is stepping.** `StepFrequency` controls tick
+snapping and pointer dragging; **`SmallChange`, inherited from `RangeBase` and defaulting to `1`, is
+what a single arrow-key or D-pad press uses.** Declaring the step alone does nothing for the input
+this device is actually driven with. `ChargeLimitSlider` now sets both; PL1/PL2 deliberately set
+neither, because they want steps of one.
+
+Worth remembering when adding any slider: the step you declare is not necessarily the step the user
+gets.
+
+Not a bug, and deliberate: the percentage **text** can show a value that is not a multiple of ten
+while the thumb sits on the nearest step. The text reports what the hardware said, so the widget
+never rounds and misreports the device.
+
 ## Confirmed working on the Claw
 
 | Feature | Path | Verified |
@@ -46,6 +97,7 @@ powershell -ExecutionPolicy Bypass -File .\Diagnostics\Start-FakeHelper.ps1
 | Power limits (PL1/PL2) | `MSI_ACPI.Set_SlaveBattery` | 2026-08-11, against sustained-clock oracle |
 | Controller mode | vendor HID `0x24`/`0x26`/`0x27` | 2026-08-12, both directions + physical button |
 | Battery charge limit | `MSI_ACPI.Set_AP` | 2026-08-12, charging resumed past the old limit |
+| RGB lighting | vendor HID `0x04`/`0x05`/`0x21` | 2026-08-12, wave visible on the device |
 | CPU Boost | documented Win32 | 2026-08-10 |
 | OS Power Mode | documented Win32 | 2026-08-10 |
 | Gamepad navigation | — | 2026-08-10, compact mode |
@@ -86,32 +138,39 @@ persisted across a helper restart, and `Get_AP` confirmed every write.
 re-asserts that value later, on its own tick or on resume. It has no bearing on the standalone
 case, but it decides whether the two can coexist until the uninstall.
 
-### 1. RGB LED (G4) — next
+### ~~2. RGB LED (G4)~~ — DONE 2026-08-12
 
-**Much closer than the G4 section suggests.** That section still says report `0x0F` is unverified
-and unstarted; G5 has since proven it, established its framing, and shipped `MsiVendorHidChannel`,
-which speaks it. Finding and opening the channel — most of the work — is done.
+Shipped in 0.2.0.10 as the widget's **Lighting** card, **last** in the card order. Four segments:
+off plus three profiles. `Function.LightingProfile = 41` — a **new** ordinal, because the retired
+40 must never be reused — with `LightingProfileNames = 42` carrying the button labels.
 
-The concrete lead: with MSI Center M restarting, the controller emits a long multi-frame `0x05`
-dump whose payload is full of plausible RGB triples (`FF 00 00`, `FF A0 00`, `C8 C8 FF`) alongside
-per-zone records. **Capture that dump while changing one colour in MSI Center M, diff it, and that
-is very likely the whole gate.** `--hid-watch` already records it.
+**No colour picker.** The three profiles are text files the user edits, seeded to reproduce what
+MSI Center M had configured; see [`lighting-profiles.md`](lighting-profiles.md). The widget only
+chooses between them, and the card carries **no explanatory text** — the folder has its own
+`README.txt` and the repo README has the path.
 
-**Scope, set 2026-08-12:** the widget does *not* need a colour picker. MSI Center M holds **three
-saved profiles**, and those three are the ones to keep. The widget should **cycle between the three
-and turn the lighting off and back on** — four states, no authoring.
+**A bad edit cannot produce a broken profile.** Every setting falls back field by field and names
+what it skipped in `helper.log`. The one asymmetry worth knowing about: an empty `Colors` *means*
+"built-in palette", so a colour list where nothing parses keeps the previous colours rather than
+committing the empty list — otherwise one typo would silently swap the profile for a different,
+valid-looking one. Recovery is to empty or delete the file and tap the profile; `Load` restores the
+default **and rewrites the file**, so nothing needs restarting.
 
-That makes the gating question narrower but also sharper: **where do those three profiles live?**
+**Decoded from MSI's own binary, not by observation.** `API_ControlMode.dll` is unobfuscated .NET
+and carries the whole protocol. That also independently confirmed G5's opcodes. Full detail in
+[`hardware-notes.md`](hardware-notes.md#the-lighting-protocol--decoded-2026-08-12).
 
-- *If the controller stores them*, this is small — find the "select profile N" command and the
-  on/off command, and nothing needs to be captured at all.
-- *If MSI Center M stores them* and merely pushes the resulting colours down, then the profiles die
-  with the uninstall. In that case each profile must be **captured as its literal payload while MSI
-  Center M is still installed** and replayed by us afterwards. There is no second chance at that
-  capture once MSI Center M is gone.
+Two facts worth carrying forward:
 
-Settle that question first — it decides whether this feature is a lookup or an archive. Either way,
-**capture all three profiles before uninstalling anything.**
+- **The profiles were MSI Center M's, not the controller's.** They are archived at
+  `Diagnostics/mystic-light-profiles/`. The controller stores only flattened keyframes, which is
+  also why the selected profile is helper state rather than something readable back.
+- **Lighting is written to RAM, never flash.** `SyncToROM` (`0x22`) exists and is deliberately not
+  used. The helper re-applies at startup instead — including "off", so a power cycle cannot quietly
+  turn the lights back on.
+
+Untested: whether MSI Center M re-asserts its own lighting later while both are installed. Same
+open question as the charge limit, and with the same non-bearing on the standalone case.
 
 ### 2. Fan control (G2) — hardest, do last
 
@@ -188,21 +247,13 @@ NuGet version.
 All four were real bugs and **none was why navigation did not work.** Kept because they remain
 latent hazards.
 
-1. **Nothing was ever focused.** `SetInitialFocus` ran in the same dispatcher callback that made
-   the cards visible, and XAML defers layout a frame — every candidate measured `ActualHeight == 0`
-   and the size guard skipped all of them. `OnLayoutUpdated` now does it once sizes are real.
+1. ~~**Nothing was ever focused.**~~ `SetInitialFocus` ran before layout, so every candidate
+   measured `ActualHeight == 0`. **All of this code was deleted in 0.2.0.17** — see below.
 2. **Selecting a segment threw focus away.** `SegmentedControl.Show` assigned a different `Style`
    per button; assigning `Style` re-applies the control template, and a control that rebuilds its
-   template loses focus. Now three brushes set in place by `Paint`.
-3. **Focus landed on the second card.** A leftover synchronous `SetInitialFocus()` in
-   `OnSnapshotApplied` ran while the TDP card still measured zero but the never-hidden power card
-   did not. That call is gone.
-4. **Dead on every show after the first.** `_initialFocusSet` latched for the session.
-   `ArmInitialFocus` re-arms on `VisibleChanged → true`.
-
-Initial focus uses `FocusState.Keyboard`, not `Programmatic` — that is what reveals the focus
-rectangle. On a device with no cursor, a focused control you cannot see is indistinguishable from
-broken navigation.
+   template loses focus. Now three brushes set in place by `Paint`. **Still live.**
+3. ~~**Focus landed on the second card.**~~ Superseded by the deletion.
+4. ~~**Dead on every show after the first.**~~ Superseded by the deletion.
 
 **Why every earlier test missed these:** a mouse click sets focus, papering over all four. The
 `--fake-hardware` pass had the same blind spot. Nothing but a controller finds these, and no unit
@@ -211,25 +262,82 @@ test reaches them.
 **Two presses of Up to leave the widget is NOT a bug** — every Game Bar widget behaves that way,
 Microsoft's bundled ones included.
 
-### Open risk: the VisibleChanged re-arm still steals focus
+### The widget no longer places focus at all — 0.2.0.17, 2026-08-12
 
-`ArmInitialFocus` runs on every `VisibleChanged → true` and unconditionally re-focuses the top
-control. **In compact mode Game Bar toggles `Visible` every two to three seconds**, so this can
-drag focus back while the user is navigating. It has not bitten since the proxyStub fix, so it
-ships as-is.
+**`SetInitialFocus`, `ArmInitialFocus`, `OnLayoutUpdated`, `IsFocusInsideContent`,
+`_initialFocusSet`, `_snapshotApplied` and `SegmentedControl.FirstSegment` are gone.** Game Bar
+places focus; this widget does not. Do not reintroduce a `Focus()` call on load, on show, or on a
+snapshot.
 
-**Symptom to watch for: focus jumping back to the top control on its own after a few seconds of no
-input.** The fix, if needed, is a guard making `ArmInitialFocus` a no-op when
-`FocusManager.GetFocusedElement()` is already inside `RootContent`. That was tried in 0.1.0.39 and
-reverted — but only because it was bundled with three extra event subscriptions that broke the
-first open. **The guard alone was never the problem**; if this is revisited, test that hypothesis
-before re-adding the subscriptions.
+**What the grab actually cost.** It pulled focus inside as soon as layout ran, and again on every
+`VisibleChanged` — every two to three seconds in compact mode, the only mode this device uses. Two
+consequences, neither obvious from the code:
 
-### Pinning loses focus — accepted, not fixed
+- **Game Bar's "press Down to enter the widget" stopped working**, because focus was already inside
+  before the user pressed anything.
+- **Focus was parked on `Pl1Slider`**, and a UWP `Slider` consumes all four arrow keys, so no key
+  could move off it.
 
-Re-arming keys off `VisibleChanged`, and a pinned widget stays `Visible` when the overlay is
-dismissed, so the event never fires on the way back. **Deliberately not fixed:** this device uses
-compact mode, which has no pinning, so the broken path is unreachable here.
+While the TDP card was first this was invisible: the grab landed exactly where Down would have put
+you. Moving the Controller card to the top made the grab land in the *second* card, and the whole
+thing surfaced as "reordering the cards broke keyboard navigation."
+
+**It was not the card order.** Five builds went into the card position, XY keyboard navigation, a
+slider `KeyDown` handler and the focus-candidate list. Every one was reverted.
+
+**How it was finally found:** a temporary on-screen readout of `FocusManager.GotFocus`, printing the
+focused element into the widget itself. It showed `(null)` → `Pl1Slider` immediately on open, and
+that single observation invalidated every theory at once. **Reach for that instrument early.** The
+symptom is only ever visible on device, and no amount of code reading substitutes for seeing where
+focus actually is.
+
+**Method note worth more than the fix:** the report was "keyboard navigation worked perfectly before
+we moved the card." That was literally true and should have been treated as data. Two rounds were
+spent constructing explanations for why the old behaviour had only *appeared* to work.
+
+### Sliders use focus engagement — 0.2.0.17
+
+`IsFocusEngagementEnabled` is set in `CardSliderStyle` (App.xaml), so it covers all three sliders.
+Enter/A engages, Esc/B releases.
+
+**Correction: engagement does NOT help the keyboard.** It was turned on believing it would fix the
+keyboard slider trap. It cannot — engagement applies to **gamepad and remote input only**, so
+`IsFocusEngaged` is never true on a keyboard path. It is kept because it works well on the
+controller, which is how this device is actually driven. `Slider_KeyDown` exists to let Escape
+release a *gamepad*-engaged slider instead of closing the Game Bar.
+
+### `XYFocusKeyboardNavigation` is required, and was wrongly blamed twice
+
+It is set on `RootContent` and **must stay**. A gamepad gets XY focus navigation for free; a
+keyboard does not, and without this its arrows do nothing.
+
+Its history is a case study in blaming the wrong change. It went in at 0.2.0.12, was reverted at
+0.2.0.14 after keyboard navigation got *worse*, and went back in at 0.2.0.18. The revert was a
+misread: the widget was still grabbing focus onto the `ScrollViewer` and the PL1 slider, so the
+arrows had no sane origin, and the resulting mess was attributed to XY. Once the grab was deleted in
+0.2.0.17, the same line simply worked.
+
+**The tell was there the whole time:** the gamepad was always fine and the keyboard never was. That
+is precisely the difference XY navigation makes, and it should have pointed here far sooner.
+
+### Arrows cannot leave a focused slider — accepted, not fixed
+
+A UWP `Slider` consumes all four arrow keys, so keyboard arrows navigate the cards right up until
+they land on a slider, and then only change its value. **Tab is the way off.**
+
+0.2.0.19 fixed this with a `Slider_KeyDown` that took Up/Down and redirected them through
+`FocusManager.FindNextElement`, leaving Left/Right to adjust. **It was reverted without being
+shipped:** other Game Bar widgets behave the same way, so this is platform-consistent, and matching
+the platform beats carrying code to deviate from it. Same reasoning as "two presses of Up to leave
+the widget".
+
+Likewise **Enter is needed to enter the widget** — Down will not do it. Also platform behaviour.
+
+### ~~Pinning loses focus~~ — moot since 0.2.0.17
+
+This described the re-arm keying off `VisibleChanged`, which a pinned widget never raises on the way
+back. **There is no re-arm any more** — the widget does not place focus at all, so there is nothing
+to miss. Doubly moot: this device uses compact mode, which has no pinning.
 
 ## History: the three removed features
 

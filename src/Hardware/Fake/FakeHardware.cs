@@ -38,12 +38,14 @@ namespace McenterLite.Hardware.Fake
                 MinChargeLimit = 50,
                 MaxChargeLimit = 100,
                 HasHwMouse = simulateClaw8Ex,
+                HasRgb = simulateClaw8Ex,
                 HasIgcl = simulateClaw8Ex,
             };
 
             Tdp = new FakeTdp(Caps);
             ChargeLimit = new FakeChargeLimit(simulateClaw8Ex, Caps);
             HwMouse = new FakeHwMouse(simulateClaw8Ex);
+            Rgb = new FakeRgb(simulateClaw8Ex);
             Igcl = new FakeIgcl(simulateClaw8Ex);
 
             // Real on purpose. CPU boost and the power-mode overlay are plain Windows APIs, so
@@ -56,6 +58,7 @@ namespace McenterLite.Hardware.Fake
         public ITdpProvider Tdp { get; }
         public IChargeLimitProvider ChargeLimit { get; }
         public IHwMouseProvider HwMouse { get; }
+        public IRgbProvider Rgb { get; }
         public IPowerProvider Power { get; }
         public IIgclProvider Igcl { get; }
 
@@ -142,6 +145,26 @@ namespace McenterLite.Hardware.Fake
             _percent = percent;
             return OpResult.Success();
         }
+    }
+
+    /// <summary>
+    /// Accepts any animation and remembers nothing.
+    /// </summary>
+    /// <remarks>
+    /// There is nothing to store because <see cref="IRgbProvider"/> has no read: the selected
+    /// profile is the helper's state, not the device's. So this fake is genuinely as thin as it
+    /// looks - the interesting logic is in <c>LightingRenderer</c>, which is pure and unit-tested
+    /// without any hardware at all.
+    /// </remarks>
+    internal sealed class FakeRgb : IRgbProvider
+    {
+        public FakeRgb(bool available) => Available = available;
+
+        public bool Available { get; }
+        public string UnavailableReason => Available ? null : "Lighting is not available on this device.";
+
+        public OpResult Apply(McenterLite.Shared.Model.LightingAnimation animation) =>
+            Available ? OpResult.Success() : OpResult.Unavailable(UnavailableReason);
     }
 
     internal sealed class FakeHwMouse : IHwMouseProvider

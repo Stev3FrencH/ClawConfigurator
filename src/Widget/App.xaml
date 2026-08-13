@@ -144,10 +144,24 @@
 
             <!-- Sliders get a taller hit area than the desktop default. This runs on a handheld:
                  every interaction is a thumb or a stick, never a mouse. -->
+            <!--
+                IsFocusEngagementEnabled makes a slider require A before the D-pad changes its
+                value, and B to let go. This is a GAMEPAD-ONLY feature: UWP applies focus engagement
+                to gamepad and remote input and never to the keyboard, so IsFocusEngaged is always
+                false on a keyboard path.
+
+                It was originally turned on here believing it would fix the keyboard, where a
+                focused Slider eats all four arrow keys. It did not and could not. It is kept
+                because it reads well on the controller, which is how this device is actually
+                driven - the deliberate cost is one extra press per slider. On a keyboard, Tab is
+                the way off a slider; see docs/status.md, where that is accepted as matching how
+                other Game Bar widgets behave.
+            -->
             <Style x:Key="CardSliderStyle" TargetType="Slider">
                 <Setter Property="Margin" Value="0,2,0,0" />
                 <Setter Property="MinHeight" Value="{StaticResource ControlHeight}" />
                 <Setter Property="IsThumbToolTipEnabled" Value="False" />
+                <Setter Property="IsFocusEngagementEnabled" Value="True" />
             </Style>
 
 

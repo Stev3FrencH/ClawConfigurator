@@ -235,6 +235,46 @@ namespace McenterLite.Hardware.Windows
             return false;
         }
 
+        /// <summary>
+        /// Reads the next input report of any kind, or returns false when time runs out.
+        /// </summary>
+        /// <remarks>
+        /// The unfiltered counterpart to <see cref="WaitFor"/>, for discovery rather than for the
+        /// providers - decoding an opcode means seeing the frames that are <i>not</i> the reply,
+        /// which is exactly what <see cref="WaitFor"/> exists to hide. Returns the count separately
+        /// because a short report is a fact worth recording here, not a frame to discard.
+        /// </remarks>
+        public bool ReadAny(TimeSpan timeout, out byte[] frame, out int count)
+        {
+            var buffer = new byte[_inputLength];
+            var deadline = DateTime.UtcNow + timeout;
+
+            while (DateTime.UtcNow < deadline)
+            {
+                try
+                {
+                    count = _stream.Read(buffer, 0, buffer.Length);
+                }
+                catch (TimeoutException)
+                {
+                    continue;
+                }
+                catch (Exception)
+                {
+                    break;
+                }
+
+                if (count <= 0) continue;
+
+                frame = buffer;
+                return true;
+            }
+
+            frame = null;
+            count = 0;
+            return false;
+        }
+
         private static int TryLength(Func<int> read)
         {
             try

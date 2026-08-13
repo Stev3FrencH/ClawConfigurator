@@ -14,7 +14,19 @@
         banner at all.
     -->
     <!-- Named because Game Bar's transparency setting is applied to it as a whole. -->
-    <Grid x:Name="RootContent">
+    <!--
+        XYFocusKeyboardNavigation="Enabled" is what lets the ARROW KEYS move focus. A gamepad gets XY
+        navigation for free - which is why the gamepad was always fine - but a keyboard does not, and
+        without this its arrows do nothing and only Tab moves.
+
+        HISTORY, because this line was added, reverted, and added again. It went in at 0.2.0.12 and
+        was pulled at 0.2.0.14 after keyboard navigation got worse, not better. That was a misread:
+        the widget was still grabbing focus onto the ScrollViewer and the PL1 slider at the time, so
+        the arrows had nowhere sane to start from and the damage was blamed on XY. The grab was
+        deleted in 0.2.0.17 - see the MainWidget class remarks - and with it gone this is simply the
+        switch that makes arrow keys work. It is independent of Tab, which never needed it.
+    -->
+    <Grid x:Name="RootContent" XYFocusKeyboardNavigation="Enabled">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -94,7 +106,29 @@
                       Padding="16,0,16,16">
             <StackPanel>
 
-                <!-- 1. TDP -->
+                <!-- 1. Controller. FIRST on purpose: it is the only card here that changes what
+                     the buttons under your thumbs do, so it is the one most likely to be wanted in
+                     a hurry - and it is also where initial focus lands. -->
+                <Border x:Name="HwMouseCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Grid.Column="0" Glyph="&#xE7FC;" Style="{StaticResource CardIconStyle}" />
+                            <TextBlock Grid.Column="1" Text="Controller" Style="{StaticResource CardTitleStyle}" />
+                        </Grid>
+
+                        <!-- Two named buttons rather than a toggle. A switch labelled "desktop
+                             mouse mode" leaves the off state unnamed, and "off" here is not
+                             nothing - it is gamepad mode. Segment order is set in code by
+                             HwMouseSegmentOrder. -->
+                        <Grid x:Name="HwMouseSegments" Margin="0,12,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- 2. TDP -->
                 <Border x:Name="TdpCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
                     <StackPanel>
                         <Grid Margin="0,0,0,4">
@@ -114,10 +148,14 @@
                             <TextBlock Text="Sustained" Style="{StaticResource RowLabelStyle}" />
                             <TextBlock x:Name="Pl1ValueText" Grid.Column="1" Style="{StaticResource ValueStyle}" />
                         </Grid>
+                        <!-- KeyDown on every slider so Escape RELEASES a gamepad-engaged slider
+                             rather than falling through to Game Bar, which reads it as close. See
+                             Slider_KeyDown; it handles nothing else. -->
                         <Slider x:Name="Pl1Slider"
                                 Style="{StaticResource CardSliderStyle}"
                                 Minimum="8" Maximum="35" StepFrequency="1"
                                 TickFrequency="1"
+                                KeyDown="Slider_KeyDown"
                                 ValueChanged="Pl1Slider_ValueChanged" />
 
                         <Grid Margin="0,4,0,0">
@@ -132,11 +170,12 @@
                                 Style="{StaticResource CardSliderStyle}"
                                 Minimum="10" Maximum="45" StepFrequency="1"
                                 TickFrequency="1"
+                                KeyDown="Slider_KeyDown"
                                 ValueChanged="Pl2Slider_ValueChanged" />
                     </StackPanel>
                 </Border>
 
-                <!-- 2. Windows power -->
+                <!-- 3. Windows power -->
                 <Border Style="{StaticResource CardStyle}">
                     <StackPanel>
                         <Grid>
@@ -166,7 +205,7 @@
                     </StackPanel>
                 </Border>
 
-                <!-- 3. Graphics -->
+                <!-- 4. Graphics -->
                 <Border x:Name="IntelCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
                     <StackPanel>
                         <Grid Margin="0,0,0,4">
@@ -216,38 +255,54 @@
                             <TextBlock Text="Charge to" Style="{StaticResource RowLabelStyle}" />
                             <TextBlock x:Name="ChargeLimitValueText" Grid.Column="1" Style="{StaticResource ValueStyle}" />
                         </Grid>
+                        <!-- SmallChange="10" as well as StepFrequency="10", and both are load
+                             bearing. StepFrequency governs tick snapping and pointer dragging;
+                             SmallChange is what RangeBase uses for a single arrow-key or D-pad
+                             press, and it defaults to 1 - which is why this slider moved in ones
+                             despite the step being declared as ten. PL1/PL2 deliberately do not set
+                             it, because they genuinely want steps of one. -->
                         <Slider x:Name="ChargeLimitSlider"
                                 Style="{StaticResource CardSliderStyle}"
                                 Minimum="50" Maximum="100" StepFrequency="10"
                                 TickFrequency="10"
+                                SmallChange="10"
+                                KeyDown="Slider_KeyDown"
                                 ValueChanged="ChargeLimitSlider_ValueChanged" />
                     </StackPanel>
                 </Border>
 
-                <!-- 4. Controller -->
-                <Border x:Name="HwMouseCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
+                <!-- 5. Lighting. LAST on purpose: it is the card least likely to be wanted
+                     mid-game, so it costs the least to be furthest from the top. -->
+                <Border x:Name="LightingCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
                     <StackPanel>
                         <Grid Margin="0,0,0,4">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <FontIcon Grid.Column="0" Glyph="&#xE7FC;" Style="{StaticResource CardIconStyle}" />
-                            <TextBlock Grid.Column="1" Text="Controller" Style="{StaticResource CardTitleStyle}" />
+                            <FontIcon Grid.Column="0" Glyph="&#xE781;" Style="{StaticResource CardIconStyle}" />
+                            <TextBlock Grid.Column="1" Text="Lighting" Style="{StaticResource CardTitleStyle}" />
                         </Grid>
 
-                        <!-- Two named buttons rather than a toggle. A switch labelled "desktop
-                             mouse mode" leaves the off state unnamed, and "off" here is not
-                             nothing - it is gamepad mode. Segment order is set in code by
-                             HwMouseSegmentOrder. -->
-                        <Grid x:Name="HwMouseSegments" Margin="0,12,0,0" />
+                        <!-- Four segments: Off, then the three profiles. There is deliberately no
+                             colour picker - the profiles are text files the user edits, and this
+                             card only chooses between them. The three labels are the profile
+                             NAMES and are filled in from the helper at runtime, because renaming
+                             a profile means editing its file. See LightingProfileStore. -->
+                        <!-- No hint line here. Explaining where the profile files live cost two
+                             wrapped lines on every open, to say something a user needs once - and
+                             the folder carries its own README.txt anyway. It is in the repo README
+                             instead. -->
+                        <Grid x:Name="LightingSegments" Margin="0,12,0,0" />
                     </StackPanel>
                 </Border>
 
-                <!-- Fan, battery charge limit and RGB lighting all had cards here. All three were
-                     removed 2026-08-08 - each is set in MSI Center, and MSI's own controls are
-                     better than anything this widget could offer. See docs/hardware-notes.md
-                     gates G2, G3 and G4 for the findings, which are kept as a device record. -->
+                <!-- Fan control had a card here. Removed 2026-08-08 and still absent: gate G2
+                     never reconciled MSI's six-point curve with the five-point model the desk
+                     research described, so nothing was ever written to the EC. The battery
+                     charge limit and RGB lighting were removed alongside it and have both since
+                     come back, on firmware paths rather than MSI Center. See
+                     docs/hardware-notes.md. -->
 
                 <!-- A banner warning that MSI Center M was NOT running lived here until
                      2026-08-11. It made sense while the registry mirror was the only TDP path -
