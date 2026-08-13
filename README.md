@@ -187,14 +187,19 @@ what it does to the scheduled task and how it puts it back.
 
 Logs land at `%LOCALAPPDATA%\Packages\<package family>\LocalCache\McenterLite\helper.log`.
 
-**What a fresh install changes.** Almost nothing: the widget reads your current power limits, charge
-limit and controller mode off the hardware and leaves them alone. Two exceptions, both applied once
-and then yours to change:
+**What a fresh install changes.** Your power limits and charge limit are read off the hardware and
+left exactly as they are. Three things are set once, and are then yours to change:
 
 | | First run applies | Why not "leave it alone" |
 |---|---|---|
 | Fans | **Auto** | An install otherwise inherits whatever curve and control flag the last owner left behind — including one you can no longer see or change |
 | Lighting | **profile 1**, seeded as Purple | The controller keeps lighting in RAM and forgets it on a power cycle, so writing nothing leaves the LEDs on a firmware default while the card claims something else |
+| Controller | **Gamepad** | What the device boots as, and what a handheld should be when a handheld app has just been installed |
+
+**Controller mode is written once and never again.** The physical MSI button switches the same mode
+and the firmware handles that on its own, so nothing here re-applies it on later starts — a
+remembered mode would silently undo the button every reboot. It is set on first run and on
+uninstall, and at no other time.
 
 ### Uninstalling
 

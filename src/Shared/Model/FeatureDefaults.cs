@@ -63,15 +63,25 @@ namespace McenterLite.Shared.Model
         public const OsPowerMode PowerMode = OsPowerMode.Balanced;
 
         /// <summary>
-        /// Controller mode. <c>false</c> is Gamepad, which is what the device boots as.
+        /// Controller mode, on both first run and uninstall. <c>false</c> is Gamepad.
         /// </summary>
         /// <remarks>
-        /// <b>Restored, reversing an earlier decision.</b> This used to be deliberately left alone
-        /// on the reasoning that the physical MSI button owns the state as much as we do. That still
-        /// describes normal running — nothing re-asserts it on a tick or at startup — but it is the
-        /// wrong call for an uninstall specifically: leaving the machine in desktop-mouse mode with
-        /// the app that switched it now gone strands the user in the one state where a handheld does
-        /// not behave like a handheld.
+        /// <para>
+        /// <b>Applied at exactly two moments, and never in between.</b> The physical MSI button
+        /// switches the same mode, and the firmware handles that entirely on its own, so this app
+        /// does not own the state during normal running — nothing re-asserts it on a tick or on
+        /// ordinary startups. Doing so would silently undo the button.
+        /// </para>
+        /// <para>
+        /// It is applied on <b>first run</b>, because Gamepad is what the device boots as and what a
+        /// handheld should be when a handheld app has just been installed; and on <b>uninstall</b>,
+        /// because leaving the machine in desktop-mouse mode with the app that switched it now gone
+        /// strands the user in the one state where a handheld does not behave like one.
+        /// </para>
+        /// <para>
+        /// The first-run write is gated by <c>SettingsKeys.HwMouseFirstRunApplied</c> rather than by
+        /// a stored mode — there is no stored mode, precisely because the button owns it.
+        /// </para>
         /// </remarks>
         public const bool HwMouseDesktopMode = false;
 

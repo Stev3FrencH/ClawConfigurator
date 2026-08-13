@@ -1389,9 +1389,16 @@ The button toggles `0x01` ↔ `0x04` only; DirectInput was never observed from i
 a read can disagree with our last write at any moment through no fault of ours. Two consequences,
 both deliberate:
 
-- **Nothing re-applies a stored mode at startup**, and nothing is captured for uninstall restore.
-  We do not own this state, so "putting it back" would mean overwriting whatever the user or the
-  button last chose with a value from an arbitrary earlier moment.
+- **Nothing re-applies a stored mode at startup**, and no mode is stored to re-apply. We do not own
+  this state during normal running, so reasserting it would overwrite whatever the user or the
+  button last chose.
+
+  **Two exceptions, added 2026-08-13, both once-only.** A fresh install applies **Gamepad** — what
+  the device boots as, and what a handheld should be when a handheld app has just been installed —
+  gated on a marker key rather than a stored mode, so it can never repeat. And an uninstall applies
+  Gamepad, because leaving the machine in desktop-mouse mode with the app that switched it now gone
+  strands the user in the one state where a handheld does not behave like one. Neither is a claim
+  of ownership; between those two moments the button wins.
 - **The helper pushes the mode on its ~1 Hz telemetry tick** while the widget is visible, so the
   buttons follow the hardware. Without that the widget would show whatever was true at connect
   time and silently disagree with the device after one button press.

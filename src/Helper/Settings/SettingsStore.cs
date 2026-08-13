@@ -164,6 +164,10 @@ namespace McenterLite.Helper.Settings
             SettingsKeys.CpuBoost,
             SettingsKeys.CpuBoostUserModified,
             SettingsKeys.OsPowerMode,
+
+            // Cleared so a restored install re-applies Gamepad on its next start, matching what
+            // the restore itself just wrote. Harmless if it does: the restore set the same value.
+            SettingsKeys.HwMouseFirstRunApplied,
         };
 
         public void SetBool(string key, bool value) => Set(key, value ? "1" : "0");
@@ -243,6 +247,19 @@ namespace McenterLite.Helper.Settings
 
         public const string CpuBoost = "CpuBoost";
         public const string OsPowerMode = "OsPowerMode";
+
+        /// <summary>
+        /// Set once the first-run controller mode has been applied. Never read as a mode.
+        /// </summary>
+        /// <remarks>
+        /// Controller mode is the one feature with no stored value, because the physical MSI button
+        /// owns it as much as we do and a remembered mode would fight the button on every start.
+        /// A fresh install still puts the device in Gamepad — see
+        /// <see cref="FeatureDefaults.HwMouseDesktopMode"/> — so this marker is what makes that a
+        /// once-ever write rather than a recurring one. It records that something happened, not
+        /// what the device is.
+        /// </remarks>
+        public const string HwMouseFirstRunApplied = "HwMouseFirstRunApplied";
 
         public const string IntelPrefix = "Intel_";
 
