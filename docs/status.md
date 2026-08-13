@@ -288,7 +288,21 @@ Still open, and both about *persistence* rather than mechanism:
   and its settings before the step that was supposed to use them. It now restores
   `FeatureDefaults` — chosen values, not replayed captures — with the order reversed in the README.
   Controller mode **is** now restored, reversing the old "the button owns it" rule for the uninstall
-  case only. **Still to run on the device:** `--restore`, then the real thing.
+  case only.
+
+  **The restore half is verified on device (0.2.0.28).** All six values written and read back, the
+  saved settings cleared, and — the actual proof — **no `Re-applied` lines at all** on the next
+  helper start. Two bugs were caught by running it rather than by reading it:
+
+  1. *The restore did not survive.* It wrote all six defaults correctly and six seconds later
+     `StartupApplier` read `settings.json` and put the old values straight back, having reported
+     success on the way. Writing the hardware was only half of putting the machine back.
+  2. *A card lied.* Clearing `LightingProfile` left the Lighting card reading **Off** while the LEDs
+     still ran 'Wave'. Lighting is the one feature whose card cannot read back from the hardware, so
+     that setting is the only record of what is lit — and the restore deliberately does not change
+     the lights. A record cleared for something that was never touched.
+
+  **Still to run:** the real `--uninstall`, which is the same restore plus the teardown.
 
   > **The pipe serves one client and the widget never releases it.** `maxNumberOfServerInstances: 1`,
   > and `"Widget disconnected."` appears **zero** times in a full day of logs — Windows suspends the
