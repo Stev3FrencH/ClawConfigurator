@@ -789,7 +789,9 @@ namespace McenterLite.Widget
                 case Function.FanProfile:
                     // The helper answers this from the firmware's own fan-control flag, not by
                     // echoing what we last sent - so this is also how a curve MSI Center M took
-                    // back gets noticed.
+                    // back gets noticed. Pushed on the helper's telemetry tick as well as at
+                    // connect, at a fifth of the rate of the rest of it; without the tick the card
+                    // would be right only until something else moved the flag.
                     _fan.Show(Clamp(
                         _connection.GetInt(Function.FanProfile, FanAutoSegment),
                         FanAutoSegment, FanCustomSegment));

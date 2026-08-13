@@ -416,12 +416,28 @@ namespace McenterLite.Helper
         /// flag answers both exactly.
         /// </para>
         /// </remarks>
-        private int ReadFanSelection()
-        {
-            if (!_hw.Fan.TryReadCustomCurve(out bool custom))
-                return _settings.GetInt(SettingsKeys.FanProfile, FanAuto);
+        private int ReadFanSelection() =>
+            TryReadFanSelection(out int selection)
+                ? selection
+                : _settings.GetInt(SettingsKeys.FanProfile, FanAuto);
 
-            return custom ? FanCustom : FanAuto;
+        /// <summary>
+        /// The fan selection as the FIRMWARE reports it, with no fallback to what we last wrote.
+        /// </summary>
+        /// <remarks>
+        /// The telemetry loop's shape, not the snapshot's: a tick that cannot read the flag has
+        /// nothing to say and should stay quiet, where a snapshot still has to answer with
+        /// something. Both go through here so the flag-to-selection mapping lives in one place.
+        /// </remarks>
+        public bool TryReadFanSelection(out int selection)
+        {
+            selection = FanAuto;
+
+            if (!_hw.Fan.Available) return false;
+            if (!_hw.Fan.TryReadCustomCurve(out bool custom)) return false;
+
+            selection = custom ? FanCustom : FanAuto;
+            return true;
         }
 
         /// <summary>The three profile names for the widget's buttons, U+001F separated.</summary>

@@ -315,7 +315,18 @@ namespace McenterLite.Helper
         }
 
         /// <summary>
-        /// Pushes the OS power mode and the controller mode while the widget is on screen.
+        /// One tick of the telemetry loop, in seconds.
+        /// </summary>
+        private static readonly TimeSpan TelemetryInterval = TimeSpan.FromSeconds(1);
+
+        /// <summary>
+        /// How many ticks between fan-control reads. See <see cref="RunTelemetryLoopAsync"/>.
+        /// </summary>
+        private const int FanTelemetryEveryNTicks = 5;
+
+        /// <summary>
+        /// Pushes the OS power mode, the controller mode and the fan-control flag while the widget
+        /// is on screen.
         /// </summary>
         /// <remarks>
         /// Gated on visibility because the widget is a UWP app that Windows suspends whenever the
@@ -331,9 +342,17 @@ namespace McenterLite.Helper
         /// changed) rather than tracking "did this change" twice.
         /// </para>
         /// <para>
-        /// This loop once carried fan telemetry too, which is why it exists at all. The power mode
-        /// alone still justifies it - it is the one value here that something outside this app
-        /// changes routinely.
+        /// <b>Not everything here runs at the same rate.</b> The power and controller modes are read
+        /// every tick; the fan-control flag is read every fifth. The two rates answer different
+        /// questions - the first two are cheap OS-level reads, the fan flag is an ACPI-WMI round
+        /// trip to the embedded controller on a battery-powered handheld, and what it is watching
+        /// for is a person pressing a button in another app. Five seconds is well inside the time it
+        /// takes to notice a change in the fans by ear.
+        /// </para>
+        /// <para>
+        /// This loop once carried fan telemetry of a different kind - live RPM and temperatures at
+        /// one second - and lost it in 295f68b when fan control was removed wholesale. It was the
+        /// feature that went, not the tick: nothing was ever recorded against the polling itself.
         /// </para>
         /// </remarks>
         private static async Task RunTelemetryLoopAsync(
@@ -342,11 +361,13 @@ namespace McenterLite.Helper
             IHardware hardware,
             CancellationToken token)
         {
+            int ticksSinceFanRead = 0;
+
             while (!token.IsCancellationRequested)
             {
                 try
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
+                    await Task.Delay(TelemetryInterval, token).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
@@ -389,6 +410,33 @@ namespace McenterLite.Helper
                     catch (Exception ex)
                     {
                         Log.Warn($"Controller-mode telemetry read failed: {ex.Message}");
+                    }
+                }
+
+                // The fan-control flag, on a slower beat - see the rate note above.
+                //
+                // Same problem as the controller mode, from a different direction: MSI Center M is
+                // still installed, owns this same flag, and does not know about us. Without this
+                // push the fan card shows whatever was true at connect and the user's only evidence
+                // that something took the fans back is the noise.
+                //
+                // Read from the firmware, never echoed from our own settings - a tick that reports
+                // what we last wrote would agree with itself forever and is worse than no tick.
+                if (hardware.Fan.Available && ++ticksSinceFanRead >= FanTelemetryEveryNTicks)
+                {
+                    ticksSinceFanRead = 0;
+
+                    try
+                    {
+                        if (dispatcher.TryReadFanSelection(out int selection))
+                        {
+                            server.Send(PipeEnvelope.Event(
+                                Function.FanProfile, PipeEnvelope.FromInt(selection)));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warn($"Fan-control telemetry read failed: {ex.Message}");
                     }
                 }
             }

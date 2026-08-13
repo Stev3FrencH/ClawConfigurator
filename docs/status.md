@@ -22,24 +22,33 @@ cleanup that waits on MSI Center M actually being uninstalled — deleting `Regi
 
 ## Current build
 
-**0.2.0.23, Debug.** Fan control, second attempt. 0.2.0.22 installed and ran on the Claw and the
-card did nothing audible: it wrote the duty tables but never set the flag that tells the EC to read
-them, so every write stored, read back and logged as a success while the firmware went on running
-its own curve. 0.2.0.23 writes the flag, drops the Apply button so the Auto/Custom press applies
-directly, and reports which profile is running from the flag rather than by comparing tables.
+**0.2.0.24, Debug.** The fan-control flag on the telemetry tick. 0.2.0.23 read the flag from the
+firmware — the right source — but only once, in the connect-time snapshot, so an open widget could
+not notice anything else moving the fans. The helper now re-reads it while the widget is visible and
+pushes `FanProfile` as an event, like the power and controller modes.
 
-**Verified on the Claw, 2026-08-12**, through the probe and then through the widget, by ear both
-times. A full-duty table written with the flag clear is silent; setting the flag alone — tables
-untouched — makes both fans go loud. Auto and Custom are both audible from the card. 0.2.0.21 was
-verified the same day for lighting, gamepad and keyboard navigation, and the charge-limit slider.
+**Every fifth tick, not every tick.** The other two are cheap OS reads; this is an ACPI-WMI round
+trip to the EC on a battery-powered handheld, and what it watches for is a person pressing a button
+in another app. ~5 s is well inside the time it takes to hear a fan change. The one worry on record
+against this — that the loop "carried fan telemetry once and lost it" — turned out not to apply:
+`295f68b` removed live RPM and temperatures at 1 Hz, and it went because the whole feature went, not
+because the polling was ever a problem.
+
+**That also makes the open MSI Center M question testable from the card.** Hold Custom, set MSI
+Center M to Auto, wait ~5 s: if the card holds, MSI Center M leaves the flag alone and we own the
+fans; if it flips to Auto, MSI Center M takes them back and startup re-apply is not enough. Until
+0.2.0.24 the card could not answer this, so the observation below was never evidence either way.
+
+**0.2.0.23, verified on the Claw, 2026-08-12**, through the probe and then through the widget, by
+ear both times. 0.2.0.22 had written the duty tables but never set the flag that tells the EC to
+read them, so every write stored, read back and logged as a success while the firmware went on
+running its own curve. A full-duty table written with the flag clear is silent; setting the flag
+alone — tables untouched — makes both fans go loud. Auto and Custom are both audible from the card.
+0.2.0.21 was verified the same day for lighting, gamepad and keyboard navigation, and the
+charge-limit slider.
 
 **MSI Center M did not follow along**, which is the fourth time its UI has been shown to be a cache
-rather than a view of the device. More interesting: setting MSI Center M to Auto while the widget
-was on Custom did **not** flip the widget back. Two readings, not yet separated — either MSI Center
-M leaves the flag alone (so the card is right), or the widget never re-read it. **The second is
-true regardless**: `FanProfile` is only in the connect-time snapshot, and the telemetry loop pushes
-just the power mode and controller mode, so a fan change made by anything else cannot reach an open
-widget. See [Next up](#next-up).
+rather than a view of the device.
 
 > **This device only ever runs the widget in compact mode.** Pinning is not a case to design for —
 > see the focus notes below, where that fact is what makes the re-arm guard safe.
@@ -221,10 +230,15 @@ other selector. The stopped-fan warning moved with it: it used to appear once Cu
 which worked while there was still a press left in which to read it, and now shows whenever the
 profile on disk contains a zero.
 
+**The card is a live readout, from 0.2.0.24.** The helper pushes `FanProfile` every fifth telemetry
+tick while the widget is visible, read from the flag rather than echoed from what we last wrote — so
+a curve something else took back shows on the card instead of only in the noise.
+
 Still open, and both about *persistence* rather than mechanism:
 
 - Whether MSI Center M overwrites a curve we wrote, and on what trigger. Startup re-applies for
-  this reason, and re-selecting the profile already running is deliberately allowed.
+  this reason, and re-selecting the profile already running is deliberately allowed. The tick above
+  is how this now gets observed rather than guessed at.
 - Intel's thermal stack (`ipfsvc`) is an independent fan actor here, so "our table is correct" and
   "the fan behaves" remain separate claims — which is precisely the gap the flag fell into.
 
