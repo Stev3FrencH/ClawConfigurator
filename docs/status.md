@@ -28,13 +28,26 @@ notes behind the roadmap below.
 > Queued behind the Release build, not before it. Documentation plus a script, so someone who did
 > not build this can install and remove it.
 >
-> **The hard part is the signing certificate, not the script.** The package is signed with a
-> self-signed `CN=msi-mcenter-lite` living in this device's `CurrentUser\My`. Any other machine
-> refuses the sideload until that certificate is exported (public key only — a `.cer`, never the
-> `.pfx`) and imported into `LocalMachine\TrustedPeople`, which needs elevation. Decide deliberately
-> whether the answer is shipping a `.cer` with an import step, or getting a properly trusted
-> certificate. A script also has to cover sideloading being permitted at all, and should state the
-> device gate up front rather than let someone install this on a non-Claw and find an empty widget.
+> **Certificate: decided 2026-08-13 — ship the self-signed cert with an import step.** This is a
+> hobby build. Export `CN=msi-mcenter-lite` as a **`.cer`, public key only, never the `.pfx`**, and
+> have the script import it into `LocalMachine\TrustedPeople` (needs elevation). The docs must say
+> in words what that means: Windows will trust anything signed by that key, forever.
+>
+> **That keeps the package identity fixed, which is the real win.** MSIX identity is `Name` + a hash
+> of the `Publisher` DN, and `Publisher` must match the certificate subject exactly. Staying
+> self-signed keeps the Package Family Name at `McenterLite_xq4frxrkckec6` — the path holding
+> settings, the deployed helper and the user's profile files. A different certificate would change
+> the DN, change the PFN, and make Windows treat this as a **different app**: no upgrade path, the
+> old task and helper still running, profiles stranded, and every hardcoded path in the README and
+> `Install.ps1` wrong.
+>
+> If it ever outgrows a hobby audience, [Azure Artifact
+> Signing](https://azure.microsoft.com/en-gb/pricing/details/trusted-signing/) is ~$9.99/month,
+> publicly trusted, no hardware token, open to individuals. **Decide that before wide distribution**
+> — switching afterwards means writing and testing a migration.
+>
+> A script also has to cover sideloading being permitted at all, and should state the device gate up
+> front rather than let someone install this on a non-Claw and find an empty widget.
 >
 > The uninstall half is mostly already prose in the README — the counter-intuitive order, the
 > non-zero exit that is not a failure, not opening the Game Bar between the steps, and the profile
