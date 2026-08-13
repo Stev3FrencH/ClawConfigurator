@@ -558,13 +558,13 @@ namespace McenterLite.Helper
                 int selection = settings.GetInt(SettingsKeys.FanProfile, -1);
                 if (selection >= 0)
                 {
-                    var profile = selection == FeatureDispatcher.FanCustom
-                        ? fans.Load(Log.Warn)
-                        : FanProfile.Factory();
+                    bool custom = selection == FeatureDispatcher.FanCustom;
+                    var profile = custom ? fans.Load(Log.Warn) : FanProfile.Factory();
 
-                    var result = hardware.Fan.Apply(profile);
+                    var result = hardware.Fan.Apply(profile, custom);
                     Log.Info(result.Ok
-                        ? $"Re-applied fan profile '{profile.Name}'."
+                        ? $"Re-applied fan profile '{profile.Name}'; "
+                          + (custom ? "fans follow this table." : "fans left to the firmware.")
                         : $"Could not re-apply the fan profile: {result.Error}");
                 }
             }

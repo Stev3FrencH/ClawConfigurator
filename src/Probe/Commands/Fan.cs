@@ -34,6 +34,12 @@ namespace McenterLite.Probe.Commands
     /// <c>Get_Temperature</c> for reference only.
     /// </para>
     /// <para>
+    /// <b>The tables are only half of it.</b> A separate flag decides whether the EC reads them at
+    /// all — <c>Set_AP</c> sub-function 1, byte 1, bit 0x80. With it clear the firmware runs its own
+    /// curve and the tables are stored and ignored, which is indistinguishable from working if you
+    /// only check that the write held. See <see cref="SetControl"/>.
+    /// </para>
+    /// <para>
     /// <b>The firmware does not enforce a duty floor.</b> A table of zeros was accepted and both
     /// tachometers read 0 - the fans stopped, at every temperature. The 58 above is the factory
     /// curve's first value, not a limit the EC imposes. Nothing underneath this command will
@@ -46,6 +52,29 @@ namespace McenterLite.Probe.Commands
         private const string ReadMethod = "Get_Fan";
         private const string WriteMethod = "Set_Fan";
         private const string TemperatureMethod = "Get_Temperature";
+
+        /// <summary>
+        /// The control flag: whether the EC reads the tables at all.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// On <c>Get_AP</c>/<c>Set_AP</c>, not on the fan methods - and at sub-function 1, where the
+        /// charge limit is at 0. Found on 2026-08-12 by re-diffing the three fan snapshots across
+        /// EVERY register captured rather than only the fan ones: byte 1 read 0x00 under MSI Center
+        /// M's Auto and 0x80 under both its minimum and its maximum, and nothing else in any
+        /// register separated the two. Everything else that moved was a tachometer or a temperature.
+        /// </para>
+        /// <para>
+        /// This matters more than it looks. <see cref="Set"/> was proven to make the tables stick
+        /// on 2026-08-12 and that proof stands - but a table that sticks is not a fan that moves,
+        /// and with this flag clear the EC runs its own curve no matter what the tables hold.
+        /// </para>
+        /// </remarks>
+        private const string ControlReadMethod = "Get_AP";
+        private const string ControlWriteMethod = "Set_AP";
+        private const byte ControlSubFunction = 0x01;
+        private const int ControlByte = 1;
+        private const byte CustomCurveFlag = 0x80;
 
         /// <summary>Sub-function 0 of <c>Get_Fan</c> returns live tachometers, not a table.</summary>
         private const byte TachSubFunction = 0x00;
@@ -87,6 +116,9 @@ namespace McenterLite.Probe.Commands
 
             using (instance)
             {
+                PrintControlState(instance);
+                Console.WriteLine();
+
                 PrintTemperatureAxis(instance);
                 Console.WriteLine();
 
@@ -154,14 +186,171 @@ namespace McenterLite.Probe.Commands
                     int code = WriteOneFan(instance, fan, duties);
                     if (code != 0) return code;
                 }
+
+                Console.WriteLine();
+                Console.WriteLine(restoring
+                    ? "Restored the factory table."
+                    : "Applied. Re-run --fan to confirm it held.");
+
+                // Said every time, not only on failure. A table that stores perfectly and changes
+                // nothing is the exact shape of this command's one historical trap.
+                if (TryReadControl(instance, out var control, out _)
+                    && (control[ControlByte] & CustomCurveFlag) == 0)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("NOTE   : fan control is AUTO, so the firmware is running its own");
+                    Console.WriteLine("         curve and the table above is stored but IGNORED. Nothing");
+                    Console.WriteLine("         you just wrote will be audible until you run:");
+                    Console.WriteLine("           --set-fan-control custom");
+                }
             }
 
-            Console.WriteLine();
-            Console.WriteLine(restoring
-                ? "Restored the factory table."
-                : "Applied. Listen to the device and re-run --fan to confirm it held.");
+            return 0;
+        }
+
+        /// <summary>
+        /// Hands the fans to the tables, or back to the firmware.
+        /// </summary>
+        /// <remarks>
+        /// Deliberately a SEPARATE command from <see cref="Set"/>, so the two halves can be tested
+        /// one at a time. The whole reason this flag went unnoticed is that a write which stores
+        /// correctly and does nothing looks exactly like a write that works; being able to flip the
+        /// flag with the tables held still is what turns that into an observation.
+        /// </remarks>
+        public static int SetControl(string[] args)
+        {
+            if (args.Length < 1)
+            {
+                Console.Error.WriteLine("Usage: --set-fan-control <auto|custom>");
+                Console.Error.WriteLine();
+                Console.Error.WriteLine("  auto   - the firmware runs its own curve; the tables are ignored.");
+                Console.Error.WriteLine("  custom - the firmware follows the tables set by --set-fan.");
+                return 64;
+            }
+
+            bool custom;
+            if (args[0].Equals("custom", StringComparison.OrdinalIgnoreCase)) custom = true;
+            else if (args[0].Equals("auto", StringComparison.OrdinalIgnoreCase)) custom = false;
+            else
+            {
+                Console.Error.WriteLine($"'{args[0]}' is not a mode. Use auto or custom.");
+                return 64;
+            }
+
+            var instance = MsiAcpi.TryGetInstance(out var error);
+            if (instance == null)
+            {
+                Console.Error.WriteLine(error);
+                return 1;
+            }
+
+            using (instance)
+            {
+                if (!TryReadControl(instance, out var before, out error))
+                {
+                    Console.Error.WriteLine(error);
+                    return 1;
+                }
+
+                ReportControl("Before", before);
+
+                // Read-modify-write, and only bit 7. The low bits of this byte were 0 in every
+                // snapshot measured, so their meaning is unknown - clearing them would be a guess.
+                var payload = (byte[])before.Clone();
+                payload[0] = ControlSubFunction;
+                payload[ControlByte] = custom
+                    ? (byte)(payload[ControlByte] | CustomCurveFlag)
+                    : (byte)(payload[ControlByte] & ~CustomCurveFlag);
+
+                Console.WriteLine($"Sending {ControlWriteMethod}: {MsiAcpi.Hex(payload.Take(16))} …");
+
+                var result = MsiAcpi.Invoke(instance, ControlWriteMethod, payload, out error);
+                if (result == null)
+                {
+                    Console.Error.WriteLine(error);
+                    return 1;
+                }
+
+                using (result) MsiAcpi.DumpResult(result);
+
+                if (!TryReadControl(instance, out var after, out error))
+                {
+                    Console.Error.WriteLine($"Wrote, but could not read back: {error}");
+                    return 1;
+                }
+
+                ReportControl("After", after);
+
+                bool actual = (after[ControlByte] & CustomCurveFlag) != 0;
+                if (actual != custom)
+                {
+                    Console.Error.WriteLine();
+                    Console.Error.WriteLine(
+                        $"FAILED: asked for {(custom ? "custom" : "auto")}, "
+                        + $"the device still reports {(actual ? "custom" : "auto")}.");
+                    return 5;
+                }
+
+                Console.WriteLine();
+                Console.WriteLine(custom
+                    ? "The fans now follow the tables. Listen - this is the moment the curve"
+                      + Environment.NewLine + "becomes audible, and --set-fan alone never was."
+                    : "The fans are back under the firmware's own curve.");
+            }
 
             return 0;
+        }
+
+        private static bool TryReadControl(
+            ManagementObject instance, out byte[] package, out string error)
+        {
+            package = null;
+
+            var result = MsiAcpi.Invoke(
+                instance, ControlReadMethod, new byte[] { ControlSubFunction }, out error);
+
+            if (result == null) return false;
+
+            using (result) package = MsiAcpi.ExtractBytes(result);
+
+            if (package == null || package.Length <= ControlByte)
+            {
+                error = $"{ControlReadMethod} sub-function {ControlSubFunction} returned no usable package.";
+                return false;
+            }
+
+            return true;
+        }
+
+        private static void ReportControl(string label, byte[] package)
+        {
+            bool custom = (package[ControlByte] & CustomCurveFlag) != 0;
+
+            Console.WriteLine(
+                $"{label,-8}: fan control = {(custom ? "CUSTOM (tables)" : "AUTO (firmware)")}  "
+                + $"|  byte {ControlByte} = 0x{package[ControlByte]:X2}");
+            Console.WriteLine($"          {MsiAcpi.Hex(package.Take(16))} …");
+        }
+
+        private static void PrintControlState(ManagementObject instance)
+        {
+            if (!TryReadControl(instance, out var package, out var error))
+            {
+                Console.WriteLine($"Fan control    : unavailable ({error})");
+                return;
+            }
+
+            bool custom = (package[ControlByte] & CustomCurveFlag) != 0;
+
+            Console.WriteLine(
+                $"Fan control    : {(custom ? "CUSTOM - the fans follow the tables below" : "AUTO - the firmware runs its own curve")}");
+
+            if (!custom)
+            {
+                Console.WriteLine(
+                    "                 the tables below are STORED BUT IGNORED. Change that with");
+                Console.WriteLine("                 --set-fan-control custom");
+            }
         }
 
         private static int WriteOneFan(ManagementObject instance, byte fan, byte[] duties)

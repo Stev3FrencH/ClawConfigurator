@@ -22,9 +22,14 @@ cleanup that waits on MSI Center M actually being uninstalled — deleting `Regi
 
 ## Current build
 
-**0.2.0.22, Debug.** Fan control built and unit-tested; **not yet verified on the Claw** — that is
-the next thing to do. 0.2.0.21 was verified on 2026-08-12 for lighting, gamepad and keyboard
-navigation, and the charge-limit slider.
+**0.2.0.23, Debug.** Fan control, second attempt. 0.2.0.22 installed and ran on the Claw and the
+card did nothing audible: it wrote the duty tables but never set the flag that tells the EC to read
+them, so every write stored, read back and logged as a success while the firmware went on running
+its own curve. 0.2.0.23 writes the flag, drops the Apply button so the Auto/Custom press applies
+directly, and reports which profile is running from the flag rather than by comparing tables.
+**Not yet verified on the Claw** — and the check that matters is by ear, not from the log, because
+the log was never wrong about what it sent. 0.2.0.21 was verified on 2026-08-12 for lighting,
+gamepad and keyboard navigation, and the charge-limit slider.
 
 > **This device only ever runs the widget in compact mode.** Pinning is not a case to design for —
 > see the focus notes below, where that fact is what makes the re-arm guard safe.
@@ -188,15 +193,30 @@ also retired the never-measured "MSI caps at 75" assumption. Full detail in
 control — it did not move when only the first was written, which is what confirmed the sub-function
 is a fan selector rather than something we had misread.
 
-**There is no "auto mode".** The firmware runs whatever table it holds, so Auto is MSI's factory
-table written back. That is the whole design of the card: two buttons and an explicit Apply.
+**There IS an auto mode, and missing it cost a build.** `Get_AP` sub-function 1, byte 1, bit `0x80`:
+clear, the firmware runs its own curve and the duty tables are stored and ignored; set, it follows
+them. 0.2.0.22 shipped without it and did nothing audible while reporting success at every layer —
+the provider read back and compared, the helper logged the duties, the probe confirmed with a second
+read, and all three were measuring whether the write was *stored* rather than whether it was
+*obeyed*. The flag had actually been spotted during G2 and dismissed in the same paragraph that
+named it, on an assumption the write test could not have tested. See
+[hardware-notes.md](hardware-notes.md#the-fan-control-flag--get_ap--set_ap-sub-function-1).
+
+Applying is therefore two writes — the tables, then the flag — and Auto writes the factory table
+*and* clears the flag rather than merely leaving ours behind.
+
+**No Apply button.** The card originally required a second press so a curve would not follow a
+control as it was being pressed; it was removed on request, and the card now behaves like every
+other selector. The stopped-fan warning moved with it: it used to appear once Custom was selected,
+which worked while there was still a press left in which to read it, and now shows whenever the
+profile on disk contains a zero.
 
 Still open, and both about *persistence* rather than mechanism:
 
 - Whether MSI Center M overwrites a curve we wrote, and on what trigger. Startup re-applies for
-  this reason, and Apply is deliberately allowed on the already-selected profile.
+  this reason, and re-selecting the profile already running is deliberately allowed.
 - Intel's thermal stack (`ipfsvc`) is an independent fan actor here, so "our table is correct" and
-  "the fan behaves" remain separate claims.
+  "the fan behaves" remain separate claims — which is precisely the gap the flag fell into.
 
 > **The firmware enforces no duty floor.** An all-zero table was accepted with both tachometers
 > reading zero. The app warns and does not refuse — a deliberate decision, matching what MSI

@@ -715,22 +715,77 @@ no failure mode could make the device quieter than stock.
 - Tachometers held at 134–136 across all three states. Correct, and a useful sanity check: editing
   the 78 °C point cannot do anything at a 44 °C idle.
 
-#### "Auto" is not a mode — it is the factory table
+#### ~~"Auto" is not a mode — it is the factory table~~ — WRONG, corrected 2026-08-12
 
-The test wrote a **non-factory** table while MSI Center M's registry still read `Fan = 1` (Auto),
-and the EC applied it. The firmware does not gate the table behind a mode, and nothing had to be
-switched before writing or after.
+**There is a mode, and skipping it shipped a feature that did nothing.** The original text of this
+section is kept below, because how it went wrong is the useful part.
 
-**Consequence for the app: applying Auto is a plain write of the factory table**, which the restore
-path does and which has now round-tripped twice. No mode register, no MSI Center involvement. The
-suspected mode flag at `Get_AP|1` byte 1 is therefore *not needed* and remains an unconfirmed
-curiosity rather than a dependency.
+> The test wrote a **non-factory** table while MSI Center M's registry still read `Fan = 1` (Auto),
+> and the EC applied it. The firmware does not gate the table behind a mode, and nothing had to be
+> switched before writing or after.
+>
+> **Consequence for the app: applying Auto is a plain write of the factory table.** No mode
+> register, no MSI Center involvement. The suspected mode flag at `Get_AP|1` byte 1 is therefore
+> *not needed* and remains an unconfirmed curiosity rather than a dependency.
+
+The error is in the second sentence: *"and the EC applied it"* was never observed. What was observed
+is that the table **read back changed** — which is all `Test-SetFan.ps1` could ever show, since it
+compared reads. The write was proven; the fans following it were assumed. The test was even designed
+so that no failure could make the device quieter, which meant the one thing that would have exposed
+this — pressing a curve and hearing nothing — could not happen.
+
+`Get_AP|1` byte 1 was then dismissed on the strength of that assumption, in the same paragraph that
+named it. It is the flag.
+
+#### The fan-control flag — `Get_AP` / `Set_AP` sub-function 1
+
+```
+byte:  0   1   2   3    4..31
+      01  XX  00  04    00 …     XX = 0x80 custom curve, 0x00 firmware's own
+```
+
+Re-diffing the three fan snapshots across **every** register captured, not only the fan ones:
+
+| Register, byte | Auto | MSI min | MSI max |
+|---|---|---|---|
+| **`Get_AP\|1` byte 1** | **0** | **128** | **128** |
+| `Get_Fan\|1` bytes 1–7 | `58;70;74;76;78;80;84` | all `0` | all `100` |
+| `Get_Fan\|0` byte 4 (tach) | 134 | 0 | 116 |
+| `Get_Temperature\|0` byte 1 | 40 | 44 | 45 |
+| `Get_Thermal\|3` byte 7 | 37 | 42 | 43 |
+
+`Get_AP|1` byte 1 is the **only** byte in any register that separates Auto from both custom
+settings. Everything else that moved is a tachometer or a temperature — telemetry, not state. Note
+the bit is set identically for MSI's minimum and maximum, which is what a mode looks like and what a
+value does not.
+
+Same `0x80` enable-bit convention as the charge limit (`percent | 0x80`), one sub-function over —
+G3 is on sub-function 0 byte 5, this is sub-function 1 byte 1, so the two do not collide. Byte 3 is
+a constant `0x04`, presumed to identify the register exactly as `C6 80` does in G3: echoed, never
+authored. The low seven bits of byte 1 were 0 in every snapshot, so only bit 7 is touched.
+
+**Consequence for the app:** applying a profile is two writes — the tables, then the flag — in that
+order, so the EC never briefly runs a stale table. Auto writes the factory table *and* clears the
+flag. "Which profile is running" is read from the flag rather than by comparing the table against
+the factory one, which is both simpler and correct in the case where a custom profile happens to
+equal the factory curve.
+
+**How this got past the gate:** every check in the chain tested that the write was *stored*, and
+none tested that it was *obeyed*. The provider read back and compared. The helper logged the duties
+it sent. The probe confirmed with a separate read. All three agreed, all three were measuring the
+same half. The missing check was the cheap one — listen to the device — and it is now the first line
+of the verification list rather than the last.
 
 #### Still open
 
+- [ ] **Whether the flag makes the curve audible.** Inferred from MSI Center M's own snapshots, not
+      yet driven by us. Prove it with `--set-fan-control custom` against a table already set to
+      something unmistakable, and confirm by ear before trusting the widget.
 - [ ] Whether byte 1 (idle duty) is independently settable, or whether MSI mirrors the first curve
       point into it. Both custom snapshots set every entry to the same value, and the write test
       left it at factory, so nothing so far distinguishes the two.
+- [ ] What the low seven bits of `Get_AP|1` byte 1 mean. Zero in every snapshot so far, so they are
+      echoed untouched.
 - [ ] Whether MSI Center M overwrites a table we wrote, and on what trigger. It is still installed,
       and it is an active participant elsewhere — re-read rather than assuming our write still
       stands.

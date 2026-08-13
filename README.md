@@ -18,24 +18,24 @@ AI+ (Panther Lake, `CG3EM` / board `1T91`), delivered as an Xbox Game Bar widget
 > reflecting changes made outside the widget — Windows Settings, the taskbar flyout, and the
 > physical MSI mode button.
 >
-> **Scope is widening again.** Fan control, battery charge limit and RGB LED were removed
+> **Scope has widened back.** Fan control, battery charge limit and RGB LED were removed
 > (2026-08-08) on the reasoning that MSI Center did them better. **That reasoning expired** once the
-> plan became to uninstall MSI Center M, so all three are coming back — see
-> [docs/status.md](docs/status.md#next-up) for the order and the open question each one carries.
+> plan became to uninstall MSI Center M, and all three are now back — see
+> [docs/status.md](docs/status.md) for what each one still carries.
 > Intel GPU controls (G6) remain an unimplemented stub.
 
 ## Scope
 
-Eight features were planned. Three were descoped on 2026-08-08 and are being brought back, because
+Eight features were planned. Three were descoped on 2026-08-08 and have been brought back, because
 the reason for dropping them — "MSI Center does it better" — stops applying once MSI Center M is
-uninstalled. The charge limit returned on 2026-08-12; fan and RGB are still to come.
+uninstalled. All three returned on 2026-08-12.
 
 | # | Feature | Path | Status |
 |---|---|---|---|
 | 1 | TDP (PL1 / PL2) | `MSI_ACPI.Set_SlaveBattery` | ✅ verified on device, standalone |
-| 2 | Fan control | TBD — `Get_Fan`/`Set_Fan`, or EC | planned, gate G2 (hardest) |
+| 2 | Fan control | `MSI_ACPI.Get_Fan`/`Set_Fan` + `Set_AP` flag | built; awaiting verification by ear |
 | 3 | Battery charge limit | `MSI_ACPI.Get_AP`/`Set_AP` | ✅ verified on device, standalone |
-| 4 | RGB LED | vendor HID report `0x0F` | planned, gate G4 |
+| 4 | RGB LED | vendor HID report `0x0F` | ✅ verified on device, standalone |
 | 5 | Controller mode — Gamepad / Desktop | vendor HID `0x24`/`0x26`/`0x27` | ✅ verified on device, standalone |
 | 6 | CPU Boost | documented Win32 | ✅ verified on device |
 | 7 | OS Power Mode | documented Win32 | ✅ verified on device |
@@ -223,13 +223,12 @@ after switching over. Full syntax, the colour formats, and what the hardware act
 
 ### Editing the fan profile
 
-The **Fans** card has two buttons — **Auto** and your custom profile — and an **Apply** button.
-**Nothing reaches the fans until you press Apply.** Choosing a button only decides what Apply will
-send, because a fan curve is not a setting that should follow a control as it is being pressed.
+The **Fans** card has two buttons — **Auto** and your custom profile. Pressing one applies it.
 
-- **Auto** writes MSI's factory curve. There is no "automatic mode" in the firmware — it always
-  runs the last table it was given, so Auto is simply the stock table put back.
-- **Custom** writes the curve in `Custom.txt`, read at the moment you press Apply.
+- **Auto** hands the fans back to the firmware's own curve, and puts MSI's stock table back at the
+  same time.
+- **Custom** takes the fans over and runs the curve in `Custom.txt`, read at the moment you press
+  the button.
 
 ```
 %LOCALAPPDATA%\Packages\McenterLite_xq4frxrkckec6\LocalCache\McenterLite\Fan
@@ -243,15 +242,17 @@ once, or `Fan1` and `Fan2` to set them apart.
 > [!WARNING]
 > **A duty of 0 stops that fan**, including under load. The firmware enforces no floor — this was
 > measured on the device, with both tachometers reading zero — and MSI Center M permits the same
-> thing. The widget shows a warning when the profile you are about to apply contains a 0, and the
-> log records it, but neither refuses. If you did not mean it, press **Auto** and **Apply**.
+> thing. The widget shows a warning whenever `Custom.txt` contains a 0 — before you press anything,
+> not after — and the log records it, but neither refuses. If you did not mean it, press **Auto**.
 
-Recovery is the same as for lighting: delete `Custom.txt`, or empty it and save, then press Apply.
-A setting that cannot be read is skipped and the previous value kept, and `helper.log` two folders
-up names everything it ignored, on lines starting `Fan profile:`.
+Recovery is the same as for lighting: delete `Custom.txt`, or empty it and save, then press
+**Custom** again. A setting that cannot be read is skipped and the previous value kept, and
+`helper.log` two folders up names everything it ignored, on lines starting `Fan profile:`.
 
-MSI Center M, while it is still installed, owns the same table and does not know about us — if a
-curve stops behaving, press **Apply** again.
+MSI Center M, while it is still installed, owns the same fans and does not know about us — if a
+curve stops behaving, press the button again. The card reads which profile is running from the
+firmware itself, so if MSI Center M has taken the fans back, the card will say **Auto** rather than
+keep claiming your curve.
 
 ## Running
 
@@ -307,13 +308,15 @@ Center's registry model and fan control had been removed. It is **not** true now
 
 - **Power limits** go to the EC through `MSI_ACPI.Set_SlaveBattery`.
 - **Controller mode** writes the controller's own firmware over the vendor HID channel.
+- **Charge limit** goes to the EC through `MSI_ACPI.Set_AP`.
+- **Fan control** writes the EC's duty tables through `MSI_ACPI.Set_Fan`, and hands the fans to
+  them with a flag on `Set_AP`. This is the riskiest thing here: it is the only feature that can
+  make the device run hotter, and **the firmware enforces no duty floor** — a table of zeros stops
+  both fans, which was measured rather than assumed. The ≤ 75 duty clamp this project long carried
+  turned out to be [wrong for this model](docs/hardware-notes.md); duty is a plain 0–100 percentage.
 
-Both are constrained to registers whose meaning was established by measurement on this exact model,
-and both are read back after every write. Fan control (gate G2) is deliberately still unimplemented
-and is the riskiest of the planned features, since it writes EC duty tables directly — the ≤ 75
-duty clamp this project long assumed is itself
-[contradicted by measurement](docs/hardware-notes.md) and must be re-derived rather than carried
-forward.
+All are constrained to registers whose meaning was established by measurement on this exact model,
+and all are read back after every write.
 
 The mitigations that apply are structural rather than advisory:
 

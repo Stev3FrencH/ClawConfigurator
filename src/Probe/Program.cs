@@ -62,6 +62,7 @@ namespace McenterLite.Probe
                 case "set-controller-mode": return Commands.ControllerMode.Set(rest);
                 case "fan": return Commands.Fan.Read(rest);
                 case "set-fan": return Commands.Fan.Set(rest);
+                case "set-fan-control": return Commands.Fan.SetControl(rest);
 
                 default:
                     Console.Error.WriteLine($"Unknown command: {args[0]}");
@@ -134,6 +135,12 @@ WRITE (these change system state)
                             THE FIRMWARE ENFORCES NO FLOOR - a table of zeros stops the fan at
                             every temperature, measured on this device. Warns, does not refuse.
                             e.g.  --set-fan both 30;35;45;55;65;75;85
+  --set-fan-control <auto|custom>
+                            Choose WHO drives the fans: the firmware's own curve, or the duty
+                            tables above. MSI_ACPI.Set_AP sub-function 1, byte 1 bit 0x80.
+                            The tables do nothing at all while this reads auto - they store,
+                            they read back, and the fans ignore them.
+                            e.g.  --set-fan-control custom
   --set-charge-limit <20-100>
                             Set the battery charge limit via MSI_ACPI.Set_AP. Echoes back the
                             package it just read with only byte 5 changed, and confirms with a

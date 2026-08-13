@@ -195,7 +195,13 @@ namespace McenterLite.Hardware.Windows
             return false;
         }
 
-        public OpResult Apply(McenterLite.Shared.Model.FanProfile profile) =>
+        public bool TryReadCustomCurve(out bool enabled)
+        {
+            enabled = false;
+            return false;
+        }
+
+        public OpResult Apply(McenterLite.Shared.Model.FanProfile profile, bool customCurve) =>
             OpResult.Unavailable(UnavailableReason);
     }
 

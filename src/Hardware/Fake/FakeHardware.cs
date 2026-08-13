@@ -69,18 +69,19 @@ namespace McenterLite.Hardware.Fake
     }
 
     /// <summary>
-    /// Holds two duty tables in memory, starting on the factory curve.
+    /// Holds two duty tables and the control flag in memory, starting as an untouched device does.
     /// </summary>
     /// <remarks>
-    /// Starts on <see cref="FanProfile.Factory"/> because that is what a device that has never been
-    /// touched reports, and the widget's "is the factory curve loaded" check must be exercisable
-    /// without a Claw. Clamps to 0-100 the way the real provider does, so a profile that would be
-    /// truncated on hardware is truncated here too.
+    /// Starts on <see cref="FanProfile.Factory"/> with the flag CLEAR, which is what a device that
+    /// has never been touched reports. The flag is modelled separately from the tables rather than
+    /// inferred from them, because that separation is the whole point on real hardware: the tables
+    /// can hold anything at all while the firmware runs its own curve.
     /// </remarks>
     internal sealed class FakeFan : IFanProvider
     {
         private readonly bool _available;
         private readonly FanProfile _state = FanProfile.Factory();
+        private bool _customCurve;
 
         public FakeFan(bool available) => _available = available;
 
@@ -100,7 +101,13 @@ namespace McenterLite.Hardware.Fake
             return true;
         }
 
-        public OpResult Apply(FanProfile profile)
+        public bool TryReadCustomCurve(out bool enabled)
+        {
+            enabled = _customCurve;
+            return _available;
+        }
+
+        public OpResult Apply(FanProfile profile, bool customCurve)
         {
             if (!_available) return OpResult.Unavailable(UnavailableReason);
             if (profile == null) return OpResult.Fail("No fan profile was given.");
@@ -119,6 +126,7 @@ namespace McenterLite.Hardware.Fake
                 }
             }
 
+            _customCurve = customCurve;
             return OpResult.Success();
         }
     }

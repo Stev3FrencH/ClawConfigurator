@@ -37,9 +37,28 @@ namespace McenterLite.Hardware.Windows
     /// Its own reply is not evidence that anything was applied.
     /// </para>
     /// <para>
-    /// <b>There is no mode to set.</b> The firmware runs whatever table it holds. A non-factory
-    /// table applied while MSI Center M's registry still read <c>Fan = 1</c> (Auto), which is what
-    /// proves the mode is MSI Center M's own bookkeeping rather than a firmware state.
+    /// <b>The table alone does nothing.</b> A second register decides whether the EC reads it:
+    /// </para>
+    /// <code>
+    /// Get_AP / Set_AP, sub-function 1:
+    ///
+    /// byte:  0   1   2   3    4..31
+    ///       01  XX  00  04    00 …     XX = 0x80 custom curve, 0x00 firmware's own
+    /// </code>
+    /// <para>
+    /// Measured across MSI Center M's own Auto / minimum / maximum settings: byte 1 was 0x00 in
+    /// Auto and 0x80 in BOTH custom settings, and it is the only byte in any register that
+    /// separates them cleanly - everything else that moved was a tachometer or a temperature.
+    /// Byte 3 is a constant 0x04 and is presumed to identify the register, exactly like the
+    /// <c>C6 80</c> in the charge limit's sub-function 0, so it is echoed and never authored.
+    /// </para>
+    /// <para>
+    /// <b>This class previously wrote the table and nothing else</b>, on the recorded belief that
+    /// the firmware had no mode. Every write succeeded and read back correctly, and the fans went
+    /// on running the firmware's curve regardless - a feature that reported success and did
+    /// nothing. The belief came from MSI Center M's REGISTRY still reading Auto while a custom
+    /// table was loaded, which proved only that the registry was a mirror. Same transport, same
+    /// class, different sub-function: not a mirror, and not in the fan table at all.
     /// </para>
     /// <para>
     /// <b>No duty floor is enforced here.</b> The firmware accepts 0 and stops the fan; so does MSI
@@ -55,6 +74,14 @@ namespace McenterLite.Hardware.Windows
         private const string ClassName = "MSI_ACPI";
         private const string ReadMethod = "Get_Fan";
         private const string WriteMethod = "Set_Fan";
+
+        // The control flag lives on Get_AP/Set_AP, NOT on the fan methods. Same class, different
+        // register - and a different sub-function from the charge limit, which is on 0.
+        private const string ReadFlagMethod = "Get_AP";
+        private const string WriteFlagMethod = "Set_AP";
+        private const byte FlagSubFunction = 0x01;
+        private const int FlagByte = 1;
+        private const byte CustomCurveFlag = 0x80;
 
         // Same embedded-instance shape as every other MSI_ACPI buffer method.
         private const string ParameterName = "Data";
@@ -82,6 +109,13 @@ namespace McenterLite.Hardware.Windows
                 _unavailableReason = "Fan " + fan + ": " + error;
                 return;
             }
+
+            // The flag register too. Without it the tables can be written and read back perfectly
+            // while the fans ignore them, which is the one failure this feature must not have -
+            // and it is exactly how the first build behaved.
+            string flagError;
+            if (!TryReadFlagPackage(out _, out flagError))
+                _unavailableReason = "Fan control flag: " + flagError;
         }
 
         public bool Available => _unavailableReason == null;
@@ -106,7 +140,28 @@ namespace McenterLite.Hardware.Windows
             return true;
         }
 
-        public OpResult Apply(FanProfile profile)
+        public bool TryReadCustomCurve(out bool enabled)
+        {
+            enabled = false;
+
+            byte[] package;
+            if (!TryReadFlagPackage(out package, out _)) return false;
+
+            enabled = (package[FlagByte] & CustomCurveFlag) != 0;
+            return true;
+        }
+
+        /// <summary>
+        /// Writes both tables, then moves the control flag.
+        /// </summary>
+        /// <remarks>
+        /// <b>Tables first, flag second, in both directions.</b> Going to Custom, setting the flag
+        /// before the tables would run the fans on whatever the tables held from last time, for as
+        /// long as the two writes take. Going to Auto the order matters less - the firmware stops
+        /// reading the tables either way - but doing it the same way round in both directions means
+        /// there is only one sequence to reason about.
+        /// </remarks>
+        public OpResult Apply(FanProfile profile, bool customCurve)
         {
             if (!Available) return OpResult.Unavailable(_unavailableReason);
             if (profile == null) return OpResult.Fail("No fan profile was given.");
@@ -117,7 +172,70 @@ namespace McenterLite.Hardware.Windows
                 if (!result.Ok) return result;
             }
 
+            return ApplyCustomCurveFlag(customCurve);
+        }
+
+        /// <summary>
+        /// Hands the fans to the tables, or back to the firmware.
+        /// </summary>
+        /// <remarks>
+        /// Read-modify-write and confirmed with a separate read, like everything else on this
+        /// class. Only bit 7 of byte 1 is touched: the low bits of that byte were 0 in every
+        /// snapshot measured, so what they mean is unknown and clearing them would be a guess.
+        /// </remarks>
+        private OpResult ApplyCustomCurveFlag(bool enabled)
+        {
+            byte[] package;
+            string readError;
+            if (!TryReadFlagPackage(out package, out readError))
+                return OpResult.Fail("Could not read the fan-control flag: " + readError);
+
+            var payload = (byte[])package.Clone();
+            payload[0] = FlagSubFunction;
+            payload[FlagByte] = enabled
+                ? (byte)(payload[FlagByte] | CustomCurveFlag)
+                : (byte)(payload[FlagByte] & ~CustomCurveFlag);
+
+            string writeError;
+            if (!TryInvoke(WriteFlagMethod, payload, out _, out writeError))
+                return OpResult.Fail("Could not hand over fan control: " + writeError);
+
+            byte[] after;
+            string verifyError;
+            if (!TryReadFlagPackage(out after, out verifyError))
+                return OpResult.Fail("Set the fan-control flag but could not read it back: " + verifyError);
+
+            bool actual = (after[FlagByte] & CustomCurveFlag) != 0;
+            if (actual != enabled)
+            {
+                return OpResult.Fail(
+                    "The fan-control flag did not stick: asked for "
+                    + (enabled ? "the custom curve" : "the firmware's own curve")
+                    + ", the device still reports "
+                    + (actual ? "the custom curve" : "the firmware's own curve") + ".");
+            }
+
             return OpResult.Success();
+        }
+
+        private bool TryReadFlagPackage(out byte[] package, out string error)
+        {
+            package = null;
+
+            var request = new byte[PackageSize];
+            request[0] = FlagSubFunction;
+
+            byte[] result;
+            if (!TryInvoke(ReadFlagMethod, request, out result, out error)) return false;
+
+            if (result == null || result.Length <= FlagByte)
+            {
+                error = ReadFlagMethod + " returned no usable package.";
+                return false;
+            }
+
+            package = result;
+            return true;
         }
 
         /// <summary>

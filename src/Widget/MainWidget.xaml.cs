@@ -290,16 +290,6 @@ namespace McenterLite.Widget
         private const int FanAutoSegment = 0;
         private const int FanCustomSegment = 1;
 
-        /// <summary>
-        /// What Apply will send. Distinct from what the fans are actually running.
-        /// </summary>
-        /// <remarks>
-        /// The whole reason this card has an Apply button is that pressing a segment must NOT
-        /// reach the hardware. So the selection lives here between the press and the apply, and
-        /// the helper's own reading of the device is what overwrites it on the next snapshot.
-        /// </remarks>
-        private int _pendingFanSelection = FanAutoSegment;
-
         /// <summary>Set from the helper: true when the custom profile contains a duty of 0.</summary>
         private bool _customFanStopsAFan;
 
@@ -731,8 +721,8 @@ namespace McenterLite.Widget
             ApplyValue(Function.LightingProfileNames);
             ApplyValue(Function.LightingProfile);
 
-            // Same ordering rule as the lighting pair above, plus one more: the warning depends on
-            // the profile, so it has to be known before the selection paints it.
+            // Same ordering rule as the lighting pair above: the Custom button is labelled with
+            // the profile's own name, so the name has to arrive before a segment is highlighted.
             ApplyValue(Function.FanProfileName);
             ApplyValue(Function.FanProfileStopsAFan);
             ApplyValue(Function.FanProfile);
@@ -797,16 +787,12 @@ namespace McenterLite.Widget
                     break;
 
                 case Function.FanProfile:
-                    // The helper answers this by reading the LIVE table, not by echoing what we
-                    // last sent - so this is also how a curve MSI Center M overwrote gets noticed.
-                    // It resets the pending selection on purpose: once the snapshot says what the
-                    // fans are doing, an older un-applied choice is stale, not pending.
-                    _pendingFanSelection = Clamp(
+                    // The helper answers this from the firmware's own fan-control flag, not by
+                    // echoing what we last sent - so this is also how a curve MSI Center M took
+                    // back gets noticed.
+                    _fan.Show(Clamp(
                         _connection.GetInt(Function.FanProfile, FanAutoSegment),
-                        FanAutoSegment, FanCustomSegment);
-
-                    _fan.Show(_pendingFanSelection);
-                    ShowFanWarning();
+                        FanAutoSegment, FanCustomSegment));
                     break;
 
                 case Function.CpuBoost:
@@ -1093,57 +1079,47 @@ namespace McenterLite.Widget
         }
 
         /// <summary>
-        /// Records which fan profile Apply will send. Deliberately writes nothing.
+        /// Applies a fan profile: Auto hands the fans back to the firmware, Custom takes them over.
         /// </summary>
         /// <remarks>
-        /// The one control on this page whose selection does not reach the hardware. Every other
-        /// segmented control here applies on press, which is right for a mouse mode or a lighting
-        /// profile - they are instant and trivially reversible. A fan curve is neither, so it was
-        /// asked for as an explicit two-step.
+        /// <para>
+        /// This card originally had a separate Apply, so that a fan curve would not follow a
+        /// control as it was being pressed. That was removed on request, which makes this behave
+        /// like every other selector on the page - and removes the one place where what the buttons
+        /// showed and what the fans were doing could disagree.
+        /// </para>
+        /// <para>
+        /// No debounce, for the same reason the lighting profiles have none: two discrete buttons,
+        /// so every event is already a deliberate choice.
+        /// </para>
         /// </remarks>
-        private void OnFanSelected(int segment)
+        private async void OnFanSelected(int segment)
         {
             if (_applyingFromHelper) return;
             if (segment < FanAutoSegment || segment > FanCustomSegment) return;
 
-            _pendingFanSelection = segment;
             _fan.Show(segment);
-            ShowFanWarning();
+            await SendAsync(Function.FanProfile, segment);
         }
 
         /// <summary>
-        /// Sends the selected fan profile. This is the only thing on the card that writes.
+        /// Warns that the custom profile on disk stops a fan.
         /// </summary>
         /// <remarks>
-        /// Applying the profile that is already loaded is allowed rather than disabled, and that is
-        /// the point of a button separate from the selection: MSI Center M owns the same table and
-        /// can overwrite us, so "put my curve back" has to be reachable without first choosing
-        /// something else and choosing back.
-        /// </remarks>
-        private async void FanApply_Click(object sender, RoutedEventArgs e)
-        {
-            if (_applyingFromHelper) return;
-
-            await SendAsync(Function.FanProfile, _pendingFanSelection);
-        }
-
-        /// <summary>
-        /// Shows the stopped-fan warning when, and only when, it applies to what Apply would send.
-        /// </summary>
-        /// <remarks>
-        /// Tied to the PENDING selection rather than the running one, because the warning's job is
-        /// to be read before the button is pressed. Auto is MSI's own curve and can never stop a
-        /// fan, so the warning is meaningless there and would only teach the user to ignore it.
+        /// Shown whichever segment is selected, and deliberately not tied to the selection. While
+        /// Apply existed the warning could wait for Custom to be chosen, because there was still a
+        /// press left in which to read it. Now the press IS the apply, so a warning that waits for
+        /// it has already been overtaken by the thing it warns about.
         /// </remarks>
         private void ShowFanWarning()
         {
-            bool warn = _pendingFanSelection == FanCustomSegment && _customFanStopsAFan;
-
-            FanWarningText.Text = warn
-                ? "This profile sets a fan to 0%, which stops it. The firmware allows this."
+            FanWarningText.Text = _customFanStopsAFan
+                ? "The custom profile sets a fan to 0%, which stops it. The firmware allows this."
                 : "";
 
-            FanWarningText.Visibility = warn ? Visibility.Visible : Visibility.Collapsed;
+            FanWarningText.Visibility = _customFanStopsAFan
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
 
         private async void OnHwMouseSelected(int segment)

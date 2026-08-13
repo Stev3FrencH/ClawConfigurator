@@ -129,19 +129,22 @@ namespace McenterLite.Hardware
     }
 
     /// <summary>
-    /// The two fans' duty tables.
+    /// The two fans: their duty tables, and whether the firmware is honouring them.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Gate G2. Takes a whole <see cref="FanProfile"/> rather than a mode, because the firmware has
-    /// no mode: it always runs the last table it was given, and "Auto" is simply MSI's factory
-    /// table written back. Proven on device — a non-factory table applied while MSI Center M's own
-    /// registry still read Auto.
+    /// Gate G2. <b>Two separate things, and both are needed.</b> The duty table says what the fans
+    /// should do; a flag elsewhere says whether the EC is reading that table at all. Writing the
+    /// table alone changes nothing audible - it is stored, it reads back correctly, and the fans go
+    /// on following the firmware's own curve. That was this interface's behaviour for its first
+    /// build, and it is why fan control appeared to do nothing while every log line said success.
     /// </para>
     /// <para>
-    /// Reads back the live table so the widget can say whether what is loaded is still the factory
-    /// curve. MSI Center M owns the same hardware and may overwrite us, so a value we wrote is not
-    /// evidence of what is running now.
+    /// This interface previously documented the opposite - that the firmware has no mode and always
+    /// runs the last table it was given. That was drawn from MSI Center M's REGISTRY still reading
+    /// Auto while a custom table was loaded, which only ever proved the registry was bookkeeping.
+    /// The firmware does have a mode; it simply is not in the fan table. See
+    /// <c>docs/hardware-notes.md</c>.
     /// </para>
     /// </remarks>
     public interface IFanProvider : IFeatureProvider
@@ -150,10 +153,30 @@ namespace McenterLite.Hardware
         bool TryRead(out FanProfile current);
 
         /// <summary>
-        /// Writes both fans' tables. Implementations must read back rather than trust the reply —
-        /// <c>Set_Fan</c> answers with a bare status that does not echo what was written.
+        /// Whether the firmware is honouring the tables rather than running its own curve.
         /// </summary>
-        OpResult Apply(FanProfile profile);
+        /// <remarks>
+        /// The honest answer to "what are the fans doing", and better evidence than comparing the
+        /// table against the factory one: a custom profile that happens to equal the factory curve
+        /// is indistinguishable by table but perfectly distinguishable by this.
+        /// </remarks>
+        bool TryReadCustomCurve(out bool enabled);
+
+        /// <summary>
+        /// Writes both fans' tables, then hands control to them or back to the firmware.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The table is always written, in both directions: with <paramref name="customCurve"/>
+        /// false the caller passes the factory curve, so Auto also puts the stock table back rather
+        /// than leaving ours behind for whatever sets the flag next.
+        /// </para>
+        /// <para>
+        /// Implementations must read back rather than trust the reply — <c>Set_Fan</c> answers with
+        /// a bare status that does not echo what was written.
+        /// </para>
+        /// </remarks>
+        OpResult Apply(FanProfile profile, bool customCurve);
     }
 
     /// <summary>

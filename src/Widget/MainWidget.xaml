@@ -275,12 +275,12 @@
                      table was measured on 2026-08-12 and Set_Fan proven with the second fan held
                      as a control. See docs/hardware-notes.md.
 
-                     Two buttons and an Apply, and NOTHING here reaches the fans until Apply is
-                     pressed. That is deliberate and was asked for: a fan curve is not a setting
-                     that should follow a control as it is being pressed, the way the sliders
-                     above do. There is no curve editor either - fourteen duty values will not fit
-                     usefully on a compact Game Bar card, so the profile is a text file and this
-                     card only chooses between it and MSI's factory curve. -->
+                     Two buttons, and pressing one applies it - like every other selector here.
+                     This card DID carry a separate Apply, so that a fan curve would not follow a
+                     control as it was being pressed; it was removed on request once a press was
+                     found to be safe in practice. There is no curve editor either - fourteen duty
+                     values will not fit usefully on a compact Game Bar card, so the profile is a
+                     text file and this card only chooses between it and MSI's factory curve. -->
                 <Border x:Name="FanCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
                     <StackPanel>
                         <Grid Margin="0,0,0,4">
@@ -297,16 +297,11 @@
                              at runtime, because renaming it means editing its file. -->
                         <Grid x:Name="FanSegments" Margin="0,12,0,0" />
 
-                        <!-- Full width and below the segments rather than beside them: on a
-                             compact card there is no room for a third column, and Apply is the
-                             control that actually does something. -->
-                        <Button x:Name="FanApplyButton"
-                                Content="Apply"
-                                Style="{StaticResource SegmentButtonStyle}"
-                                Margin="2,8,2,0"
-                                Click="FanApply_Click" />
-
-                        <!-- Shown only when the selected profile contains a duty of 0. The
+                        <!-- Shown whenever the custom profile on disk contains a duty of 0,
+                             WHICHEVER segment is selected. It used to appear only once Custom was
+                             selected, which was fine while Apply was a second press away - there
+                             was still a moment to read it. With the press itself applying, a
+                             warning that waits for the press arrives too late to be one. The
                              firmware enforces no floor - an all-zero table was accepted on this
                              device with both tachometers reading zero - and neither this app nor
                              MSI Center M refuses one, so saying so is the whole mitigation. -->
