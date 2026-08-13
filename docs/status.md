@@ -20,11 +20,8 @@ being uninstalled.
 
 ## Current build
 
-**0.2.0.17, Debug.** Built 2026-08-12. Lighting verified on the Claw in 0.2.0.10.
-
-> Carries a **temporary on-screen focus readout** under the device name (`focus: …`). It is what
-> found the focus-grab bug; remove it once navigation is verified. `FocusDebugText` in
-> `MainWidget.xaml` and `OnFocusManagerGotFocus` in the code-behind, both marked `TEMPORARY`.
+**0.2.0.21, Debug.** Verified on the Claw 2026-08-12 — lighting, gamepad and keyboard navigation,
+and the charge-limit slider.
 
 > **This device only ever runs the widget in compact mode.** Pinning is not a case to design for —
 > see the focus notes below, where that fact is what makes the re-arm guard safe.
@@ -75,25 +72,23 @@ powershell -ExecutionPolicy Bypass -File .\Diagnostics\Start-FakeHelper.ps1
 > **Read the `Found package:` line `Install.ps1` prints.** It names the file and its timestamp, and
 > it is the only place a wrong-package install announces itself.
 
-## Open bugs
+## A slider needs BOTH StepFrequency and SmallChange
 
-### Charge-limit slider steps by 1, not 10 — reported 2026-08-12
+Fixed 2026-08-12, verified on device. The Battery card's slider declared `StepFrequency="10"` and
+still moved in ones.
 
-The Battery card's slider should only stop on 50, 60, 70, 80, 90, 100. On device it moves in
-single-digit increments.
+**They govern different inputs, and only one of them is stepping.** `StepFrequency` controls tick
+snapping and pointer dragging; **`SmallChange`, inherited from `RangeBase` and defaulting to `1`, is
+what a single arrow-key or D-pad press uses.** Declaring the step alone does nothing for the input
+this device is actually driven with. `ChargeLimitSlider` now sets both; PL1/PL2 deliberately set
+neither, because they want steps of one.
 
-**`StepFrequency="10"` is already set in the markup**, so this is not a missing attribute — check
-before "fixing" it and finding nothing changes. Two candidates, neither confirmed:
+Worth remembering when adding any slider: the step you declare is not necessarily the step the user
+gets.
 
-- **`SmallChange` is what arrow keys actually use.** It comes from `RangeBase` and defaults to `1`;
-  `StepFrequency` governs tick snapping and pointer dragging. If so the fix is `SmallChange="10"`,
-  and PL1/PL2 are unaffected because they genuinely want steps of 1.
-- **`ApplyCaps` overwrites `Minimum`/`Maximum` from the device** at runtime but never touches
-  `StepFrequency`. If the device reports a range that is not a multiple of 10, snapping has nothing
-  clean to land on.
-
-Only reachable on device — check which input is doing it (arrows, D-pad, or drag), since those take
-different code paths through the control.
+Not a bug, and deliberate: the percentage **text** can show a value that is not a multiple of ten
+while the thumb sits on the nearest step. The text reports what the hardware said, so the widget
+never rounds and misreports the device.
 
 ## Confirmed working on the Claw
 

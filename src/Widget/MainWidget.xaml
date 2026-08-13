@@ -255,10 +255,17 @@
                             <TextBlock Text="Charge to" Style="{StaticResource RowLabelStyle}" />
                             <TextBlock x:Name="ChargeLimitValueText" Grid.Column="1" Style="{StaticResource ValueStyle}" />
                         </Grid>
+                        <!-- SmallChange="10" as well as StepFrequency="10", and both are load
+                             bearing. StepFrequency governs tick snapping and pointer dragging;
+                             SmallChange is what RangeBase uses for a single arrow-key or D-pad
+                             press, and it defaults to 1 - which is why this slider moved in ones
+                             despite the step being declared as ten. PL1/PL2 deliberately do not set
+                             it, because they genuinely want steps of one. -->
                         <Slider x:Name="ChargeLimitSlider"
                                 Style="{StaticResource CardSliderStyle}"
                                 Minimum="50" Maximum="100" StepFrequency="10"
                                 TickFrequency="10"
+                                SmallChange="10"
                                 KeyDown="Slider_KeyDown"
                                 ValueChanged="ChargeLimitSlider_ValueChanged" />
                     </StackPanel>
