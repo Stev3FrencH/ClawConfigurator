@@ -118,11 +118,13 @@ namespace McenterLite.Helper.Settings
                 foreach (var key in FeatureKeys) _values.Remove(key);
 
                 // Intel settings are written under a prefix rather than at fixed names, so they
-                // have to be found rather than listed.
+                // have to be found rather than listed. Original_* are dead keys from the removed
+                // capture scheme, swept here so a restored install leaves a clean file.
                 var prefixed = new List<string>();
                 foreach (var key in _values.Keys)
                 {
-                    if (key.StartsWith(SettingsKeys.IntelPrefix, StringComparison.Ordinal))
+                    if (key.StartsWith(SettingsKeys.IntelPrefix, StringComparison.Ordinal)
+                        || key.StartsWith("Original_", StringComparison.Ordinal))
                         prefixed.Add(key);
                 }
 
@@ -134,15 +136,30 @@ namespace McenterLite.Helper.Settings
         }
 
         /// <summary>
-        /// Every key <see cref="StartupApplier"/> reads. Adding a re-applied setting without
-        /// adding it here would leave that one feature reverting after a restore.
+        /// Every key <see cref="StartupApplier"/> reads <b>for a feature the restore actually
+        /// changes</b>. Adding a re-applied setting without adding it here would leave that one
+        /// feature reverting after a restore.
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b><see cref="SettingsKeys.LightingProfile"/> is excluded, and that is load-bearing.</b>
+        /// The restore deliberately leaves the lights on, so clearing the record of which profile is
+        /// running does not undo anything — it just makes the record wrong. Every other card reads
+        /// its value back from the hardware and so cannot lie; lighting cannot, because the
+        /// controller stores flattened keyframes with no profile number in them, making this setting
+        /// the only record of what is on the LEDs.
+        /// </para>
+        /// <para>
+        /// Observed on device 2026-08-13: clearing it left the Lighting card showing <b>Off</b>
+        /// while the LEDs were still running 'Wave'. A record cleared for something that was never
+        /// changed.
+        /// </para>
+        /// </remarks>
         private static readonly string[] FeatureKeys =
         {
             SettingsKeys.Pl1,
             SettingsKeys.Pl2,
             SettingsKeys.ChargeLimit,
-            SettingsKeys.LightingProfile,
             SettingsKeys.FanProfile,
             SettingsKeys.CpuBoost,
             SettingsKeys.CpuBoostUserModified,
