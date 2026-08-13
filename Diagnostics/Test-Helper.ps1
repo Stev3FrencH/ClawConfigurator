@@ -63,15 +63,17 @@ $PipeName = 'McenterLiteHelper'
 # map only ever grows.
 #
 # RETIRED, deliberately absent: 20-23 (fan), 30/31 (charge limit), 40 (lighting) and 81 (Intel
-# thermal, which only existed to keep Intel's stack off the fan). All removed 2026-08-08 and their
-# ordinals must never be reused - listing them here would invite exactly that.
+# thermal, which only existed to keep Intel's stack off the fan), all removed 2026-08-08; plus
+# 13 (PerfMode) and 80 (MsiCenterRunning), removed 2026-08-13 with the registry-mirror backend and
+# MSI Center M itself. Their ordinals must never be reused - listing them here would invite
+# exactly that.
 #
 # Fan, charge limit and lighting came BACK on 2026-08-12 on new ordinals, exactly as that rule
 # requires: 24-26, 32, and 41/42. This map missed them until 2026-08-13, so -Restore could not read
 # back most of what it had just changed.
 $Fn = @{
     Hello = 1; Snapshot = 2; DeviceCaps = 3; WidgetVisible = 4; PrepareForUninstall = 5
-    Pl1 = 10; Pl2 = 11; TdpBackend = 12; PerfMode = 13
+    Pl1 = 10; Pl2 = 11; TdpBackend = 12
     FanProfile = 24; FanProfileName = 25; FanProfileStopsAFan = 26
     ChargeLimitPercent = 32
     LightingProfile = 41; LightingProfileNames = 42
@@ -79,7 +81,6 @@ $Fn = @{
     CpuBoost = 60; OsPowerMode = 61
     IntelFpsTier = 70; IntelLowLatency = 71; IntelFrameSync = 72
     IntelAdaptiveSharpness = 73; IntelSaturation = 74; IntelContrast = 75; IntelGamma = 76
-    MsiCenterRunning = 80
 }
 $FnName = @{}
 foreach ($k in $Fn.Keys) { $FnName[$Fn[$k]] = $k }
@@ -207,20 +208,27 @@ function Show-Snapshot {
     }
 }
 
+# Reads MSI Center M's own TDP model, which this app once WROTE through the registry-mirror
+# backend. That backend was deleted on 2026-08-13 and MSI Center M is uninstalled, so these keys
+# are orphaned leftovers - the values here are frozen at whatever they held that morning.
+#
+# Kept because it is still the answer to one question worth asking: if these ever START moving
+# again, something reinstalled MSI Center M and is driving the same hardware we are.
 function Show-TdpRegistry {
     $path = 'HKLM:\SOFTWARE\WOW6432Node\MSI\MSI Center M\Component\User Scenario'
     try {
         $k = Get-ItemProperty -Path $path -ErrorAction Stop
         Write-Host ''
-        Write-Host '=== MSI Center''s own model ===' -ForegroundColor Cyan
+        Write-Host '=== MSI Center''s own model (orphaned; nothing reads or writes it) ===' -ForegroundColor Cyan
         Write-Host ("  AC  PL1={0}  PL2={1}" -f $k.ManualPL1AC, $k.ManualPL2AC)
         Write-Host ("  DC  PL1={0}  PL2={1}" -f $k.ManualPL1DC, $k.ManualPL2DC)
         Write-Host ("  Mode={0}" -f $k.Mode)
         Write-Host ''
-        Write-Host 'Only meaningful when tdpBackend is 2 (RegistryMirror). On tdpBackend 1 (Wmi)' -ForegroundColor DarkGray
-        Write-Host 'the helper writes the EC directly and these values are expected NOT to move.' -ForegroundColor DarkGray
+        Write-Host 'These are expected NOT to move. The helper writes the EC directly.' -ForegroundColor DarkGray
+        Write-Host 'If they DO move, MSI Center M is back and contending for the hardware.' -ForegroundColor DarkGray
     } catch {
-        Write-Warning "Could not read $path"
+        Write-Host ''
+        Write-Host 'MSI Center M''s registry model is gone, as expected after the uninstall.' -ForegroundColor DarkGray
     }
 }
 

@@ -1,37 +1,14 @@
 namespace McenterLite.Shared.Ipc
 {
+    // The PerfMode enum - Endurance / UserScenario / AiEngine / Unknown - was REMOVED on
+    // 2026-08-13 along with the registry-mirror backend it described. It modelled MSI Center M's
+    // own performance-mode selector, which mattered only because that backend's manual power
+    // limits were honoured in User Scenario alone. The WMI path writes the EC directly and is not
+    // gated by MSI's triple at all, so with the mirror gone there is no mode left to model.
+    //
+    // Its wire ordinal, Function.PerfMode = 13, is RETIRED and must never be reused.
+
     /// <summary>How TDP reaches the hardware. Resolved at runtime; see <see cref="Function.TdpBackend"/>.</summary>
-    /// <summary>
-    /// MSI's performance mode selector, as offered by MSI Center M.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// These ordinals are OURS, not MSI's. On device MSI stores 3 = Endurance, 4 = User Scenario,
-    /// 5 = AI Engine across three separate registry values that move together
-    /// (<c>Mode</c>, <c>ShiftMode</c>, <c>GamingEvent</c>) - the hardware layer owns that mapping.
-    /// Putting MSI's raw numbers on the wire would bake a firmware detail into a contract the
-    /// widget also speaks, and it would silently change meaning if MSI ever renumbered.
-    /// </para>
-    /// <para>
-    /// This matters more than usual because the mode <b>gates the power limits</b>: manual PL1/PL2
-    /// are only honoured in <see cref="UserScenario"/>.
-    /// </para>
-    /// </remarks>
-    public enum PerfMode
-    {
-        /// <summary>Battery-first. MSI manages power; manual limits are ignored.</summary>
-        Endurance = 0,
-
-        /// <summary>The only mode in which manual power limits apply.</summary>
-        UserScenario = 1,
-
-        /// <summary>MSI's automatic mode. Manual limits are ignored.</summary>
-        AiEngine = 2,
-
-        /// <summary>MSI reported a mode we do not recognise. Treated as "not User Scenario".</summary>
-        Unknown = 99,
-    }
-
     public enum TdpBackendKind
     {
         /// <summary>Unused today. Kept so wire values stay stable if an auto-selection value is ever needed.</summary>
@@ -45,14 +22,11 @@ namespace McenterLite.Shared.Ipc
         /// </summary>
         Wmi = 1,
 
-        /// <summary>
-        /// Write MSI Center's own registry model and let its service push the values to the EC.
-        /// The fallback when <see cref="Wmi"/> is unavailable. Hard-requires MSI Center M to be
-        /// installed AND running — with the service stopped nothing applies the values and TDP
-        /// silently does nothing, which is why the widget warns when MSI Center is NOT running
-        /// rather than when it is.
-        /// </summary>
-        RegistryMirror = 2,
+        // RegistryMirror = 2 is RETIRED and must never be reused. It wrote MSI Center's own
+        // registry model and let its service push the values to the EC, so it hard-required MSI
+        // Center M installed AND running. Removed 2026-08-13: MSI Center M is uninstalled, and on
+        // the first boot without it the helper resolved Wmi anyway - the mirror was never reached
+        // and could not have worked if it had been.
 
         /// <summary>No usable backend was found on this device. All TDP controls are disabled.</summary>
         Unavailable = 99,

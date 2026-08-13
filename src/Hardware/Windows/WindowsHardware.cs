@@ -44,24 +44,27 @@ namespace McenterLite.Hardware.Windows
                 HasIgcl = false,
             };
 
-            // Prefer the WMI path: it writes the EC directly and needs nothing from MSI Center M,
-            // not even that it be installed. Falls back to the registry mirror only if that ever
-            // stops being true on this firmware - see WmiTdpProvider's remarks.
+            // The WMI path writes the EC directly and needs nothing from MSI Center M, not even
+            // that it be installed. It used to fall back to a registry mirror that wrote MSI
+            // Center's own model and relied on its service to push the values; that fallback was
+            // deleted on 2026-08-13, once MSI Center M was uninstalled and this path resolved on
+            // the first boot without it. A fallback that requires the thing we removed is not one.
             var wmiTdp = new WmiTdpProvider();
-            ITdpProvider tdp = wmiTdp.Available ? wmiTdp : new RegistryTdpProvider();
+            ITdpProvider tdp = wmiTdp.Available
+                ? (ITdpProvider)wmiTdp
+                : new UnavailableTdp(wmiTdp.UnavailableReason);
+
             Caps.TdpBackend = (identity.IsClaw8Ex && tdp.Available)
                 ? tdp.Backend
                 : TdpBackendKind.Unavailable;
 
-            // Same reasoning as TDP above: the firmware path talks to the controller directly and
-            // needs MSI Center M neither running nor installed. The registry value the fallback
-            // reads is in fact a mirror MSI Center M maintains BY WATCHING that same channel, so
-            // the fallback is strictly the weaker of the two - it is kept only until MSI Center M
-            // is actually uninstalled and this path is confirmed on a machine without it.
+            // Same story, and the mirror here was weaker still: the registry value it read was one
+            // MSI Center M maintained BY WATCHING this same HID channel, so it was a copy of the
+            // answer rather than a second way to get it. Deleted with the TDP mirror.
             var hidHwMouse = new HidHwMouseProvider();
             IHwMouseProvider hwMouse = hidHwMouse.Available
-                ? hidHwMouse
-                : new RegistryHwMouseProvider();
+                ? (IHwMouseProvider)hidHwMouse
+                : new UnavailableHwMouse(hidHwMouse.UnavailableReason);
 
             Caps.HasHwMouse = identity.IsClaw8Ex && hwMouse.Available;
 
@@ -118,8 +121,6 @@ namespace McenterLite.Hardware.Windows
         public IFanProvider Fan { get; }
         public IPowerProvider Power { get; }
         public IIgclProvider Igcl { get; }
-
-        public bool IsMsiCenterRunning() => DeviceDetection.IsMsiCenterRunning();
     }
 
     // ── Stubs ───────────────────────────────────────────────────────────────────
@@ -145,14 +146,6 @@ namespace McenterLite.Hardware.Windows
         }
 
         public OpResult Apply(int pl1, int pl2) => OpResult.Unavailable(UnavailableReason);
-
-        public bool TryReadMode(out PerfMode mode)
-        {
-            mode = PerfMode.Unknown;
-            return false;
-        }
-
-        public OpResult ApplyMode(PerfMode mode) => OpResult.Unavailable(UnavailableReason);
     }
 
     internal sealed class UnavailableChargeLimit : IChargeLimitProvider

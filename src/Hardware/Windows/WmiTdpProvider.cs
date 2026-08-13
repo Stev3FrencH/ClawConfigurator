@@ -35,15 +35,16 @@ namespace McenterLite.Hardware.Windows
     /// trusting the call's own return value.
     /// </para>
     /// <para>
-    /// <b>One register, not two.</b> <see cref="RegistryTdpProvider"/> writes independent AC and
-    /// DC pairs because MSI Center's own model has both; driving the EC directly here found only
-    /// one live value shared by AC and DC (same reading under load, plugged and unplugged). So
-    /// there is no separate battery ceiling to maintain - by design, confirmed against MSI
-    /// Center's own UI, which offers the same PL1/PL2 range on battery as on AC.
+    /// <b>One register, not two.</b> The old registry-mirror backend wrote independent AC and DC
+    /// pairs because MSI Center's own model has both; driving the EC directly here found only one
+    /// live value shared by AC and DC (same reading under load, plugged and unplugged). So there is
+    /// no separate battery ceiling to maintain - by design, confirmed against MSI Center's own UI,
+    /// which offers the same PL1/PL2 range on battery as on AC.
     /// </para>
     /// <para>
-    /// Also unlike the registry path, nothing here is gated by MSI's Endurance/AI Engine/Manual
-    /// picker - see <see cref="TryReadMode"/>.
+    /// Nothing here is gated by MSI's Endurance/AI Engine/Manual picker either. That gate was the
+    /// registry path's, and modelling it cost this class a <c>TryReadMode</c> that could only ever
+    /// answer "yes" - both went with the mirror on 2026-08-13.
     /// </para>
     /// </remarks>
     [SupportedOSPlatform("windows")]
@@ -120,25 +121,11 @@ namespace McenterLite.Hardware.Windows
             return OpResult.Success();
         }
 
-        /// <summary>
-        /// Always reports the one mode that honours a manual limit.
-        /// </summary>
-        /// <remarks>
-        /// This path writes the EC directly and is not gated by MSI's Endurance/AI Engine/Manual
-        /// triple at all - confirmed by writing through it with MSI Center M's whole user-mode
-        /// stack, and with it any notion of "mode", stopped. <see cref="PerfMode.UserScenario"/>
-        /// is reported unconditionally because that is the enum value that means "limits are
-        /// honoured", not because MSI's mode registry value is being read.
-        /// </remarks>
-        public bool TryReadMode(out PerfMode mode)
-        {
-            mode = Available ? PerfMode.UserScenario : PerfMode.Unknown;
-            return Available;
-        }
-
-        /// <summary>No-op. See <see cref="TryReadMode"/> - there is no mode for this path to switch.</summary>
-        public OpResult ApplyMode(PerfMode mode) =>
-            Available ? OpResult.Success() : OpResult.Unavailable(_unavailableReason);
+        // TryReadMode / ApplyMode are gone as of 2026-08-13. This path writes the EC directly and
+        // is never gated by MSI's Endurance/AI Engine/Manual triple - confirmed by writing through
+        // it with MSI Center M's whole user-mode stack, and with it any notion of "mode", stopped.
+        // So the implementations answered UserScenario unconditionally and no-opped the write,
+        // which described the interface rather than the hardware.
 
         private static byte[] BuildReadPayload()
         {

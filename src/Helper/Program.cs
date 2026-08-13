@@ -337,10 +337,11 @@ namespace McenterLite.Helper
                 ? $"Power limits: {hardware.Tdp.Backend}."
                 : $"Power limits unavailable: {hardware.Tdp.UnavailableReason}");
 
-            // Which backend won matters more than it looks. Both work while MSI Center M is
-            // installed, so a silent fall back to the registry mirror is invisible until MSI
-            // Center M is uninstalled - at which point controller mode stops working and nothing
-            // in the log says why.
+            // There is one backend now. This line used to name which of two had won, because a
+            // silent fall back to the registry mirror was invisible until MSI Center M went - at
+            // which point controller mode stopped working and nothing in the log said why. The
+            // mirror is deleted; the name is kept because "firmware (vendor HID)" in the log is
+            // still what distinguishes a working probe from an unavailable one.
             Log.Info(hardware.HwMouse.Available
                 ? $"Controller mode: {DescribeHwMouseBackend(hardware.HwMouse)}."
                 : $"Controller mode unavailable: {hardware.HwMouse.UnavailableReason}");
@@ -365,7 +366,6 @@ namespace McenterLite.Helper
         private static string DescribeHwMouseBackend(IHwMouseProvider provider) => provider switch
         {
             McenterLite.Hardware.Windows.HidHwMouseProvider => "firmware (vendor HID)",
-            McenterLite.Hardware.Windows.RegistryHwMouseProvider => "MSI Center registry mirror",
             _ => provider.GetType().Name,
         };
 

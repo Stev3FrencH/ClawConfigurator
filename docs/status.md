@@ -20,9 +20,11 @@ All five talk to the firmware directly and need MSI Center M neither running nor
 - **RGB lighting** via the vendor HID profile block, merged 2026-08-12.
 - **Fan control** via `MSI_ACPI.Set_Fan` (ACPI-WMI), 2026-08-12.
 
-**Every feature on the roadmap is now built.** What remains is not new features but removal: the
-cleanup that waits on MSI Center M actually being uninstalled — deleting `RegistryTdpProvider` and
-`RegistryHwMouseProvider`, which are mirrors rather than real paths.
+**Every feature on the roadmap is built, and the MSI Center M scaffolding is gone.**
+`RegistryTdpProvider`, `RegistryHwMouseProvider`, `PerfMode`, `TdpBackendKind.RegistryMirror` and
+`IsMsiCenterRunning` were all deleted on 2026-08-13, once the uninstall proved the firmware paths
+stand on their own. There is one backend per feature now, and no fallback that depends on software
+this machine no longer has.
 
 ## Current build
 
@@ -262,13 +264,22 @@ Still open, and both about *persistence* rather than mechanism:
 
 ## Cleanup — no longer waiting, as of 2026-08-13
 
-- **`RegistryTdpProvider` and `RegistryHwMouseProvider`** are both inert and both provably weaker
-  than the firmware paths that replaced them. **The condition on deleting them has been met**: MSI
-  Center M is uninstalled, and both firmware paths were confirmed without it — the helper chose
-  `Wmi` and `firmware (vendor HID)` on the first boot after. The registry values they read still
-  exist as orphaned keys under `WOW6432Node\MSI` and are now exactly what they were suspected of
-  being: records with nothing behind them. Deleting these is also what finally removes `PerfMode`,
-  `TdpBackendKind.RegistryMirror` and `IsMsiCenterRunning`.
+- [x] ~~**`RegistryTdpProvider` and `RegistryHwMouseProvider`**~~ **Deleted 2026-08-13**, with
+  `PerfMode`, `TdpBackendKind.RegistryMirror` and `IsMsiCenterRunning`. Both were inert and both
+  provably weaker than the firmware paths that replaced them — the HID one especially, since the
+  registry value it read was a mirror MSI Center M maintained *by watching that same channel*, a
+  copy of the answer rather than a second way to get it. The condition was met by the uninstall:
+  the helper chose `Wmi` and `firmware (vendor HID)` on the first boot without MSI Center M.
+
+  Two of the removed pieces were never load-bearing at all, which only became visible on the way
+  out. `PerfMode` modelled MSI's Endurance/User Scenario/AI Engine triple, but the WMI backend is
+  not gated by it — its implementation answered `UserScenario` unconditionally and no-opped the
+  write, so the interface method had no honest implementation left. `MsiCenterRunning` was carried
+  in every snapshot and **read by no widget build, ever**.
+
+  Ordinals **13** (`PerfMode`) and **80** (`MsiCenterRunning`) are retired and must never be
+  reused, along with `TdpBackendKind` value **2**. `RetiredOrdinalTests` now pins all of them,
+  replacing the `PerfModeTests` that went with the enum.
 - **Automate the package version bump.** Worth doing *before* three features' worth of install
   cycles.
 

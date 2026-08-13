@@ -47,15 +47,10 @@ namespace McenterLite.Shared.Ipc
         /// <summary>Which backend applies TDP. See <see cref="TdpBackendKind"/>.</summary>
         TdpBackend = 12,
 
-        /// <summary>
-        /// MSI's performance mode. See <see cref="PerfMode"/>.
-        /// </summary>
-        /// <remarks>
-        /// Lives in the TDP group because it GATES the power limits: MSI only honours
-        /// <see cref="Pl1"/> and <see cref="Pl2"/> in <see cref="PerfMode.UserScenario"/>. In the
-        /// other modes MSI drives power itself and the sliders do nothing.
-        /// </remarks>
-        PerfMode = 13,
+        // Ordinal 13 (PerfMode) is RETIRED and must never be reused. It carried MSI's performance
+        // mode, which mattered only to the registry-mirror backend - manual limits were honoured
+        // in User Scenario alone. Both went on 2026-08-13 with MSI Center M uninstalled; the WMI
+        // path writes the EC directly and no mode gates it.
 
         // ── 2. Fan control ───────────────────────────────────────────────────────
         //
@@ -203,8 +198,11 @@ namespace McenterLite.Shared.Ipc
         IntelGamma = 76,
 
         // ── Coexistence ──────────────────────────────────────────────────────────
-        /// <summary>Helper -> widget. MSI Center M is running and may be fighting us for the EC/HID.</summary>
-        MsiCenterRunning = 80,
+        //
+        // Ordinal 80 (MsiCenterRunning) is RETIRED and must never be reused. It reported whether
+        // MSI Center M's servers were up and contending for the EC and HID. Removed 2026-08-13:
+        // MSI Center M is uninstalled, and no widget build ever read the value - it was carried in
+        // every snapshot and consumed by nothing.
 
         // Ordinal 81 (IntelThermalCmd) is RETIRED. It existed only to stop Intel's IPF/DTT thermal
         // stack from latching the fan above any table we wrote - an escape hatch for EC fan writes.

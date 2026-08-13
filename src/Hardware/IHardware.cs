@@ -62,21 +62,12 @@ namespace McenterLite.Hardware
         /// </summary>
         OpResult Apply(int pl1, int pl2);
 
-        /// <summary>MSI's current performance mode, which gates whether the limits are honoured.</summary>
-        bool TryReadMode(out PerfMode mode);
-
-        /// <summary>
-        /// Switches MSI's performance mode.
-        /// </summary>
-        /// <remarks>
-        /// The widget has no control for this any more - it only ever wants
-        /// <see cref="PerfMode.UserScenario"/>, the one mode that honours a manual limit, and
-        /// <see cref="Apply"/> calls this itself when the device is in a different mode. Kept as
-        /// its own method rather than folded into <see cref="Apply"/> because the two write
-        /// different registry values and the registry-mirror implementation needs to call it from
-        /// more than one place.
-        /// </remarks>
-        OpResult ApplyMode(PerfMode mode);
+        // TryReadMode / ApplyMode are gone as of 2026-08-13, with MSI's whole "performance mode"
+        // concept. They existed for the registry-mirror backend, where a manual limit was only
+        // honoured in User Scenario. The WMI path writes the EC directly and is not gated by that
+        // triple at all - which is why its implementation answered UserScenario unconditionally
+        // and no-opped the write. An interface method whose only honest implementation is a
+        // constant is not describing the hardware.
     }
 
     /// <summary>
@@ -222,7 +213,9 @@ namespace McenterLite.Hardware
         IPowerProvider Power { get; }
         IIgclProvider Igcl { get; }
 
-        /// <summary>True when MSI Center M is running and may be contending for the EC or HID.</summary>
-        bool IsMsiCenterRunning();
+        // IsMsiCenterRunning is gone as of 2026-08-13. It reported whether MSI Center M's servers
+        // were up so the widget could warn about contention for the EC and HID. MSI Center M is
+        // uninstalled, no feature depends on it, and nothing ever consumed the answer - the widget
+        // never referenced it in any build.
     }
 }

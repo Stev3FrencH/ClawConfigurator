@@ -100,10 +100,10 @@ are two different claims.
 
 ### Housekeeping that should happen alongside
 
-- **`RegistryTdpProvider` and `RegistryHwMouseProvider` are both inert** while their firmware paths
-  work, and both are provably the weaker option. Delete them once MSI Center M is actually
-  uninstalled and both firmware paths are confirmed on a machine without it. That deletion is also
-  what finally removes `PerfMode`, `TdpBackendKind.RegistryMirror` and `IsMsiCenterRunning`.
+- [x] ~~**`RegistryTdpProvider` and `RegistryHwMouseProvider` are both inert**~~ — **deleted
+  2026-08-13**, with `PerfMode`, `TdpBackendKind.RegistryMirror` and `IsMsiCenterRunning`. MSI
+  Center M was uninstalled and both firmware paths resolved on the first boot without it. See
+  [`status.md`](status.md#cleanup--no-longer-waiting-as-of-2026-08-13).
 - **The package version is bumped by hand** and nothing catches a missed bump. Both documented
   MSBuild overrides are proven not to work with this template. Worth solving *before* three
   features' worth of install cycles, not after.
@@ -177,8 +177,10 @@ enumerable without MSI Center**. Sibling classes: `MSI_AP`, `MSI_CPU`, `MSI_Devi
 > still stands.
 >
 > **Consequence for `IsMsiCenterRunning()`:** it must detect the *server*, not the window. Matching
-> the UWP process would report "MSI Center is not running" on a machine where everything works, and
-> the widget would show a warning the hardware contradicts.
+> the UWP process would report "MSI Center is not running" on a machine where everything works.
+> (The `IHardware` member was removed on 2026-08-13 — no widget build ever read it. The
+> `DeviceDetection` static survives for the probe's `--device`, where the useful question is now the
+> reverse one: has MSI Center M come back?)
 
 ### Registry map
 
@@ -297,9 +299,9 @@ DC pair — 25 W PL1 / 30 W PL2 — on the theory that an 8-inch handheld runnin
 empties itself fast. Confirmed on device that this was never a firmware limit: MSI Center's own UI
 offers the same PL1/PL2 range on battery as on AC, and `WmiTdpProvider` (the preferred TDP
 backend, see the "Confirmed 2026-08-11" section above) writes a single EC register with no AC/DC
-distinction at all. `RegistryTdpProvider`, now only a fallback, writes the same value to both the
-AC and DC registry pairs rather than deriving a lower one — there is nothing left to derive.
-`DeviceCaps.MaxPl1Dc`/`MaxPl2Dc` and `ClampPowerLimitsForBattery` were removed with it.
+distinction at all. `DeviceCaps.MaxPl1Dc`/`MaxPl2Dc` and `ClampPowerLimitsForBattery` were removed
+with the theory. (`RegistryTdpProvider` wrote the same value to both the AC and DC registry pairs
+rather than deriving a lower one; it was deleted entirely on 2026-08-13.)
 
 ### Fan — the EX model is not the model we implemented
 

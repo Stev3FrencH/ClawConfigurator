@@ -71,9 +71,6 @@ namespace McenterLite.Helper
                 case Function.DeviceCaps:
                     return PipeEnvelope.Response(request.Id, request.Fn, _hw.Caps.Serialize());
 
-                case Function.MsiCenterRunning:
-                    return Ok(request, PipeEnvelope.FromBool(_hw.IsMsiCenterRunning()));
-
                 default:
                     var value = ReadValue(request.Fn);
                     return value == null
@@ -94,11 +91,6 @@ namespace McenterLite.Helper
 
                 case Function.TdpBackend:
                     return PipeEnvelope.FromEnum(_hw.Tdp.Backend);
-
-                case Function.PerfMode:
-                    return _hw.Tdp.TryReadMode(out var perfMode)
-                        ? PipeEnvelope.FromEnum(perfMode)
-                        : null;
 
                 case Function.ChargeLimitPercent:
                     return _hw.ChargeLimit.TryRead(out int chargePercent)
@@ -157,9 +149,6 @@ namespace McenterLite.Helper
                 case Function.IntelGamma:
                     return _hw.Igcl.TryRead(fn, out int igclValue) ? PipeEnvelope.FromInt(igclValue) : null;
 
-                case Function.MsiCenterRunning:
-                    return PipeEnvelope.FromBool(_hw.IsMsiCenterRunning());
-
                 case Function.WidgetVisible:
                     return PipeEnvelope.FromBool(WidgetVisible);
 
@@ -184,13 +173,6 @@ namespace McenterLite.Helper
                 case Function.Pl1:
                 case Function.Pl2:
                     return SetTdp(request);
-
-                case Function.PerfMode:
-                    // Switching mode changes what MSI honours, and it moves settings beyond the
-                    // one asked for - the power limits it reports can change with it. The widget
-                    // re-reads the whole snapshot rather than assuming only this changed.
-                    return Apply(request, _hw.Tdp.ApplyMode(request.AsEnum(PerfMode.UserScenario)),
-                        () => ReadValue(Function.PerfMode));
 
                 case Function.ChargeLimitPercent:
                     return SetChargeLimit(request);
@@ -560,7 +542,6 @@ namespace McenterLite.Helper
             Function.Pl1,
             Function.Pl2,
             Function.TdpBackend,
-            Function.PerfMode,
             Function.ChargeLimitPercent,
             Function.HwMouseMode,
             Function.LightingProfile,
@@ -577,7 +558,6 @@ namespace McenterLite.Helper
             Function.IntelSaturation,
             Function.IntelContrast,
             Function.IntelGamma,
-            Function.MsiCenterRunning,
         };
 
         // ── Plumbing ────────────────────────────────────────────────────────────

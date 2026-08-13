@@ -277,9 +277,9 @@ can be compiled here to find out. Every key `MainWidget.xaml` references is defi
   plain string, rendered by a `DataTemplate` that binds `{Binding}` and appends a chevron. If the
   buttons come out blank, that binding is the first thing to check — `{Binding}` against a
   `ContentPresenter` resolves to the content itself, which is correct but easy to break.
-- **Selector option lists live in `MainWidget.xaml.cs`, not in XAML.** `OptionCycler` is
-  constructed with them, and **the index is the wire value** — cast straight to `PerfMode`,
-  `FanPreset` and so on. Reordering a list silently changes what the helper is told.
+- **Selector option lists live in `MainWidget.xaml.cs`, not in XAML.** `SegmentedControl` is
+  constructed with them, and **the index is the wire value** — the lighting slot, the fan
+  selection, and so on. Reordering a list silently changes what the helper is told.
 
 ### Sizing: the numbers and where they come from
 

@@ -64,8 +64,6 @@ namespace McenterLite.Hardware.Fake
         public IFanProvider Fan { get; }
         public IPowerProvider Power { get; }
         public IIgclProvider Igcl { get; }
-
-        public bool IsMsiCenterRunning() => false;
     }
 
     /// <summary>
@@ -162,21 +160,10 @@ namespace McenterLite.Hardware.Fake
 
             // No mode gate: this models WmiTdpProvider, the default simulated backend (see
             // FakeHardware's TdpBackend = TdpBackendKind.Wmi above), which writes the EC directly
-            // and is not gated by MSI's Endurance/AI Engine/Manual triple at all.
+            // and is not gated by MSI's Endurance/AI Engine/Manual triple at all. That triple, and
+            // the PerfMode enum modelling it, were removed on 2026-08-13.
             return OpResult.Success();
         }
-
-        // Always reports UserScenario / no-ops on write, matching WmiTdpProvider - see its
-        // TryReadMode remarks for why "the one mode that means limits are honoured" is reported
-        // unconditionally rather than tracking a real mode.
-        public bool TryReadMode(out PerfMode mode)
-        {
-            mode = Available ? PerfMode.UserScenario : PerfMode.Unknown;
-            return Available;
-        }
-
-        public OpResult ApplyMode(PerfMode mode) =>
-            Available ? OpResult.Success() : OpResult.Unavailable(UnavailableReason);
     }
 
     internal sealed class FakeChargeLimit : IChargeLimitProvider

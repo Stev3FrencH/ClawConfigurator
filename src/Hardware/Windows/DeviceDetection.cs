@@ -92,19 +92,22 @@ namespace McenterLite.Hardware.Windows
         }
 
         /// <summary>
-        /// True when the MSI Center M component that APPLIES our settings is running.
+        /// True when any MSI Center M server process is running. <b>Diagnostic only.</b>
         /// </summary>
         /// <remarks>
         /// <para>
-        /// This deliberately does not look for the MSI Center window. Measured on device
-        /// 2026-08-07: power limits written to the registry are applied by the background process
-        /// <c>MSI_Center_M_Server_UserScenario</c>, and they apply just as well with the UWP front
-        /// end (<c>MSI Center M</c>) closed - which is the normal state.
+        /// <b>Nothing in the product depends on this any more.</b> It used to answer
+        /// <c>IHardware.IsMsiCenterRunning</c>, so the widget could warn about contention for the
+        /// EC and HID; both went on 2026-08-13, when MSI Center M was uninstalled and no feature
+        /// was left needing it. The single remaining caller is the probe's <c>--device</c>, where
+        /// the question is now the opposite one: <i>has MSI Center M come back?</i> — since MSI's
+        /// own updater is exactly the sort of thing that reinstalls itself.
         /// </para>
         /// <para>
-        /// Matching the window would therefore report "MSI Center is not running" for a machine
-        /// where everything works, and the widget would show a warning contradicted by the
-        /// hardware. The servers are what matter; the window is incidental.
+        /// This deliberately does not look for the MSI Center window. Measured on device
+        /// 2026-08-07: the background servers do the work and run with the UWP front end closed,
+        /// which is the normal state, so matching the window would report "not running" on a
+        /// machine where the whole stack is up.
         /// </para>
         /// </remarks>
         public static bool IsMsiCenterRunning()

@@ -704,7 +704,6 @@ namespace McenterLite.Widget
             switch (backend)
             {
                 case TdpBackendKind.Wmi: return "the firmware interface";
-                case TdpBackendKind.RegistryMirror: return "MSI Center (which must stay running)";
                 default: return "an unknown backend";
             }
         }
