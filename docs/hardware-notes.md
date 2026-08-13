@@ -776,11 +776,31 @@ it sent. The probe confirmed with a separate read. All three agreed, all three w
 same half. The missing check was the cheap one — listen to the device — and it is now the first line
 of the verification list rather than the last.
 
+#### The flag proven on device (2026-08-12)
+
+Two commands, in this order, with the duty tables held still between them:
+
+```powershell
+& $probe --set-fan both "100;100;100;100;100;100;100"   # silent — nothing changes
+& $probe --set-fan-control custom                        # both fans go loud immediately
+```
+
+**The first command is the control**, and it is the whole point of splitting `--set-fan-control`
+off from `--set-fan`: a full-duty table written while the flag is clear does nothing at all, though
+it stores and reads back perfectly. Only the flag moves the fans, and it moves them against a table
+written earlier — so the two registers are genuinely independent, and the table is genuinely what
+the EC reads once told to.
+
+This is the observation `Test-SetFan.ps1` could never have produced. That test compared reads, and
+was deliberately built so no failure could make the device quieter — which also meant no success
+could make it louder. It proved the write; the ear proved the effect.
+
+`--fan` now reports the control state as its first line, so the "stored but ignored" condition is
+visible without writing anything.
+
 #### Still open
 
-- [ ] **Whether the flag makes the curve audible.** Inferred from MSI Center M's own snapshots, not
-      yet driven by us. Prove it with `--set-fan-control custom` against a table already set to
-      something unmistakable, and confirm by ear before trusting the widget.
+- [x] ~~Whether the flag makes the curve audible.~~ **Proven on device 2026-08-12.** See below.
 - [ ] Whether byte 1 (idle duty) is independently settable, or whether MSI mirrors the first curve
       point into it. Both custom snapshots set every entry to the same value, and the write test
       left it at factory, so nothing so far distinguishes the two.

@@ -33,7 +33,7 @@ uninstalled. All three returned on 2026-08-12.
 | # | Feature | Path | Status |
 |---|---|---|---|
 | 1 | TDP (PL1 / PL2) | `MSI_ACPI.Set_SlaveBattery` | ✅ verified on device, standalone |
-| 2 | Fan control | `MSI_ACPI.Get_Fan`/`Set_Fan` + `Set_AP` flag | built; awaiting verification by ear |
+| 2 | Fan control | `MSI_ACPI.Get_Fan`/`Set_Fan` + `Set_AP` flag | ✅ mechanism proven on device; widget pending |
 | 3 | Battery charge limit | `MSI_ACPI.Get_AP`/`Set_AP` | ✅ verified on device, standalone |
 | 4 | RGB LED | vendor HID report `0x0F` | ✅ verified on device, standalone |
 | 5 | Controller mode — Gamepad / Desktop | vendor HID `0x24`/`0x26`/`0x27` | ✅ verified on device, standalone |

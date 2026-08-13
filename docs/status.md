@@ -27,9 +27,12 @@ card did nothing audible: it wrote the duty tables but never set the flag that t
 them, so every write stored, read back and logged as a success while the firmware went on running
 its own curve. 0.2.0.23 writes the flag, drops the Apply button so the Auto/Custom press applies
 directly, and reports which profile is running from the flag rather than by comparing tables.
-**Not yet verified on the Claw** — and the check that matters is by ear, not from the log, because
-the log was never wrong about what it sent. 0.2.0.21 was verified on 2026-08-12 for lighting,
-gamepad and keyboard navigation, and the charge-limit slider.
+
+**The flag itself is proven on device (2026-08-12)**, through the probe and by ear: a full-duty
+table written with the flag clear is silent, and setting the flag alone — tables untouched — makes
+both fans go loud. **The widget is not yet verified on the Claw**, and the check that matters there
+is also by ear, because the log was never wrong about what it sent. 0.2.0.21 was verified on
+2026-08-12 for lighting, gamepad and keyboard navigation, and the charge-limit slider.
 
 > **This device only ever runs the widget in compact mode.** Pinning is not a case to design for —
 > see the focus notes below, where that fact is what makes the re-arm guard safe.
