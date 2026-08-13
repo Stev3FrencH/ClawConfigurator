@@ -622,12 +622,20 @@ namespace McenterLite.Probe.Commands
 
         private static void PrintSetUsage()
         {
-            Console.Error.WriteLine("Usage: --set-fan <1|2|both> <idle;d1;d2;d3;d4;d5;d6>");
+            Console.Error.WriteLine("Usage: --set-fan <1|2|both> \"<idle;d1;d2;d3;d4;d5;d6>\"");
             Console.Error.WriteLine("       --set-fan <1|2|both> auto");
             Console.Error.WriteLine();
             Console.Error.WriteLine($"  Seven duties, 0-{MaxDuty}: the idle duty then the six curve");
             Console.Error.WriteLine("  points at 47, 50, 57, 64, 71 and 78 C.");
             Console.Error.WriteLine($"  'auto' restores the factory table {Join(FactoryDuties)}.");
+            Console.Error.WriteLine();
+
+            // Worth the two lines: ';' is a statement separator in PowerShell, so an unquoted
+            // list is split by the shell and each duty runs as its own command. The failure is
+            // silent from here - this tool is handed one argument and reports a usage error,
+            // which reads as the list being malformed rather than never having arrived.
+            Console.Error.WriteLine("  QUOTE the duty list in PowerShell:");
+            Console.Error.WriteLine("    --set-fan both \"30;35;45;55;65;75;85\"");
         }
     }
 }

@@ -134,7 +134,9 @@ WRITE (these change system state)
                             percentages, 0-100, read back and confirmed by a separate read.
                             THE FIRMWARE ENFORCES NO FLOOR - a table of zeros stops the fan at
                             every temperature, measured on this device. Warns, does not refuse.
-                            e.g.  --set-fan both 30;35;45;55;65;75;85
+                            QUOTE the duties in PowerShell - ';' separates statements there, so
+                            an unquoted list runs as seven commands and never reaches this tool.
+                            e.g.  --set-fan both ""30;35;45;55;65;75;85""
   --set-fan-control <auto|custom>
                             Choose WHO drives the fans: the firmware's own curve, or the duty
                             tables above. MSI_ACPI.Set_AP sub-function 1, byte 1 bit 0x80.
