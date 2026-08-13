@@ -1,9 +1,27 @@
-# Status — 2026-08-12
+# Status — 2026-08-13
 
 A snapshot for picking this back up: what's built, what's confirmed on the real Claw, and exactly
 what to do next. See [`hardware-notes.md`](hardware-notes.md) for gate-by-gate detail, and its
 [What's next](hardware-notes.md#whats-next--fan-charge-limit-and-rgb) section for the technical
 notes behind the roadmap below.
+
+> ## Next session: cut the Release build
+>
+> On branch `release/rc1`, currently at **0.2.0.32, Debug**. Everything in this project has ever
+> only been built and run in **Debug** — no Release configuration build exists.
+>
+> **Expect it not to work first time.** A UWP C# project builds Release through the **.NET Native**
+> toolchain rather than CoreCLR: a different compiler and a different runtime, and historically the
+> place where reflection, serialization and marshalling quietly behave differently. This widget
+> round-trips enums over a text pipe; the helper marshals WMI embedded instances and P/Invokes HID.
+>
+> The helper is a separate self-contained .NET 8 publish and is **not** affected — only the widget
+> goes through .NET Native — so a Release-only fault is far more likely in the widget than in the
+> hardware layer. Swap `/p:Configuration=Debug` for `Release` in the usual MSBuild line; the
+> signing, bundling and sideload steps are otherwise identical, and the version still bumps by hand.
+>
+> Verify on device rather than trusting a clean build: the cards, the fans by ear, one power-limit
+> change.
 
 ## The headline
 
@@ -28,7 +46,33 @@ this machine no longer has.
 
 ## Current build
 
-**0.2.0.24, Debug.** The fan-control flag on the telemetry tick. 0.2.0.23 read the flag from the
+**0.2.0.32, Debug**, on branch `release/rc1`. Since 0.2.0.24 this branch has done four things, all
+verified on device:
+
+1. **Rewrote the uninstall/restore flow**, which verification found could not work at all —
+   `--uninstall` tore down without restoring anything, and the documented order deleted the helper
+   and its settings *before* the step meant to use them. It now restores `FeatureDefaults` — chosen
+   values (17/19 W, charge 100%, fans Auto, controller Gamepad, boost on, Balanced), not replayed
+   captures — and clears the saved selections so the restore survives the next start.
+2. **Added `--restore`**, because the restore was otherwise verifiable only by performing an
+   uninstall. The pipe serves one client and the widget never releases it, so `Test-Helper.ps1`
+   cannot reach the helper once the Game Bar has been opened.
+3. **Deleted the MSI Center M scaffolding** — see the headline above.
+4. **First-run defaults**: a fresh install applies fan **Auto** and lighting **profile 1**, and
+   nothing else. Power limits, charge limit and controller mode are read off the hardware and left
+   alone.
+
+A full uninstall → remove → reinstall cycle was run on 2026-08-13 and both halves behaved: no
+`Re-applied` lines on the fresh install, two `First run:` lines, and profile files re-seeded.
+
+> **A first-run controller-mode write was added and removed the same day.** The device already boots
+> as Gamepad, and the write needed a marker key and a once-only gate purely to avoid undoing the
+> physical MSI button — machinery whose whole job was containing the feature it enabled. Uninstall
+> still sets Gamepad; that one earns its exception.
+
+### Earlier on this branch — 0.2.0.24
+
+**The fan-control flag on the telemetry tick.** 0.2.0.23 read the flag from the
 firmware — the right source — but only once, in the connect-time snapshot, so an open widget could
 not notice anything else moving the fans. The helper now re-reads it while the widget is visible and
 pushes `FanProfile` as an event, like the power and controller modes.
