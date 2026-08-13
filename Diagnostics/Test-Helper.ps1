@@ -248,6 +248,10 @@ try {
         # FeatureDefaults - 17/19 W, charge 100%, fans Auto, controller Gamepad, boost on,
         # Balanced - rather than replaying captured Original_* values, which no longer exist.
         # Lighting is deliberately left alone.
+        #
+        # PREFER 'McenterLite.Helper.exe --restore' over this. The pipe is
+        # maxNumberOfServerInstances:1 and the widget never disconnects once shown, so this path
+        # cannot connect at all if the Game Bar has been opened since the helper started.
         Write-Host ''
         Write-Host '=== Restoring every feature to its default ===' -ForegroundColor Cyan
         Show-Reply 'Restore' (Invoke-Helper -Cmd $CmdSet -Function $Fn.PrepareForUninstall -Val '1')

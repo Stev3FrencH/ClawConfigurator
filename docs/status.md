@@ -283,10 +283,18 @@ Still open, and both about *persistence* rather than mechanism:
 - **That desktop mode works on the UAC secure desktop.** This is the whole premise of the firmware
   route over software cursor injection, and it has never been tested. Trigger any elevation prompt
   and try to move the cursor.
-- **Uninstall/restore flow**, never tested end-to-end. Lower stakes than it sounds while MSI Center
-  M is still installed, but that changes when it is not: once MSI Center M is gone, this app is the
-  only way back to a default. Controller mode is deliberately never restored — the physical button
-  owns that state as much as we do.
+- **Uninstall/restore flow.** Rewritten 2026-08-13 after verification found it could not work:
+  `--uninstall` tore down without restoring anything, and the documented order deleted the helper
+  and its settings before the step that was supposed to use them. It now restores
+  `FeatureDefaults` — chosen values, not replayed captures — with the order reversed in the README.
+  Controller mode **is** now restored, reversing the old "the button owns it" rule for the uninstall
+  case only. **Still to run on the device:** `--restore`, then the real thing.
+
+  > **The pipe serves one client and the widget never releases it.** `maxNumberOfServerInstances: 1`,
+  > and `"Widget disconnected."` appears **zero** times in a full day of logs — Windows suspends the
+  > widget with its handle open. So `Test-Helper.ps1` cannot connect on any machine where the Game
+  > Bar has been opened since the helper started, which is what `--restore` exists to work around.
+  > Fine for the product, since there is one widget; a real limit on the diagnostic script.
 
 ## Widget placement in the Game Bar — answered
 

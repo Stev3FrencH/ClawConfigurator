@@ -204,6 +204,17 @@ package's `LocalCache`, so removing the app first deletes the executable that wo
 That leaves the scheduled task orphaned against a missing file and the device on whatever limits
 were last set, with nothing left able to change them.
 
+To see what the restore does **without** uninstalling anything, close the Game Bar and run the same
+code path on its own:
+
+```powershell
+& "$env:LOCALAPPDATA\Packages\McenterLite_xq4frxrkckec6\LocalCache\McenterLite\Helper\McenterLite.Helper.exe" --restore
+```
+
+It applies every default and exits, leaving the app installed. (`Test-Helper.ps1 -Restore` sends the
+same message over the pipe, but the pipe serves one client at a time and the widget never releases
+it, so that route only works if the Game Bar has not been opened since the helper started.)
+
 What the restore puts back — chosen values, not whatever happened to be there before:
 
 | | Default |

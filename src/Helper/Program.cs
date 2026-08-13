@@ -52,6 +52,7 @@ namespace McenterLite.Helper
             {
                 if (options.Setup) return RunSetupRole();
                 if (options.Uninstall) return RunUninstallRole(options);
+                if (options.Restore) return RunRestoreRole(options);
 
                 // Dev and test runs skip deployment entirely and serve in place, so the whole
                 // IPC and UI stack can be exercised without touching persistence or elevation.
@@ -72,6 +73,7 @@ namespace McenterLite.Helper
         {
             if (options.Setup) return "setup";
             if (options.Uninstall) return "uninstall";
+            if (options.Restore) return "restore";
             if (options.FakeHardware || options.NoDeploy) return "service(dev)";
             return HelperDeployment.IsRunningFromDeployedLocation() ? "service" : "bootstrap";
         }
@@ -159,6 +161,37 @@ namespace McenterLite.Helper
             }
 
             return HelperDeployment.RunTeardown(() => RestoreDefaults(options)) ? 0 : 1;
+        }
+
+        /// <summary>
+        /// Applies every default and stops, leaving the app installed. The uninstall's restore,
+        /// runnable on its own.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>Exists because the restore was otherwise untestable.</b> The only other way to reach
+        /// it without uninstalling is the <c>PrepareForUninstall</c> pipe message, and the pipe is
+        /// <c>maxNumberOfServerInstances: 1</c> — the widget connects on first show and never
+        /// disconnects, so on any machine where the Game Bar has been opened since the helper
+        /// started, no second client can connect at all. A flow this consequential should not be
+        /// verifiable only by performing it.
+        /// </para>
+        /// <para>
+        /// Unlike <c>--uninstall</c> this does not stop the service first, so the widget should be
+        /// closed before running it — not for safety, since the service writes only when commanded,
+        /// but so the card values on screen are not left disagreeing with the device.
+        /// </para>
+        /// </remarks>
+        private static int RunRestoreRole(CommandLineOptions options)
+        {
+            if (!Elevation.IsElevated())
+            {
+                var exitCode = Elevation.RelaunchElevated("--restore");
+                return exitCode ?? 3;
+            }
+
+            RestoreDefaults(options);
+            return 0;
         }
 
         /// <summary>
@@ -498,6 +531,12 @@ namespace McenterLite.Helper
         /// <summary>Remove the scheduled task and the deployed copy, then exit.</summary>
         public bool Uninstall { get; private set; }
 
+        /// <summary>
+        /// Apply every default and exit, leaving the app installed. What <c>--uninstall</c> does
+        /// first, on its own, so the restore can be verified without performing an uninstall.
+        /// </summary>
+        public bool Restore { get; private set; }
+
         /// <summary>Serve in place without deploying. For debugging against real hardware.</summary>
         public bool NoDeploy { get; private set; }
 
@@ -513,6 +552,7 @@ namespace McenterLite.Helper
                     case "--fake-hardware": options.FakeHardware = true; break;
                     case "--setup": options.Setup = true; break;
                     case "--uninstall": options.Uninstall = true; break;
+                    case "--restore": options.Restore = true; break;
                     case "--no-deploy": options.NoDeploy = true; break;
                 }
             }
