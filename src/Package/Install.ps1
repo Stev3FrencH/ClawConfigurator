@@ -75,15 +75,16 @@ if (-not $PackagePath) {
     #
     # Newest by LastWriteTime, not by name: version strings sort as text, so 0.1.0.9 would beat
     # 0.1.0.31 and quietly install a months-old build.
+    #
+    # Both extensions in ONE ranking, never bundles-then-msix as a fallback chain. Whether a build
+    # produces a .msixbundle or a bare .msix depends on how it was invoked (AppxBundle / a pinned
+    # Platform), so the two kinds interleave in AppPackages over time. Preferring bundles meant the
+    # newest .msix lost to the newest bundle no matter how old the bundle was - which silently
+    # installed 0.2.0.8 over 0.2.0.9 and looked exactly like a build that had not picked up its
+    # changes.
     $candidate =
-        Get-ChildItem -Path $scriptDirectory -Filter '*.msixbundle' -Recurse -ErrorAction SilentlyContinue |
+        Get-ChildItem -Path $scriptDirectory -Include '*.msixbundle', '*.msix' -Recurse -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTime -Descending | Select-Object -First 1
-
-    if (-not $candidate) {
-        $candidate =
-            Get-ChildItem -Path $scriptDirectory -Filter '*.msix' -Recurse -ErrorAction SilentlyContinue |
-            Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    }
 
     if (-not $candidate) {
         throw ("No .msixbundle or .msix found under $scriptDirectory. Build one with the " +
@@ -139,13 +140,21 @@ Write-Host "Stopping any running instance..." -ForegroundColor Cyan
 $taskName = 'McenterLiteHelper'
 $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 if ($task) {
-    Write-Host "  stopping scheduled task $taskName"
-    try { Stop-ScheduledTask -TaskName $taskName -ErrorAction Stop } catch { Write-Warning "  could not stop the task: $_" }
+    # -TaskPath is REQUIRED here and comes from the task we just found. The helper registers itself
+    # under \McenterLite\, and while Get-ScheduledTask searches every folder, Stop- and
+    # Disable-ScheduledTask default to the root and fail with "The system cannot find the file
+    # specified" - a warning that looks like the task is simply absent. Both calls then quietly did
+    # nothing, leaving the task free to restart the helper mid-install, which is the exact failure
+    # this block exists to prevent.
+    $taskPath = $task.TaskPath
+    Write-Host "  stopping scheduled task $taskPath$taskName"
+    try { Stop-ScheduledTask -TaskName $taskName -TaskPath $taskPath -ErrorAction Stop }
+    catch { Write-Warning "  could not stop the task: $_" }
 
     # Disabled, not just stopped: a stopped ONLOGON task can still be triggered while the install
     # is in flight. Re-enabled below whatever happens, so a failed install cannot leave the helper
     # permanently unable to start.
-    try { Disable-ScheduledTask -TaskName $taskName -ErrorAction Stop | Out-Null } catch { }
+    try { Disable-ScheduledTask -TaskName $taskName -TaskPath $taskPath -ErrorAction Stop | Out-Null } catch { }
 }
 
 try {
@@ -238,7 +247,7 @@ finally {
     # itself on next run anyway, but leaving a disabled task behind means no hardware control and
     # no obvious reason for it.
     if ($task) {
-        try { Enable-ScheduledTask -TaskName $taskName -ErrorAction Stop | Out-Null } catch { }
+        try { Enable-ScheduledTask -TaskName $taskName -TaskPath $task.TaskPath -ErrorAction Stop | Out-Null } catch { }
     }
 }
 

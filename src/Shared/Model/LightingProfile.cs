@@ -282,7 +282,16 @@ namespace McenterLite.Shared.Model
             if (key.Equals("Style", StringComparison.OrdinalIgnoreCase))
             {
                 LightingStyle style;
-                if (TryParseEnum(value, out style)) profile.Style = style;
+                if (TryParseEnum(value, out style))
+                {
+                    profile.Style = style;
+
+                    // Valid, and indistinguishable from a broken profile once applied. Noted here
+                    // so "I edited the file and the lights went out" leaves a trace that says it
+                    // was the edit, not a failure. Same for Brightness=0 below.
+                    if (style == LightingStyle.Off)
+                        problems.Add("Style=Off - this profile will look exactly like the Off button.");
+                }
                 else problems.Add("Style=" + value + " is not a style; keeping " + profile.Style + ".");
                 return;
             }
@@ -307,7 +316,14 @@ namespace McenterLite.Shared.Model
             {
                 int brightness;
                 if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out brightness))
+                {
                     profile.Brightness = Clamp(brightness, 0, 100);
+
+                    if (brightness != profile.Brightness)
+                        problems.Add("Brightness=" + value + " is out of range; using " + profile.Brightness + ".");
+                    else if (profile.Brightness == 0)
+                        problems.Add("Brightness=0 - this profile will look exactly like Off.");
+                }
                 else
                     problems.Add("Brightness=" + value + " is not a number; keeping " + profile.Brightness + ".");
                 return;
@@ -318,16 +334,32 @@ namespace McenterLite.Shared.Model
             {
                 // An empty value is meaningful - it selects the built-in palette - so this must
                 // clear the seeded defaults rather than leave them in place.
-                profile.Colors = new List<LightingColor>();
-                if (value.Length == 0) return;
+                if (value.Length == 0)
+                {
+                    profile.Colors = new List<LightingColor>();
+                    return;
+                }
 
+                var parsed = new List<LightingColor>();
                 foreach (var part in SplitColors(value))
                 {
                     LightingColor colour;
-                    if (LightingColor.TryParse(part, out colour)) profile.Colors.Add(colour);
+                    if (LightingColor.TryParse(part, out colour)) parsed.Add(colour);
                     else problems.Add(part + " is not a colour; ignoring it.");
                 }
 
+                // Nothing survived. Committing the empty list here would mean "built-in palette",
+                // which is a legitimate and completely different look - so a single mistyped colour
+                // would silently REPLACE the profile rather than fail. Keep what was already there,
+                // which is the field-by-field rule every other setting in this method follows.
+                if (parsed.Count == 0)
+                {
+                    var kept = profile.UsesOwnColors ? profile.FormatColors() : "the built-in palette";
+                    problems.Add("Colors=" + value + " has no usable colour; keeping " + kept + ".");
+                    return;
+                }
+
+                profile.Colors = parsed;
                 return;
             }
 

@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using McenterLite.Shared.Model;
 using Xunit;
@@ -280,6 +282,111 @@ namespace McenterLite.Shared.Tests
             var animation = LightingRenderer.Render(profile);
 
             Assert.All(Frame(animation, 0), led => Assert.Equal(Red, led));
+        }
+
+        // ── Surviving a bad edit ──────────────────────────────────────────────────────────
+
+        [Fact]
+        public void AColourListThatParsesToNothingKeepsTheOldColoursInsteadOfThePalette()
+        {
+            // The trap this guards: an empty Colors list MEANS "built-in palette", so committing
+            // one after every colour was rejected would silently swap a typo for a completely
+            // different, perfectly valid-looking profile. Profile 1 is Steady purple.
+            var profile = LightingProfile.Parse("Style=Steady\nColors=#GGGGGG", 1, out var problems);
+
+            Assert.True(profile.UsesOwnColors);
+            Assert.Equal("#7F00FF", Assert.Single(profile.Colors).ToString());
+            Assert.Contains(problems, p => p.Contains("no usable colour"));
+        }
+
+        [Fact]
+        public void OnePartialColourListKeepsTheColoursThatParsed()
+        {
+            var profile = LightingProfile.Parse("Colors=#FF0000, nonsense, #0000FF", 1, out var problems);
+
+            Assert.Equal(new[] { "#FF0000", "#0000FF" }, profile.Colors.Select(c => c.ToString()));
+            Assert.Contains(problems, p => p.Contains("nonsense"));
+        }
+
+        [Fact]
+        public void AnEmptyColourListStillMeansTheBuiltInPalette()
+        {
+            // Distinct from the case above and must stay distinct: this one is deliberate.
+            var profile = LightingProfile.Parse("Style=Wave\nColors=", 2, out var problems);
+
+            Assert.False(profile.UsesOwnColors);
+            Assert.Empty(problems);
+        }
+
+        [Theory]
+        [InlineData("Style=Off", "Off")]
+        [InlineData("Brightness=0", "Brightness=0")]
+        public void TheValidSettingsThatLookLikeAFaultSaySoInTheLog(string line, string expected)
+        {
+            // Both are legitimate and both turn the lights off. Without this the log is silent and
+            // "I edited the file and the lights went out" has no trace pointing back at the edit.
+            LightingProfile.Parse(line, 1, out var problems);
+
+            Assert.Contains(problems, p => p.Contains(expected));
+        }
+
+        [Fact]
+        public void AnOutOfRangeBrightnessSaysItWasClamped()
+        {
+            LightingProfile.Parse("Brightness=400", 1, out var problems);
+
+            Assert.Contains(problems, p => p.Contains("out of range"));
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("   \r\n  \n")]
+        public void EmptyingOrDeletingAProfileRestoresItsDefaultAndRewritesTheFile(string content)
+        {
+            // The documented recovery from a bad edit, and the reason it needs no restart: Load
+            // both returns the default AND puts the file back.
+            var directory = Path.Combine(Path.GetTempPath(), "McenterLite.Tests", Guid.NewGuid().ToString("N"));
+            try
+            {
+                var store = new LightingProfileStore(directory);
+                store.EnsureSeeded();
+
+                var path = store.PathFor(1);
+                if (content == null) File.Delete(path);
+                else File.WriteAllText(path, content);
+
+                var profile = store.Load(1);
+
+                Assert.Equal(LightingProfile.Default(1).Name, profile.Name);
+                Assert.Equal(LightingStyle.Steady, profile.Style);
+                Assert.True(File.Exists(path));
+                Assert.Equal(LightingProfile.Default(1).Format(1), File.ReadAllText(path));
+            }
+            finally
+            {
+                if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            }
+        }
+
+        [Fact]
+        public void SeedingNeverOverwritesAProfileThatAlreadyExists()
+        {
+            var directory = Path.Combine(Path.GetTempPath(), "McenterLite.Tests", Guid.NewGuid().ToString("N"));
+            try
+            {
+                var store = new LightingProfileStore(directory);
+                store.EnsureSeeded();
+                File.WriteAllText(store.PathFor(1), "Name=Mine\nStyle=Breath\nColors=#123456");
+
+                store.EnsureSeeded();
+
+                Assert.Equal("Mine", store.Load(1).Name);
+            }
+            finally
+            {
+                if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            }
         }
     }
 }

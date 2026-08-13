@@ -7,13 +7,17 @@ change them.
 ## Where the files are
 
 ```
-%LOCALAPPDATA%\Packages\<package family name>\LocalCache\McenterLite\Lighting\
+%LOCALAPPDATA%\Packages\McenterLite_xq4frxrkckec6\LocalCache\McenterLite\Lighting
 ```
+
+`McenterLite_xq4frxrkckec6` is the package family name — a hash of the `Identity` name and publisher
+in `src/Package/Package.appxmanifest`, so it is stable across versions and machines. If either has
+been changed, `(Get-AppxPackage McenterLite).PackageFamilyName` prints the real one.
 
 Two shortcuts to finding it without typing that:
 
 - The helper logs the full path on every start. Look for `Lighting profiles:` in `helper.log`, which
-  sits two folders up from the profiles.
+  sits one folder up from the profiles.
 - The folder also contains a `README.txt` with the same reference as this page, so once you are
   there you do not need to come back here.
 
@@ -27,8 +31,32 @@ The files are `Profile_1.txt`, `Profile_2.txt` and `Profile_3.txt`.
 The file is read **at the moment you tap**, so there is nothing to restart — not the widget, not the
 helper. Tapping a profile that is already selected re-reads it, which is how you preview an edit.
 
-**Delete a file to get its original back**, recreated the next time the helper starts. Nothing else
-rewrites these files: once they exist, they are yours.
+## Undoing a bad edit
+
+**Delete the file, or delete everything in it and save. Then tap that profile.** The default comes
+back and the file is rewritten in place, so recovery is one action in the folder you are already in,
+with nothing to restart and no syntax to remember. An empty file and a missing one mean the same
+thing deliberately — select-all-and-delete is what people reach for first.
+
+Nothing you can type in these files can break the widget or the controller:
+
+- A setting that cannot be read is **skipped, and the previous value kept**. The worst case is a
+  profile that ignores part of your edit, never one that fails to apply.
+- A colour list where **nothing** parses keeps the colours that were there before. This matters more
+  than it looks: an empty `Colors` means "built-in palette", so committing an empty list after a
+  typo would silently swap your profile for a different, perfectly valid-looking one.
+- A file that cannot be read at all — open in another program, or a permissions problem — falls back
+  to the default but is **not** rewritten. That condition is transient, and overwriting a file we
+  merely failed to read would destroy work.
+
+**`helper.log`, one folder up, names every setting that was skipped** and the value kept instead,
+prefixed `Profile 1:`, `Profile 2:` or `Profile 3:`.
+
+Two settings are valid but look exactly like a fault: **`Style=Off`** and **`Brightness=0`**. Both
+turn the lights off, and both say so in the log, so that "I edited the file and the lights went out"
+leaves a trace pointing at the edit rather than at a failure.
+
+Nothing else rewrites these files: once they exist, they are yours.
 
 ## What goes in a file
 

@@ -63,30 +63,45 @@ namespace McenterLite.Shared.Model
                 var path = PathFor(slot);
                 if (File.Exists(path)) continue;
 
-                try
-                {
-                    File.WriteAllText(path, LightingProfile.Default(slot).Format(slot));
-                    if (log != null) log("Created lighting profile " + slot + " at " + path + ".");
-                }
-                catch (Exception ex)
-                {
-                    if (log != null) log("Could not create " + path + ": " + ex.Message);
-                }
+                if (TryWrite(path, LightingProfile.Default(slot).Format(slot), log) && log != null)
+                    log("Created lighting profile " + slot + " at " + path + ".");
             }
 
+            TryWrite(ReadmePath, Readme(), log);
+        }
+
+        /// <summary>
+        /// Writes a file, reporting failure rather than throwing.
+        /// </summary>
+        /// <remarks>
+        /// Nothing here is worth taking the helper down for. A profile that cannot be written still
+        /// applies from memory, so the lights work and the log says why the file did not change.
+        /// </remarks>
+        private static bool TryWrite(string path, string content, Action<string> log)
+        {
             try
             {
-                File.WriteAllText(ReadmePath, Readme());
+                File.WriteAllText(path, content);
+                return true;
             }
             catch (Exception ex)
             {
-                if (log != null) log("Could not write " + ReadmePath + ": " + ex.Message);
+                if (log != null) log("Could not write " + path + ": " + ex.Message);
+                return false;
             }
         }
 
         /// <summary>
         /// Loads one profile, falling back to its default if the file is missing or unreadable.
         /// </summary>
+        /// <remarks>
+        /// <b>This is the recovery path.</b> Emptying a profile file or deleting it restores that
+        /// slot's default AND rewrites the file, so "undo my bad edit" is one action in the folder
+        /// the user is already in, with nothing to restart and no need to remember the syntax. An
+        /// unreadable file - open in another program, or a permissions problem - falls back too but
+        /// is deliberately NOT rewritten: that is a transient condition, and overwriting a file we
+        /// merely failed to read would destroy work.
+        /// </remarks>
         public LightingProfile Load(int slot, Action<string> log = null)
         {
             if (slot < 1 || slot > ProfileCount) return LightingProfile.Default(1);
@@ -104,7 +119,16 @@ namespace McenterLite.Shared.Model
                 return LightingProfile.Default(slot);
             }
 
-            if (text == null) return LightingProfile.Default(slot);
+            // Missing, or emptied out. Whitespace counts as empty because select-all-and-delete is
+            // what someone reaches for before they think to delete the file itself, and both should
+            // mean the same thing.
+            if (string.IsNullOrEmpty(text) || text.Trim().Length == 0)
+            {
+                var restored = LightingProfile.Default(slot);
+                if (log != null) log("Profile " + slot + " was empty or missing; restoring its default.");
+                TryWrite(path, restored.Format(slot), log);
+                return restored;
+            }
 
             List<string> problems;
             var profile = LightingProfile.Parse(text, slot, out problems);
@@ -136,7 +160,23 @@ There is no colour picker in the widget on purpose: this folder is where the det
 Edit Profile_1.txt, Profile_2.txt or Profile_3.txt, save, then tap that profile in the
 widget. The file is read at the moment you tap, so there is nothing to restart.
 
-Delete a file to get its original back the next time the helper starts.
+
+IF SOMETHING LOOKS WRONG
+------------------------
+
+Nothing you can type in these files can break the widget or the controller. A setting
+that cannot be read is skipped and the previous value kept, so the worst case is a
+profile that ignores part of your edit.
+
+To undo an edit: DELETE THE FILE, or delete everything in it and save. Then tap that
+profile. The default comes back, the file is rewritten, and there is nothing to restart.
+
+To find out what was ignored, open  helper.log  in the folder ABOVE this one and look
+for lines starting  Profile 1:  ,  Profile 2:  or  Profile 3:  . Every skipped setting
+names itself there, with the value that was kept instead.
+
+Two settings are valid but look exactly like a fault:  Style=Off  and  Brightness=0 .
+Both turn the lights off. The log says so when it sees them.
 
 
 SETTINGS
