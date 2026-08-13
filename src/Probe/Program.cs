@@ -60,6 +60,9 @@ namespace McenterLite.Probe
                 case "set-hid-raw": return Commands.HidRaw.Send(rest);
                 case "controller-mode": return Commands.ControllerMode.Read(rest);
                 case "set-controller-mode": return Commands.ControllerMode.Set(rest);
+                case "fan": return Commands.Fan.Read(rest);
+                case "set-fan": return Commands.Fan.Set(rest);
+                case "set-fan-control": return Commands.Fan.SetControl(rest);
 
                 default:
                     Console.Error.WriteLine($"Unknown command: {args[0]}");
@@ -105,6 +108,9 @@ READ
 
   --charge-limit            Read the battery charge limit (MSI_ACPI.Get_AP, byte 5) and dump
                             the whole package, so a change anywhere else is visible.
+  --fan                     Read both fans' duty tables, the fixed temperature breakpoints they
+                            are indexed against, and the live tachometers. Two fans, one table
+                            each: an idle duty, six curve points, and a ceiling the EC owns.
   --controller-mode         Ask the controller whether it is in gamepad or desktop-mouse mode,
                             over the vendor HID channel. Needs no MSI Center. This one does
                             put bytes on the wire - the channel has no feature report, so a
@@ -122,6 +128,21 @@ WRITE (these change system state)
                             This is the bluntest command here - the opcode map is not known,
                             so it is a write to an undocumented controller. Used to find the
                             lighting opcodes for G4.  e.g.  --set-hid-raw 04
+  --set-fan <1|2|both> <idle;d1;d2;d3;d4;d5;d6>
+  --set-fan <1|2|both> auto
+                            Write one fan duty table, or restore the factory one. Duties are
+                            percentages, 0-100, read back and confirmed by a separate read.
+                            THE FIRMWARE ENFORCES NO FLOOR - a table of zeros stops the fan at
+                            every temperature, measured on this device. Warns, does not refuse.
+                            QUOTE the duties in PowerShell - ';' separates statements there, so
+                            an unquoted list runs as seven commands and never reaches this tool.
+                            e.g.  --set-fan both ""30;35;45;55;65;75;85""
+  --set-fan-control <auto|custom>
+                            Choose WHO drives the fans: the firmware's own curve, or the duty
+                            tables above. MSI_ACPI.Set_AP sub-function 1, byte 1 bit 0x80.
+                            The tables do nothing at all while this reads auto - they store,
+                            they read back, and the fans ignore them.
+                            e.g.  --set-fan-control custom
   --set-charge-limit <20-100>
                             Set the battery charge limit via MSI_ACPI.Set_AP. Echoes back the
                             package it just read with only byte 5 changed, and confirms with a

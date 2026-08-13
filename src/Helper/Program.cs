@@ -190,11 +190,20 @@ namespace McenterLite.Helper
                 Log.Info($"Lighting profiles: {lighting.Directory}");
             }
 
-            var dispatcher = new FeatureDispatcher(hardware, settings, lighting);
+            // Same reasoning as the lighting profiles above: seeded before the dispatcher so the
+            // first snapshot carries the real profile name.
+            var fans = new FanProfileStore(Path.Combine(dataDirectory, "Fan"));
+            if (hardware.Fan.Available)
+            {
+                fans.EnsureSeeded(Log.Info);
+                Log.Info($"Fan profile: {fans.Directory}");
+            }
+
+            var dispatcher = new FeatureDispatcher(hardware, settings, lighting, fans);
 
             // Apply persisted settings BEFORE accepting connections, so the widget's first
             // snapshot describes a device already in its intended state.
-            StartupApplier.ApplyAll(hardware, settings, lighting);
+            StartupApplier.ApplyAll(hardware, settings, lighting, fans);
 
             using var server = new PipeServer(dispatcher.Handle);
 
@@ -262,6 +271,10 @@ namespace McenterLite.Helper
                 ? "Lighting: vendor HID profile block (RAM)."
                 : $"Lighting unavailable: {hardware.Rgb.UnavailableReason}");
 
+            Log.Info(hardware.Fan.Available
+                ? "Fan control: MSI_ACPI Get_Fan/Set_Fan, two fans."
+                : $"Fan control unavailable: {hardware.Fan.UnavailableReason}");
+
             return hardware;
         }
 
@@ -302,7 +315,18 @@ namespace McenterLite.Helper
         }
 
         /// <summary>
-        /// Pushes the OS power mode and the controller mode while the widget is on screen.
+        /// One tick of the telemetry loop, in seconds.
+        /// </summary>
+        private static readonly TimeSpan TelemetryInterval = TimeSpan.FromSeconds(1);
+
+        /// <summary>
+        /// How many ticks between fan-control reads. See <see cref="RunTelemetryLoopAsync"/>.
+        /// </summary>
+        private const int FanTelemetryEveryNTicks = 5;
+
+        /// <summary>
+        /// Pushes the OS power mode, the controller mode and the fan-control flag while the widget
+        /// is on screen.
         /// </summary>
         /// <remarks>
         /// Gated on visibility because the widget is a UWP app that Windows suspends whenever the
@@ -318,9 +342,17 @@ namespace McenterLite.Helper
         /// changed) rather than tracking "did this change" twice.
         /// </para>
         /// <para>
-        /// This loop once carried fan telemetry too, which is why it exists at all. The power mode
-        /// alone still justifies it - it is the one value here that something outside this app
-        /// changes routinely.
+        /// <b>Not everything here runs at the same rate.</b> The power and controller modes are read
+        /// every tick; the fan-control flag is read every fifth. The two rates answer different
+        /// questions - the first two are cheap OS-level reads, the fan flag is an ACPI-WMI round
+        /// trip to the embedded controller on a battery-powered handheld, and what it is watching
+        /// for is a person pressing a button in another app. Five seconds is well inside the time it
+        /// takes to notice a change in the fans by ear.
+        /// </para>
+        /// <para>
+        /// This loop once carried fan telemetry of a different kind - live RPM and temperatures at
+        /// one second - and lost it in 295f68b when fan control was removed wholesale. It was the
+        /// feature that went, not the tick: nothing was ever recorded against the polling itself.
         /// </para>
         /// </remarks>
         private static async Task RunTelemetryLoopAsync(
@@ -329,11 +361,13 @@ namespace McenterLite.Helper
             IHardware hardware,
             CancellationToken token)
         {
+            int ticksSinceFanRead = 0;
+
             while (!token.IsCancellationRequested)
             {
                 try
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
+                    await Task.Delay(TelemetryInterval, token).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
@@ -376,6 +410,33 @@ namespace McenterLite.Helper
                     catch (Exception ex)
                     {
                         Log.Warn($"Controller-mode telemetry read failed: {ex.Message}");
+                    }
+                }
+
+                // The fan-control flag, on a slower beat - see the rate note above.
+                //
+                // Same problem as the controller mode, from a different direction: MSI Center M is
+                // still installed, owns this same flag, and does not know about us. Without this
+                // push the fan card shows whatever was true at connect and the user's only evidence
+                // that something took the fans back is the noise.
+                //
+                // Read from the firmware, never echoed from our own settings - a tick that reports
+                // what we last wrote would agree with itself forever and is worse than no tick.
+                if (hardware.Fan.Available && ++ticksSinceFanRead >= FanTelemetryEveryNTicks)
+                {
+                    ticksSinceFanRead = 0;
+
+                    try
+                    {
+                        if (dispatcher.TryReadFanSelection(out int selection))
+                        {
+                            server.Send(PipeEnvelope.Event(
+                                Function.FanProfile, PipeEnvelope.FromInt(selection)));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warn($"Fan-control telemetry read failed: {ex.Message}");
                     }
                 }
             }
@@ -471,7 +532,9 @@ namespace McenterLite.Helper
     /// <summary>Re-applies persisted settings to the hardware at startup.</summary>
     internal static class StartupApplier
     {
-        public static void ApplyAll(IHardware hardware, SettingsStore settings, LightingProfileStore lighting)
+        public static void ApplyAll(
+            IHardware hardware, SettingsStore settings,
+            LightingProfileStore lighting, FanProfileStore fans)
         {
             // TDP: the EC forgets across sleep and power-source changes, so this is re-applied
             // rather than assumed to have survived.
@@ -526,6 +589,31 @@ namespace McenterLite.Helper
                     Log.Info(result.Ok
                         ? $"Re-applied lighting profile {slot} '{profile.Name}'."
                         : $"Could not re-apply the lighting: {result.Error}");
+                }
+            }
+
+            // Fan curve, only if the user has actually chosen one through this app. Re-applied for
+            // the same reason as the charge limit above, and one more that is specific to fans:
+            // MSI Center M is still installed, owns the same table, and does not know about us. A
+            // custom curve it overwrote would otherwise stay overwritten until the user noticed the
+            // noise and pressed Apply again.
+            //
+            // Auto is re-applied too, not skipped as a no-op. "Auto" here means MSI's factory
+            // table, and if something else has since written a different one, putting it back is
+            // exactly what the user asked for when they chose it.
+            if (hardware.Fan.Available)
+            {
+                int selection = settings.GetInt(SettingsKeys.FanProfile, -1);
+                if (selection >= 0)
+                {
+                    bool custom = selection == FeatureDispatcher.FanCustom;
+                    var profile = custom ? fans.Load(Log.Warn) : FanProfile.Factory();
+
+                    var result = hardware.Fan.Apply(profile, custom);
+                    Log.Info(result.Ok
+                        ? $"Re-applied fan profile '{profile.Name}'; "
+                          + (custom ? "fans follow this table." : "fans left to the firmware.")
+                        : $"Could not re-apply the fan profile: {result.Error}");
                 }
             }
 

@@ -57,15 +57,56 @@ namespace McenterLite.Shared.Ipc
         /// </remarks>
         PerfMode = 13,
 
-        // ── 2. Fan presets — REMOVED ─────────────────────────────────────────────
+        // ── 2. Fan control ───────────────────────────────────────────────────────
         //
         // Ordinals 20 (FanEnabled), 21 (FanPreset), 22 (FanState) and 23 (FanFullSpeed) are
-        // RETIRED and must never be reused.
-        //
-        // Descoped 2026-08-08. Fan control stays in MSI Center. Gate G2 never resolved the byte
-        // layout - the six-point curve MSI ships could not be reconciled with the five-point model
-        // the desk research described - so nothing was ever written to the EC. Findings kept in
-        // docs/hardware-notes.md.
+        // RETIRED and must never be reused. They belonged to the 2026-08-08 preset model, which
+        // described a five-point table on a different device and was never written to hardware.
+        // The feature came back on 2026-08-12 at NEW ordinals, per the rule at the top of this
+        // enum - an old widget meeting a new helper would otherwise route a stale fan message onto
+        // whatever took the number, and that number now reaches an embedded controller.
+
+        /// <summary>
+        /// Which fan profile is selected: 0 = Auto (MSI's factory curve), 1 = the custom profile.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// A <b>Set</b> is the Apply button. Choosing between Auto and Custom in the widget changes
+        /// nothing on the device until this is sent, which is the whole shape of the card: a fan
+        /// curve is not something that should follow a control as it is being dragged.
+        /// </para>
+        /// <para>
+        /// The custom profile's file is read at the moment this arrives, so editing it and pressing
+        /// Apply needs nothing restarted. See <c>FanProfileStore</c>.
+        /// </para>
+        /// <para>
+        /// <b>Answered from the hardware, not from settings.</b> Unlike <see cref="LightingProfile"/>
+        /// the device really does hold the value - the firmware runs whatever table it was last
+        /// given. The helper reports Auto when both fans match the factory table and Custom
+        /// otherwise, so a curve MSI Center M overwrote shows up as a changed selection rather than
+        /// as our own stale optimism.
+        /// </para>
+        /// </remarks>
+        FanProfile = 24,
+
+        /// <summary>Helper -> widget. The custom profile's name, for its button.</summary>
+        /// <remarks>
+        /// Read-only and re-read from disk on every <see cref="Snapshot"/>, because the user renames
+        /// it by editing the file - so this cannot live in <see cref="DeviceCaps"/> with the values
+        /// that never change. Same arrangement as <see cref="LightingProfileNames"/>.
+        /// </remarks>
+        FanProfileName = 25,
+
+        /// <summary>
+        /// Helper -> widget. "1" when the profile about to be applied stops a fan.
+        /// </summary>
+        /// <remarks>
+        /// The firmware enforces no duty floor - an all-zero table was accepted on this device with
+        /// both tachometers reading zero - and neither this app nor MSI Center M refuses one. So the
+        /// widget must be able to SAY so. Sent as its own value rather than folded into the name,
+        /// because a warning that arrives as part of a label cannot be styled as a warning.
+        /// </remarks>
+        FanProfileStopsAFan = 26,
 
         // ── 3. Battery charge limit ──────────────────────────────────────────────
         //

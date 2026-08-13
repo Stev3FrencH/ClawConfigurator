@@ -271,6 +271,47 @@
                     </StackPanel>
                 </Border>
 
+                <!-- 4. Fans. Gate G2, back after being removed on 2026-08-08 - the firmware
+                     table was measured on 2026-08-12 and Set_Fan proven with the second fan held
+                     as a control. See docs/hardware-notes.md.
+
+                     Two buttons, and pressing one applies it - like every other selector here.
+                     This card DID carry a separate Apply, so that a fan curve would not follow a
+                     control as it was being pressed; it was removed on request once a press was
+                     found to be safe in practice. There is no curve editor either - fourteen duty
+                     values will not fit usefully on a compact Game Bar card, so the profile is a
+                     text file and this card only chooses between it and MSI's factory curve. -->
+                <Border x:Name="FanCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Grid.Column="0" Glyph="&#xE9CA;" Style="{StaticResource CardIconStyle}" />
+                            <TextBlock Grid.Column="1" Text="Fans" Style="{StaticResource CardTitleStyle}" />
+                        </Grid>
+
+                        <!-- Two segments: Auto, then the custom profile. Index IS the value the
+                             helper expects. The second label is the profile NAME and is filled in
+                             at runtime, because renaming it means editing its file. -->
+                        <Grid x:Name="FanSegments" Margin="0,12,0,0" />
+
+                        <!-- Shown whenever the custom profile on disk contains a duty of 0,
+                             WHICHEVER segment is selected. It used to appear only once Custom was
+                             selected, which was fine while Apply was a second press away - there
+                             was still a moment to read it. With the press itself applying, a
+                             warning that waits for the press arrives too late to be one. The
+                             firmware enforces no floor - an all-zero table was accepted on this
+                             device with both tachometers reading zero - and neither this app nor
+                             MSI Center M refuses one, so saying so is the whole mitigation. -->
+                        <TextBlock x:Name="FanWarningText"
+                                   Style="{StaticResource HintStyle}"
+                                   Foreground="{StaticResource WarningBrush}"
+                                   Visibility="Collapsed" />
+                    </StackPanel>
+                </Border>
+
                 <!-- 5. Lighting. LAST on purpose: it is the card least likely to be wanted
                      mid-game, so it costs the least to be furthest from the top. -->
                 <Border x:Name="LightingCard" Style="{StaticResource CardStyle}" Visibility="Collapsed">
@@ -296,13 +337,6 @@
                         <Grid x:Name="LightingSegments" Margin="0,12,0,0" />
                     </StackPanel>
                 </Border>
-
-                <!-- Fan control had a card here. Removed 2026-08-08 and still absent: gate G2
-                     never reconciled MSI's six-point curve with the five-point model the desk
-                     research described, so nothing was ever written to the EC. The battery
-                     charge limit and RGB lighting were removed alongside it and have both since
-                     come back, on firmware paths rather than MSI Center. See
-                     docs/hardware-notes.md. -->
 
                 <!-- A banner warning that MSI Center M was NOT running lived here until
                      2026-08-11. It made sense while the registry mirror was the only TDP path -

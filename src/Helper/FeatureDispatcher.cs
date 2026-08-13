@@ -24,13 +24,21 @@ namespace McenterLite.Helper
         private readonly IHardware _hw;
         private readonly SettingsStore _settings;
         private readonly LightingProfileStore _lighting;
+        private readonly FanProfileStore _fans;
 
-        public FeatureDispatcher(IHardware hardware, SettingsStore settings, LightingProfileStore lighting)
+        public FeatureDispatcher(
+            IHardware hardware, SettingsStore settings,
+            LightingProfileStore lighting, FanProfileStore fans)
         {
             _hw = hardware ?? throw new ArgumentNullException(nameof(hardware));
             _settings = settings ?? throw new ArgumentNullException(nameof(settings));
             _lighting = lighting ?? throw new ArgumentNullException(nameof(lighting));
+            _fans = fans ?? throw new ArgumentNullException(nameof(fans));
         }
+
+        /// <summary>Fan selection: Auto is MSI's factory curve, Custom is the file on disk.</summary>
+        public const int FanAuto = 0;
+        public const int FanCustom = 1;
 
         /// <summary>Set by the widget so telemetry is only pushed while anyone is looking.</summary>
         public bool WidgetVisible { get; private set; }
@@ -114,6 +122,24 @@ namespace McenterLite.Helper
                 case Function.LightingProfileNames:
                     return _hw.Rgb.Available ? BuildProfileNames() : null;
 
+                // Answered from the HARDWARE, unlike the lighting profile above. The firmware
+                // tracks whether it is honouring our tables, so "which profile is running" is a
+                // real question with a real answer - and MSI Center M can change it behind us.
+                case Function.FanProfile:
+                    return _hw.Fan.Available ? PipeEnvelope.FromInt(ReadFanSelection()) : null;
+
+                // Re-read from disk every time, so renaming the profile in its file shows up the
+                // next time the widget opens.
+                case Function.FanProfileName:
+                    return _hw.Fan.Available
+                        ? (_fans.Load().Name ?? "Custom").Replace(RecordSeparator, " ").Trim()
+                        : null;
+
+                case Function.FanProfileStopsAFan:
+                    return _hw.Fan.Available
+                        ? PipeEnvelope.FromBool(_fans.Load().StopsAFan)
+                        : null;
+
                 case Function.CpuBoost:
                     return _hw.Power.TryReadCpuBoost(out bool boost) ? PipeEnvelope.FromBool(boost) : null;
 
@@ -171,6 +197,9 @@ namespace McenterLite.Helper
 
                 case Function.LightingProfile:
                     return SetLightingProfile(request);
+
+                case Function.FanProfile:
+                    return SetFanProfile(request);
 
                 case Function.HwMouseMode:
                     return Apply(request, _hw.HwMouse.Apply(request.AsBool()),
@@ -311,6 +340,104 @@ namespace McenterLite.Helper
             Log.Info($"Lighting -> profile {slot} '{profile.Name}' ({profile.Style}).");
 
             return Ok(request, PipeEnvelope.FromInt(slot));
+        }
+
+        /// <summary>
+        /// Applies a fan profile: Auto writes MSI's factory curve, Custom writes the file on disk.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>Both halves, every time.</b> Auto is not merely "stop applying ours" - it writes the
+        /// factory table back AND hands the fans to the firmware, so nothing of ours is left behind
+        /// in a register for whatever sets the flag next.
+        /// </para>
+        /// <para>
+        /// The profile file is read HERE, at the moment of the tap, not cached at startup. That is
+        /// what makes the file a usable editing surface: save, press Custom, hear the change.
+        /// </para>
+        /// <para>
+        /// Nothing is captured for uninstall restore, and nothing needs to be: <b>Auto is itself
+        /// the restore.</b> The factory table is a constant measured from this device rather than a
+        /// value we have to remember having seen, so "put it back" is a button the user already has
+        /// rather than state we have to keep.
+        /// </para>
+        /// </remarks>
+        private PipeEnvelope SetFanProfile(PipeEnvelope request)
+        {
+            if (!_hw.Fan.Available)
+                return PipeEnvelope.Failure(request.Id, request.Fn, _hw.Fan.UnavailableReason);
+
+            int selection = request.AsInt(FanAuto);
+            if (selection != FanAuto && selection != FanCustom)
+                return PipeEnvelope.Failure(request.Id, request.Fn, $"There is no fan profile {selection}.");
+
+            bool custom = selection == FanCustom;
+
+            var profile = custom ? _fans.Load(Log.Warn) : FanProfile.Factory();
+
+            var result = _hw.Fan.Apply(profile, custom);
+            if (!result.Ok)
+            {
+                Log.Warn($"Fan write FAILED: '{profile.Name}' - {result.Error}");
+                return PipeEnvelope.Failure(request.Id, request.Fn, result.Error);
+            }
+
+            _settings.SetInt(SettingsKeys.FanProfile, selection);
+
+            // Logged on success as well as failure, like TDP and the charge limit. A fan curve's
+            // effect is invisible until the device gets hot, so "what did we send" cannot be
+            // reconstructed afterwards from how the machine sounds.
+            // The control state is logged as well as the duties. Writing the tables without it was
+            // the whole of the bug this feature shipped with, and that was invisible in the log
+            // precisely because the log only ever recorded the duties.
+            Log.Info(
+                $"Fan -> '{profile.Name}': fan 1 {profile.FormatDuties(1)}, fan 2 {profile.FormatDuties(2)}; "
+                + (custom ? "fans follow this table." : "fans handed back to the firmware.")
+                + (custom && profile.StopsAFan ? " WARNING: this profile stops a fan." : ""));
+
+            // Report what the hardware ended up holding, not what was asked for.
+            return Ok(request, PipeEnvelope.FromInt(ReadFanSelection()));
+        }
+
+        /// <summary>
+        /// Which profile the fans are actually running: <see cref="FanAuto"/> or <see cref="FanCustom"/>.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Read from the firmware's own fan-control flag rather than from what we last wrote. MSI
+        /// Center M owns the same hardware and does not know about us, so control it took back must
+        /// show up as a changed selection instead of as our own stale optimism.
+        /// </para>
+        /// <para>
+        /// This compared the live table against the factory one until the flag was found. That was
+        /// the best evidence available at the time and it was wrong in both directions: it reported
+        /// Custom whenever a table we had written was still sitting there unread by the EC, and it
+        /// could not tell a custom profile that happened to equal the factory curve from Auto. The
+        /// flag answers both exactly.
+        /// </para>
+        /// </remarks>
+        private int ReadFanSelection() =>
+            TryReadFanSelection(out int selection)
+                ? selection
+                : _settings.GetInt(SettingsKeys.FanProfile, FanAuto);
+
+        /// <summary>
+        /// The fan selection as the FIRMWARE reports it, with no fallback to what we last wrote.
+        /// </summary>
+        /// <remarks>
+        /// The telemetry loop's shape, not the snapshot's: a tick that cannot read the flag has
+        /// nothing to say and should stay quiet, where a snapshot still has to answer with
+        /// something. Both go through here so the flag-to-selection mapping lives in one place.
+        /// </remarks>
+        public bool TryReadFanSelection(out int selection)
+        {
+            selection = FanAuto;
+
+            if (!_hw.Fan.Available) return false;
+            if (!_hw.Fan.TryReadCustomCurve(out bool custom)) return false;
+
+            selection = custom ? FanCustom : FanAuto;
+            return true;
         }
 
         /// <summary>The three profile names for the widget's buttons, U+001F separated.</summary>
@@ -486,6 +613,9 @@ namespace McenterLite.Helper
             Function.HwMouseMode,
             Function.LightingProfile,
             Function.LightingProfileNames,
+            Function.FanProfile,
+            Function.FanProfileName,
+            Function.FanProfileStopsAFan,
             Function.CpuBoost,
             Function.OsPowerMode,
             Function.IntelFpsTier,

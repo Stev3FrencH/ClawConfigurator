@@ -55,8 +55,12 @@ prove the read reflects hardware rather than MSI Center M's opinion of it.
 | Gate | Feature | Standalone path | Confidence | Biggest unknown |
 |---|---|---|---|---|
 | ~~**G3**~~ | ~~Battery charge limit~~ | `MSI_ACPI.Get_AP` / `Set_AP` | **DONE 2026-08-12** | — |
-| **G4** | RGB LED | vendor HID report `0x0F` | **Medium–high** | the LED payload layout |
-| **G2** | Fan control | `MSI_ACPI.Get_Fan` / `Set_Fan`, or EC | **Low** | duty encoding and curve shape |
+| ~~**G4**~~ | ~~RGB LED~~ | vendor HID report `0x0F` | **DONE 2026-08-12** | — |
+| **G2** | Fan control | `MSI_ACPI.Get_Fan` / `Set_Fan` | **Medium–high** | does `Set_Fan` take, and does MSI Center overwrite it |
+
+**G2's confidence was raised from Low on 2026-08-12**, after the read described in
+[Gate G2](#gate-g2--fan-control) settled both of the unknowns it had been stuck on since August.
+The remaining risk is no longer *what to write* — it is whether the write takes and holds.
 
 **G3 is done.** It was the obvious first pick and it went the way the confidence suggested: the
 read was already measured, the write turned out to be plain read-modify-write, and it needed no new
@@ -298,6 +302,12 @@ AC and DC registry pairs rather than deriving a lower one — there is nothing l
 `DeviceCaps.MaxPl1Dc`/`MaxPl2Dc` and `ClampPowerLimitsForBattery` were removed with it.
 
 ### Fan — the EX model is not the model we implemented
+
+> **RESOLVED 2026-08-12 — read this section as history.** Everything below is a correct reading of
+> the *registry*, and the contradiction it describes is real but was never the whole picture. The
+> ACPI read in [Gate G2](#gate-g2--fan-control) shows the two models agree once the firmware table
+> is read directly: the six registry points are bytes 2–7 of an eight-byte table, and ClawTweaks'
+> `58` floor and `94` ceiling are bytes 1 and 8. The registry carries only the part MSI's UI edits.
 
 ```
 Default_Temp = "47;50;57;64;71;78;47;50;57;64;71;78;"
@@ -576,18 +586,251 @@ settled this had the UI open), and find out what re-asserts MSI's own values ove
 
 ---
 
-## Gate G2 — Fan presets
+## Gate G2 — Fan control
 
-> **FEATURE REMOVED 2026-08-08.** Fan control stays in MSI Center. This gate never resolved — the
-> six-point curve MSI ships on this device could not be reconciled with the five-point model the
-> desk research described, and the duty scales were never shown to match — so **nothing was ever
-> written to the EC**. The code is gone from every layer; `Function` ordinals 20–23 are retired,
-> along with 81 (`IntelThermalCmd`), which existed only as the escape hatch for EC fan writes.
+> **REOPENED 2026-08-12, and the blocking question is answered.** The gate was removed on
+> 2026-08-08 because the six-point curve MSI ships could not be reconciled with the five-point
+> model the desk research described, and the duty scale was never shown to match. **Both are now
+> settled by direct measurement** — see [The fan table, measured](#the-fan-table-measured-2026-08-12)
+> immediately below, which supersedes the historical material after it wherever they disagree.
 >
-> **Everything below is kept as a device record, not as live work.** If it is ever revisited,
-> `Diagnostics/Sweep-MsiAcpi.ps1` is the tool to start with: `Get_Fan` / `Set_Fan` take the same
-> `Package_32` as everything else on that class, so snapshotting across MSI Center's fan settings
-> and diffing is the approach that finally located the charge limit in G3.
+> The approach was the one this file predicted: snapshot across MSI Center M's own fan settings and
+> diff. `Diagnostics/Watch-Fan.ps1` does it for both surfaces at once.
+
+### The fan table, measured (2026-08-12)
+
+Captured with `Diagnostics/Watch-Fan.ps1` across three MSI Center M states — Auto, Advanced with
+every point dragged to minimum, and Advanced with every point dragged to maximum. Raw snapshots are
+`Diagnostics/fan-snapshot-{auto,custom-low,custom-high}.json`.
+
+**Two fans, independently addressed.** `MSI_ACPI.Get_Fan` sub-function **1** and **2** each return
+one fan's table. Sub-function **0** returns live tachometers for both, at bytes 2 and 4.
+
+| Byte | Meaning | Auto (factory) | custom-low | custom-high |
+|---|---|---|---|---|
+| 0 | WMI status | 1 | 1 | 1 |
+| 1 | idle duty, below the first breakpoint | **58** | 0 | 100 |
+| 2–7 | duty at 47, 50, 57, 64, 71, 78 °C | **70 74 76 78 80 84** | 0 ×6 | 100 ×6 |
+| 8 | ceiling — EC state, never written by MSI | **94** | 94 | 94 |
+
+**Duty is a percentage, 0–100.** MSI Center M's own slider at maximum wrote exactly `100` into
+every entry and at minimum exactly `0`. This **refutes** two assumptions carried from the desk
+research and never measured here: that MSI caps duty at 75, and that duty might be a raw EC byte on
+a 0–150 scale. Neither holds for this table on this device.
+
+**The five/six-point contradiction was an artefact of reading only the registry.** The registry
+carries the six points MSI's UI edits. The firmware table wraps them with an idle duty and a
+ceiling, and those two are exactly the values the desk research recorded — ClawTweaks' EX idle
+floor of `58` and its `index 7 = 94`, one position over because byte 0 is the WMI status byte.
+**The structural model was right all along; only the A2VM's duty numbers were wrong for an EX.**
+
+**The temperature axis is fixed and is not part of a profile.** `Get_Temperature` sub-functions 1
+and 2, and `Get_Thermal` sub-functions 1 and 2, are byte-identical across all three snapshots. MSI
+Center M's Advanced UI edits duty only. A custom profile is therefore **seven duty percentages per
+fan**, not a curve editor.
+
+| Method | Layout | Value |
+|---|---|---|
+| `Get_Temperature\|1` | `[1]`, then `[4..8]` | **47**, 50, 57, 64, 71, 78 — the breakpoints |
+| `Get_Temperature\|1` | `[2]`, `[3]` | 85, 105 — meaning not established; likely throttle and critical |
+| `Get_Temperature\|2` | as above, `[3]` = 0 | fan 2 has no third value |
+| `Get_Thermal\|1,2` | `[2..7]` | 48, 51, 58, 65, 72, 79 — the breakpoints **+1**, likely hysteresis |
+
+**The registry is a mirror, for the third time on this device.** In the `auto` snapshot `High_Fan`
+still held the stale `100;100;…` left by the previous capture, while `Get_Fan` correctly returned
+the factory curve. The firmware table is the live state; `Component\User Scenario` is MSI Center
+M's own store of what its UI last showed. `Fan` = `1` Auto / `3` Advanced was confirmed, and
+`High_Fan` — not `Default_Fan` — is the editable curve. `Default_Temp` and `Default_Fan` did not
+move in any snapshot and are the factory reference.
+
+**Possibly a firmware-side mode flag.** `Get_AP` sub-function 1 byte 1 read `0x80` in both Advanced
+snapshots and `0x00` in Auto. Byte 3 read `4`, matching the registry `Mode` value for User Scenario.
+**Hypothesis only** — one transition, n=1. It is not needed to write a curve and should not be
+relied on until it has been seen to toggle both ways on its own.
+
+#### ⚠ The firmware does not enforce a duty floor
+
+In `custom-low` both tachometers read **0**. The fans genuinely stopped, at every temperature, and
+nothing below MSI Center refused the setting. The `58` idle duty is **the factory curve's first
+value, not a floor the EC imposes** — the desk research's phrase "firmware idle duty floor" is
+misleading and should not be read as a guarantee.
+
+**Consequence: any custom profile this app applies must clamp its own minimum.** There is no layer
+underneath that will do it. This is the single most important fact in this section.
+
+#### Incident: hard lock on 2026-08-12, and why the sweep was narrowed
+
+The device hard-locked and had to be cold-booted shortly after the capture run. The SSD vanished
+and did not return until a full shutdown.
+
+**Most likely unrelated to this work**, on the evidence:
+
+- `disk` event 11 (controller error) appears on `Harddisk1`, `2` and `3` on **8 August**, four days
+  before this branch existed, and again on 8/11 and on 8/12 three hours before the lock. The `DR`
+  numbers shift between sessions, which is what removable devices being re-enumerated look like.
+  The internal drive is `DeviceId 0` and is not among them.
+- **No fan or thermal path can remove an NVMe device.** A fan fault throttles or shuts down
+  cleanly. The fans were on `Fan = 1` with the factory table intact throughout.
+- There is no crash dump and **no System-log entry at all** for the seventeen minutes before the
+  lock. That is the signature, not missing evidence: Windows cannot flush the event log or write a
+  dump to a disk that is gone, so it hangs instead of bugchecking.
+
+**What is not ruled out.** The capture ran elevated and made roughly 96 ACPI control-method calls
+per snapshot, into sub-functions the firmware may never be asked for in normal operation. Those
+execute in kernel context against an undocumented implementation. Nothing points at it, and the
+timing is a poor fit, but it is the only thing in this workstream that touched firmware.
+
+**What changed as a result.** `Watch-Fan.ps1` now defaults to four methods across sub-functions
+0–2 — the ones measured to carry fan state — and the original sweep is behind `-Wide`. A broad
+sweep is worth its risk while hunting for a table and is not worth it once the table is known.
+
+**The standing rule this reinforces:** never sweep a firmware surface wider or longer than the
+question requires, and narrow the tool as soon as it has answered.
+
+#### What the factory table is, for restore
+
+Auto is fully captured, which satisfies the "capture before any write" item this gate has carried
+since August. Both fans read identically:
+
+```
+idle 58 | 70 74 76 78 80 84 | ceiling 94
+```
+
+#### `Set_Fan` proven on device (2026-08-12)
+
+Run with `Diagnostics/Test-SetFan.ps1`; transcript in `Diagnostics/transcripts/`. One fan, one
+byte, upward only — the 78 °C point moved 84 → 90 on fan 1 with the idle duty left at factory, so
+no failure mode could make the device quieter than stock.
+
+| | Baseline | After write to fan 1 | After restore |
+|---|---|---|---|
+| Fan 1 | `58;70;74;76;78;80;84` | **`58;70;74;76;78;80;90`** | `58;70;74;76;78;80;84` |
+| Fan 2 | `58;70;74;76;78;80;84` | **unchanged** | `58;70;74;76;78;80;84` |
+
+- **The write takes**, confirmed by a separate read.
+- **The sub-function is a real per-fan selector.** Fan 2 was never addressed and did not move. This
+  was the control that mattered: if both had moved, the table model would have been wrong.
+- **`Set_Fan` returns a bare status** (`01 00 00 …`), not an echo — same as `Set_SlaveBattery`. Its
+  reply is not evidence, which is why every write here is confirmed by a read.
+- Tachometers held at 134–136 across all three states. Correct, and a useful sanity check: editing
+  the 78 °C point cannot do anything at a 44 °C idle.
+
+#### ~~"Auto" is not a mode — it is the factory table~~ — WRONG, corrected 2026-08-12
+
+**There is a mode, and skipping it shipped a feature that did nothing.** The original text of this
+section is kept below, because how it went wrong is the useful part.
+
+> The test wrote a **non-factory** table while MSI Center M's registry still read `Fan = 1` (Auto),
+> and the EC applied it. The firmware does not gate the table behind a mode, and nothing had to be
+> switched before writing or after.
+>
+> **Consequence for the app: applying Auto is a plain write of the factory table.** No mode
+> register, no MSI Center involvement. The suspected mode flag at `Get_AP|1` byte 1 is therefore
+> *not needed* and remains an unconfirmed curiosity rather than a dependency.
+
+The error is in the second sentence: *"and the EC applied it"* was never observed. What was observed
+is that the table **read back changed** — which is all `Test-SetFan.ps1` could ever show, since it
+compared reads. The write was proven; the fans following it were assumed. The test was even designed
+so that no failure could make the device quieter, which meant the one thing that would have exposed
+this — pressing a curve and hearing nothing — could not happen.
+
+`Get_AP|1` byte 1 was then dismissed on the strength of that assumption, in the same paragraph that
+named it. It is the flag.
+
+#### The fan-control flag — `Get_AP` / `Set_AP` sub-function 1
+
+```
+byte:  0   1   2   3    4..31
+      01  XX  00  04    00 …     XX = 0x80 custom curve, 0x00 firmware's own
+```
+
+Re-diffing the three fan snapshots across **every** register captured, not only the fan ones:
+
+| Register, byte | Auto | MSI min | MSI max |
+|---|---|---|---|
+| **`Get_AP\|1` byte 1** | **0** | **128** | **128** |
+| `Get_Fan\|1` bytes 1–7 | `58;70;74;76;78;80;84` | all `0` | all `100` |
+| `Get_Fan\|0` byte 4 (tach) | 134 | 0 | 116 |
+| `Get_Temperature\|0` byte 1 | 40 | 44 | 45 |
+| `Get_Thermal\|3` byte 7 | 37 | 42 | 43 |
+
+`Get_AP|1` byte 1 is the **only** byte in any register that separates Auto from both custom
+settings. Everything else that moved is a tachometer or a temperature — telemetry, not state. Note
+the bit is set identically for MSI's minimum and maximum, which is what a mode looks like and what a
+value does not.
+
+Same `0x80` enable-bit convention as the charge limit (`percent | 0x80`), one sub-function over —
+G3 is on sub-function 0 byte 5, this is sub-function 1 byte 1, so the two do not collide. Byte 3 is
+a constant `0x04`, presumed to identify the register exactly as `C6 80` does in G3: echoed, never
+authored. The low seven bits of byte 1 were 0 in every snapshot, so only bit 7 is touched.
+
+**Consequence for the app:** applying a profile is two writes — the tables, then the flag — in that
+order, so the EC never briefly runs a stale table. Auto writes the factory table *and* clears the
+flag. "Which profile is running" is read from the flag rather than by comparing the table against
+the factory one, which is both simpler and correct in the case where a custom profile happens to
+equal the factory curve.
+
+**How this got past the gate:** every check in the chain tested that the write was *stored*, and
+none tested that it was *obeyed*. The provider read back and compared. The helper logged the duties
+it sent. The probe confirmed with a separate read. All three agreed, all three were measuring the
+same half. The missing check was the cheap one — listen to the device — and it is now the first line
+of the verification list rather than the last.
+
+#### The flag proven on device (2026-08-12)
+
+Two commands, in this order, with the duty tables held still between them:
+
+```powershell
+& $probe --set-fan both "100;100;100;100;100;100;100"   # silent — nothing changes
+& $probe --set-fan-control custom                        # both fans go loud immediately
+```
+
+**The first command is the control**, and it is the whole point of splitting `--set-fan-control`
+off from `--set-fan`: a full-duty table written while the flag is clear does nothing at all, though
+it stores and reads back perfectly. Only the flag moves the fans, and it moves them against a table
+written earlier — so the two registers are genuinely independent, and the table is genuinely what
+the EC reads once told to.
+
+This is the observation `Test-SetFan.ps1` could never have produced. That test compared reads, and
+was deliberately built so no failure could make the device quieter — which also meant no success
+could make it louder. It proved the write; the ear proved the effect.
+
+`--fan` now reports the control state as its first line, so the "stored but ignored" condition is
+visible without writing anything.
+
+#### Still open
+
+- [x] ~~Whether the flag makes the curve audible.~~ **Proven on device 2026-08-12.** See below.
+- [x] ~~**Whether MSI Center M ever clears the flag.**~~ **It does not — measured on device
+      2026-08-13.** Held Custom, set MSI Center M to Auto, and the fans went on audibly running our
+      curve. **The ear is the evidence here, not the card**: the widget also stayed on Custom, but a
+      card that never re-read would look identical, so only the noise separates "MSI Center M left
+      the flag alone" from "the widget did not look". Same distinction that cost 0.2.0.22 a build.
+      Its UI switching to Auto while the device did not is the **fifth** time MSI Center M has been
+      shown to be a cache rather than a view of the device.
+      <br>Narrow claim: one trigger, its own Auto/Custom control, with its service running. It says
+      nothing about resume, plug events, or its own periodic re-assertion.
+- [ ] Whether byte 1 (idle duty) is independently settable, or whether MSI mirrors the first curve
+      point into it. Both custom snapshots set every entry to the same value, and the write test
+      left it at factory, so nothing so far distinguishes the two.
+- [ ] What the low seven bits of `Get_AP|1` byte 1 mean. Zero in every snapshot so far, so they are
+      echoed untouched.
+- [ ] Whether MSI Center M overwrites a table we wrote, and on what trigger. It is still installed,
+      and it is an active participant elsewhere — re-read rather than assuming our write still
+      stands.
+- [ ] Whether the write survives with MSI Center M's service stopped — the standing gate question
+      for every feature in this project. The write needs no MSI Center to *succeed*; whether it
+      *persists* is a separate claim.
+- [ ] Meaning of `Get_Temperature|1` bytes 2 and 3 (85, 105).
+- [ ] Tachometer units. Idle reads ~135, which is above 100, so it is **not** the duty percentage
+      read back and must not be presented as one.
+
+---
+
+### Historical — the pre-2026-08-12 record
+
+Everything below predates the measurement above and is kept for provenance. Where it disagrees,
+the measurement wins.
 
 Only three fixed profiles are exposed; no custom curve. The values below come from the reference
 project's widget code and are **carried over as hypotheses** — every one must be confirmed on this
