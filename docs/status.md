@@ -34,10 +34,15 @@ against this — that the loop "carried fan telemetry once and lost it" — turn
 `295f68b` removed live RPM and temperatures at 1 Hz, and it went because the whole feature went, not
 because the polling was ever a problem.
 
-**That also makes the open MSI Center M question testable from the card.** Hold Custom, set MSI
-Center M to Auto, wait ~5 s: if the card holds, MSI Center M leaves the flag alone and we own the
-fans; if it flips to Auto, MSI Center M takes them back and startup re-apply is not enough. Until
-0.2.0.24 the card could not answer this, so the observation below was never evidence either way.
+**That settled the open MSI Center M question, on 2026-08-13: it does not take the fans back.** Held
+Custom, set MSI Center M to Auto, and the fans went on audibly running our curve. **The ear is what
+proved it, not the card** — the card stayed on Custom too, but a card that never re-read would look
+exactly the same, which is the same "stored vs obeyed" shape that cost 0.2.0.22 a build. Narrow
+claim: one trigger, its own control, its service running.
+
+**The tick itself is still unproven.** That test cannot prove it, for the reason above. What proves
+it is making the flag move underneath an open widget — `--set-fan-control auto` from the probe,
+watching the card flip on its own within ~5 s.
 
 **0.2.0.23, verified on the Claw, 2026-08-12**, through the probe and then through the widget, by
 ear both times. 0.2.0.22 had written the duty tables but never set the flag that tells the EC to
@@ -236,9 +241,10 @@ a curve something else took back shows on the card instead of only in the noise.
 
 Still open, and both about *persistence* rather than mechanism:
 
-- Whether MSI Center M overwrites a curve we wrote, and on what trigger. Startup re-applies for
-  this reason, and re-selecting the profile already running is deliberately allowed. The tick above
-  is how this now gets observed rather than guessed at.
+- Whether MSI Center M overwrites a curve we wrote, and on what trigger. **Its own Auto control is
+  ruled out** — 2026-08-13, by ear, the fans kept our curve through it. Resume, plug events and any
+  periodic re-assertion of its own are still untested. Startup re-applies for this reason, and
+  re-selecting the profile already running is deliberately allowed.
 - Intel's thermal stack (`ipfsvc`) is an independent fan actor here, so "our table is correct" and
   "the fan behaves" remain separate claims — which is precisely the gap the flag fell into.
 

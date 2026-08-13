@@ -801,12 +801,15 @@ visible without writing anything.
 #### Still open
 
 - [x] ~~Whether the flag makes the curve audible.~~ **Proven on device 2026-08-12.** See below.
-- [ ] **Whether MSI Center M ever clears the flag.** Setting it to Auto while we held Custom did not
-      flip the widget back — but at the time the widget only read the flag at connect, so the card
-      was not evidence either way. **The helper now re-reads the flag every fifth telemetry tick
-      (~5 s) while the widget is visible, from 0.2.0.24**, so the card is finally a live readout and
-      the same test answers the question: hold Custom, set MSI Center M to Auto, and watch the card.
-      `--fan` reads the flag directly and settles it without the widget at all.
+- [x] ~~**Whether MSI Center M ever clears the flag.**~~ **It does not — measured on device
+      2026-08-13.** Held Custom, set MSI Center M to Auto, and the fans went on audibly running our
+      curve. **The ear is the evidence here, not the card**: the widget also stayed on Custom, but a
+      card that never re-read would look identical, so only the noise separates "MSI Center M left
+      the flag alone" from "the widget did not look". Same distinction that cost 0.2.0.22 a build.
+      Its UI switching to Auto while the device did not is the **fifth** time MSI Center M has been
+      shown to be a cache rather than a view of the device.
+      <br>Narrow claim: one trigger, its own Auto/Custom control, with its service running. It says
+      nothing about resume, plug events, or its own periodic re-assertion.
 - [ ] Whether byte 1 (idle duty) is independently settable, or whether MSI mirrors the first curve
       point into it. Both custom snapshots set every entry to the same value, and the write test
       left it at factory, so nothing so far distinguishes the two.

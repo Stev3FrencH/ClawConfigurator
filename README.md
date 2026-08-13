@@ -250,9 +250,11 @@ Recovery is the same as for lighting: delete `Custom.txt`, or empty it and save,
 `helper.log` two folders up names everything it ignored, on lines starting `Fan profile:`.
 
 MSI Center M, while it is still installed, owns the same fans and does not know about us — if a
-curve stops behaving, press the button again. The card reads which profile is running from the
-firmware itself, and re-reads it every few seconds while the widget is open, so if MSI Center M
-takes the fans back the card changes to **Auto** rather than going on claiming your curve.
+curve stops behaving, press the button again. Setting **its** fans to Auto does **not** take yours
+away, measured on device 2026-08-13; its UI simply stops agreeing with the machine. The card reads
+which profile is running from the firmware itself and re-reads it every few seconds while the widget
+is open, so if anything ever does take the fans back, the card changes to **Auto** rather than going
+on claiming your curve.
 
 ## Running
 
