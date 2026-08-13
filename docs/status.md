@@ -7,21 +7,24 @@ notes behind the roadmap below.
 
 ## The headline
 
-**The MSI Center M dependency is nearly gone.** All four hardware features that ship now talk to
-the firmware directly and need MSI Center M neither running nor installed:
+**The MSI Center M dependency is gone.** All five hardware features talk to the firmware directly
+and need MSI Center M neither running nor installed:
 
 - **Power limits** via `MSI_ACPI.Set_SlaveBattery` (ACPI-WMI), merged 2026-08-11.
 - **Controller mode** via the controller's vendor HID channel, merged 2026-08-12.
 - **Battery charge limit** via `MSI_ACPI.Set_AP` (ACPI-WMI), merged 2026-08-12.
-- **RGB lighting** via the vendor HID profile block, 2026-08-12.
+- **RGB lighting** via the vendor HID profile block, merged 2026-08-12.
+- **Fan control** via `MSI_ACPI.Set_Fan` (ACPI-WMI), 2026-08-12.
 
-**Fan control (G2) is the only feature left**, and then cleanup that waits on MSI Center M actually
-being uninstalled.
+**Every feature on the roadmap is now built.** What remains is not new features but removal: the
+cleanup that waits on MSI Center M actually being uninstalled — deleting `RegistryTdpProvider` and
+`RegistryHwMouseProvider`, which are mirrors rather than real paths.
 
 ## Current build
 
-**0.2.0.21, Debug.** Verified on the Claw 2026-08-12 — lighting, gamepad and keyboard navigation,
-and the charge-limit slider.
+**0.2.0.22, Debug.** Fan control built and unit-tested; **not yet verified on the Claw** — that is
+the next thing to do. 0.2.0.21 was verified on 2026-08-12 for lighting, gamepad and keyboard
+navigation, and the charge-limit slider.
 
 > **This device only ever runs the widget in compact mode.** Pinning is not a case to design for —
 > see the focus notes below, where that fact is what makes the re-arm guard safe.
@@ -172,16 +175,32 @@ Two facts worth carrying forward:
 Untested: whether MSI Center M re-asserts its own lighting later while both are installed. Same
 open question as the charge limit, and with the same non-bearing on the standalone case.
 
-### 2. Fan control (G2) — hardest, do last
+### 2. Fan control (G2) — built 2026-08-12
 
-The only one of the three that would write the embedded controller, and the only one blocked on a
-real contradiction rather than unfinished work: MSI's curve on this device is **six** points, while
-the model implemented here is a five-point 8-byte table taken from a **different machine** (the
-Lunar Lake A2VM). Duty scales were never reconciled.
+The contradiction that blocked this since August dissolved the moment the firmware was read
+directly instead of through the registry. MSI's six registry points are bytes 2–7 of an eight-byte
+table; the "five-point model from a different machine" was right about the *structure*, and its
+`58` floor and `94` ceiling are the bytes on either side. Duty is a plain 0–100 percentage, which
+also retired the never-measured "MSI caps at 75" assumption. Full detail in
+[hardware-notes.md](hardware-notes.md#gate-g2--fan-control).
 
-Start read-only: `MSI_ACPI.Get_Fan` diffed against MSI Center's six-point curve answers the layout
-question without writing anything. Note also that Intel's thermal stack (`ipfsvc`) is an
-independent fan actor here, so "our table is correct" and "the fan behaves" are separate claims.
+**Two fans, addressed separately.** `Set_Fan` proven on device with the second fan held as a
+control — it did not move when only the first was written, which is what confirmed the sub-function
+is a fan selector rather than something we had misread.
+
+**There is no "auto mode".** The firmware runs whatever table it holds, so Auto is MSI's factory
+table written back. That is the whole design of the card: two buttons and an explicit Apply.
+
+Still open, and both about *persistence* rather than mechanism:
+
+- Whether MSI Center M overwrites a curve we wrote, and on what trigger. Startup re-applies for
+  this reason, and Apply is deliberately allowed on the already-selected profile.
+- Intel's thermal stack (`ipfsvc`) is an independent fan actor here, so "our table is correct" and
+  "the fan behaves" remain separate claims.
+
+> **The firmware enforces no duty floor.** An all-zero table was accepted with both tachometers
+> reading zero. The app warns and does not refuse — a deliberate decision, matching what MSI
+> Center M itself permits.
 
 ## Cleanup waiting on the uninstall
 

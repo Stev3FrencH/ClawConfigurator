@@ -76,6 +76,12 @@ namespace McenterLite.Hardware.Windows
             var rgb = new HidRgbProvider();
             Caps.HasRgb = identity.IsClaw8Ex && rgb.Available;
 
+            // Gate G2, on the same ACPI-WMI transport as TDP and the charge limit. No registry
+            // fallback: MSI Center M's Component\User Scenario fan values are a mirror of its own
+            // UI, and were observed holding a stale curve while the firmware ran the factory one.
+            var fan = new WmiFanProvider();
+            Caps.HasFan = identity.IsClaw8Ex && fan.Available;
+
             // A device we do not recognise gets nothing, whatever the registry contains. Every
             // value above is calibrated to one model, and a wrong power limit on a different Claw
             // is a real write to real firmware.
@@ -94,6 +100,11 @@ namespace McenterLite.Hardware.Windows
             Rgb = identity.IsClaw8Ex
                 ? rgb
                 : new UnavailableRgb("This device is not an MSI Claw 8 EX AI+.");
+
+            Fan = identity.IsClaw8Ex
+                ? fan
+                : new UnavailableFan("This device is not an MSI Claw 8 EX AI+.");
+
             Igcl = new UnavailableIgcl("Intel graphics controls are not implemented yet.");
 
             Power = new WindowsPowerProvider();
@@ -104,6 +115,7 @@ namespace McenterLite.Hardware.Windows
         public IChargeLimitProvider ChargeLimit { get; }
         public IHwMouseProvider HwMouse { get; }
         public IRgbProvider Rgb { get; }
+        public IFanProvider Fan { get; }
         public IPowerProvider Power { get; }
         public IIgclProvider Igcl { get; }
 
@@ -167,6 +179,23 @@ namespace McenterLite.Hardware.Windows
         public string UnavailableReason { get; }
 
         public OpResult Apply(McenterLite.Shared.Model.LightingAnimation animation) =>
+            OpResult.Unavailable(UnavailableReason);
+    }
+
+    internal sealed class UnavailableFan : IFanProvider
+    {
+        public UnavailableFan(string reason) => UnavailableReason = reason;
+
+        public bool Available => false;
+        public string UnavailableReason { get; }
+
+        public bool TryRead(out McenterLite.Shared.Model.FanProfile current)
+        {
+            current = null;
+            return false;
+        }
+
+        public OpResult Apply(McenterLite.Shared.Model.FanProfile profile) =>
             OpResult.Unavailable(UnavailableReason);
     }
 

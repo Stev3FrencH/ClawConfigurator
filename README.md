@@ -221,6 +221,38 @@ The three defaults reproduce the profiles MSI Center M had configured, so the li
 after switching over. Full syntax, the colour formats, and what the hardware actually stores are in
 [docs/lighting-profiles.md](docs/lighting-profiles.md).
 
+### Editing the fan profile
+
+The **Fans** card has two buttons — **Auto** and your custom profile — and an **Apply** button.
+**Nothing reaches the fans until you press Apply.** Choosing a button only decides what Apply will
+send, because a fan curve is not a setting that should follow a control as it is being pressed.
+
+- **Auto** writes MSI's factory curve. There is no "automatic mode" in the firmware — it always
+  runs the last table it was given, so Auto is simply the stock table put back.
+- **Custom** writes the curve in `Custom.txt`, read at the moment you press Apply.
+
+```
+%LOCALAPPDATA%\Packages\McenterLite_xq4frxrkckec6\LocalCache\McenterLite\Fan
+```
+
+The device has **two fans**, and each holds an idle duty used below 47 °C plus one duty at each of
+47, 50, 57, 64, 71 and 78 °C. Duty is a percentage. **The temperatures are fixed** — they are not
+editable here or in MSI Center M, so only the duties are yours. Use `Fan =` to set both fans at
+once, or `Fan1` and `Fan2` to set them apart.
+
+> [!WARNING]
+> **A duty of 0 stops that fan**, including under load. The firmware enforces no floor — this was
+> measured on the device, with both tachometers reading zero — and MSI Center M permits the same
+> thing. The widget shows a warning when the profile you are about to apply contains a 0, and the
+> log records it, but neither refuses. If you did not mean it, press **Auto** and **Apply**.
+
+Recovery is the same as for lighting: delete `Custom.txt`, or empty it and save, then press Apply.
+A setting that cannot be read is skipped and the previous value kept, and `helper.log` two folders
+up names everything it ignored, on lines starting `Fan profile:`.
+
+MSI Center M, while it is still installed, owns the same table and does not know about us — if a
+curve stops behaving, press **Apply** again.
+
 ## Running
 
 For development and discovery, without installing the packaged app — against simulated hardware,

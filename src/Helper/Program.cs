@@ -190,11 +190,20 @@ namespace McenterLite.Helper
                 Log.Info($"Lighting profiles: {lighting.Directory}");
             }
 
-            var dispatcher = new FeatureDispatcher(hardware, settings, lighting);
+            // Same reasoning as the lighting profiles above: seeded before the dispatcher so the
+            // first snapshot carries the real profile name.
+            var fans = new FanProfileStore(Path.Combine(dataDirectory, "Fan"));
+            if (hardware.Fan.Available)
+            {
+                fans.EnsureSeeded(Log.Info);
+                Log.Info($"Fan profile: {fans.Directory}");
+            }
+
+            var dispatcher = new FeatureDispatcher(hardware, settings, lighting, fans);
 
             // Apply persisted settings BEFORE accepting connections, so the widget's first
             // snapshot describes a device already in its intended state.
-            StartupApplier.ApplyAll(hardware, settings, lighting);
+            StartupApplier.ApplyAll(hardware, settings, lighting, fans);
 
             using var server = new PipeServer(dispatcher.Handle);
 
@@ -261,6 +270,10 @@ namespace McenterLite.Helper
             Log.Info(hardware.Rgb.Available
                 ? "Lighting: vendor HID profile block (RAM)."
                 : $"Lighting unavailable: {hardware.Rgb.UnavailableReason}");
+
+            Log.Info(hardware.Fan.Available
+                ? "Fan control: MSI_ACPI Get_Fan/Set_Fan, two fans."
+                : $"Fan control unavailable: {hardware.Fan.UnavailableReason}");
 
             return hardware;
         }
@@ -471,7 +484,9 @@ namespace McenterLite.Helper
     /// <summary>Re-applies persisted settings to the hardware at startup.</summary>
     internal static class StartupApplier
     {
-        public static void ApplyAll(IHardware hardware, SettingsStore settings, LightingProfileStore lighting)
+        public static void ApplyAll(
+            IHardware hardware, SettingsStore settings,
+            LightingProfileStore lighting, FanProfileStore fans)
         {
             // TDP: the EC forgets across sleep and power-source changes, so this is re-applied
             // rather than assumed to have survived.
@@ -526,6 +541,31 @@ namespace McenterLite.Helper
                     Log.Info(result.Ok
                         ? $"Re-applied lighting profile {slot} '{profile.Name}'."
                         : $"Could not re-apply the lighting: {result.Error}");
+                }
+            }
+
+            // Fan curve, only if the user has actually chosen one through this app. Re-applied for
+            // the same reason as the charge limit above, and one more that is specific to fans:
+            // MSI Center M is still installed, owns the same table, and does not know about us. A
+            // custom curve it overwrote would otherwise stay overwritten until the user noticed the
+            // noise and pressed Apply again.
+            //
+            // Auto is re-applied too, not skipped as a no-op. "Auto" here means MSI's factory
+            // table, and if something else has since written a different one, putting it back is
+            // exactly what the user asked for when they chose it.
+            if (hardware.Fan.Available)
+            {
+                int selection = settings.GetInt(SettingsKeys.FanProfile, -1);
+                if (selection >= 0)
+                {
+                    var profile = selection == FeatureDispatcher.FanCustom
+                        ? fans.Load(Log.Warn)
+                        : FanProfile.Factory();
+
+                    var result = hardware.Fan.Apply(profile);
+                    Log.Info(result.Ok
+                        ? $"Re-applied fan profile '{profile.Name}'."
+                        : $"Could not re-apply the fan profile: {result.Error}");
                 }
             }
 

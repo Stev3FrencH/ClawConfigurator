@@ -65,6 +65,9 @@ namespace McenterLite.Shared.Model
         /// <summary>The controller's nine RGB LEDs, over the vendor HID channel.</summary>
         public bool HasRgb { get; set; }
 
+        /// <summary>The two fans' duty tables, over ACPI-WMI.</summary>
+        public bool HasFan { get; set; }
+
         public bool HasIgcl { get; set; }
 
         public string Serialize()
@@ -82,6 +85,7 @@ namespace McenterLite.Shared.Model
             Append(sb, "hasCharge", HasChargeLimit ? "1" : "0");
             Append(sb, "hwMouse", HasHwMouse ? "1" : "0");
             Append(sb, "hasRgb", HasRgb ? "1" : "0");
+            Append(sb, "hasFan", HasFan ? "1" : "0");
             Append(sb, "igcl", HasIgcl ? "1" : "0");
             return sb.ToString();
         }
@@ -126,6 +130,10 @@ namespace McenterLite.Shared.Model
                     // "hasRgb", not the retired "led": that key meant a brightness on/off flag in
                     // a registry mirror, and an old helper still sends it with that meaning.
                     case "hasRgb": caps.HasRgb = value == "1"; break;
+                    // "hasFan", not the retired "fan": that key was a bool for the five-point
+                    // preset model that was never written to hardware, and an old helper still
+                    // sends it with that meaning.
+                    case "hasFan": caps.HasFan = value == "1"; break;
                     case "igcl": caps.HasIgcl = value == "1"; break;
                     // Unknown keys are ignored on purpose - forward compatibility.
                 }

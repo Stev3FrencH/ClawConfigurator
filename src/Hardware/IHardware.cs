@@ -129,6 +129,34 @@ namespace McenterLite.Hardware
     }
 
     /// <summary>
+    /// The two fans' duty tables.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Gate G2. Takes a whole <see cref="FanProfile"/> rather than a mode, because the firmware has
+    /// no mode: it always runs the last table it was given, and "Auto" is simply MSI's factory
+    /// table written back. Proven on device — a non-factory table applied while MSI Center M's own
+    /// registry still read Auto.
+    /// </para>
+    /// <para>
+    /// Reads back the live table so the widget can say whether what is loaded is still the factory
+    /// curve. MSI Center M owns the same hardware and may overwrite us, so a value we wrote is not
+    /// evidence of what is running now.
+    /// </para>
+    /// </remarks>
+    public interface IFanProvider : IFeatureProvider
+    {
+        /// <summary>Reads both fans' live tables into a profile. Name is not meaningful.</summary>
+        bool TryRead(out FanProfile current);
+
+        /// <summary>
+        /// Writes both fans' tables. Implementations must read back rather than trust the reply —
+        /// <c>Set_Fan</c> answers with a bare status that does not echo what was written.
+        /// </summary>
+        OpResult Apply(FanProfile profile);
+    }
+
+    /// <summary>
     /// CPU boost and the Windows power-mode overlay.
     /// </summary>
     /// <remarks>
@@ -167,6 +195,7 @@ namespace McenterLite.Hardware
         IChargeLimitProvider ChargeLimit { get; }
         IHwMouseProvider HwMouse { get; }
         IRgbProvider Rgb { get; }
+        IFanProvider Fan { get; }
         IPowerProvider Power { get; }
         IIgclProvider Igcl { get; }
 

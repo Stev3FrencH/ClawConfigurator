@@ -167,6 +167,18 @@ namespace McenterLite.Helper.Settings
         /// </remarks>
         public const string LightingProfile = "LightingProfile";
 
+        /// <summary>
+        /// Which fan profile the user last applied: 0 = Auto, 1 = the custom profile.
+        /// </summary>
+        /// <remarks>
+        /// Unlike <see cref="LightingProfile"/> the hardware CAN answer this - the firmware runs
+        /// whatever table it holds, and the helper compares it against the factory curve. This is
+        /// persisted for a narrower job: knowing whether to re-apply at startup. Without it, a
+        /// custom curve lost to a power cycle or overwritten by MSI Center M would silently become
+        /// Auto, and the user would have no way to tell that from having chosen Auto.
+        /// </remarks>
+        public const string FanProfile = "FanProfile";
+
         public const string CpuBoost = "CpuBoost";
         public const string OsPowerMode = "OsPowerMode";
 

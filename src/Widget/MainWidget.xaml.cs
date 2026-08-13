@@ -278,6 +278,32 @@ namespace McenterLite.Widget
         /// </remarks>
         private const char RecordSeparator = '\u001F';
 
+        /// <summary>
+        /// The fan segments, left to right. Index IS the value the helper expects.
+        /// </summary>
+        /// <remarks>
+        /// 0 = Auto, MSI's factory curve; 1 = the custom profile. The second label is a placeholder
+        /// until the helper sends the profile's real name, exactly as the lighting labels are.
+        /// </remarks>
+        private static readonly string[] FanSegmentLabels = { "Auto", "Custom" };
+
+        private const int FanAutoSegment = 0;
+        private const int FanCustomSegment = 1;
+
+        /// <summary>
+        /// What Apply will send. Distinct from what the fans are actually running.
+        /// </summary>
+        /// <remarks>
+        /// The whole reason this card has an Apply button is that pressing a segment must NOT
+        /// reach the hardware. So the selection lives here between the press and the apply, and
+        /// the helper's own reading of the device is what overwrites it on the next snapshot.
+        /// </remarks>
+        private int _pendingFanSelection = FanAutoSegment;
+
+        /// <summary>Set from the helper: true when the custom profile contains a duty of 0.</summary>
+        private bool _customFanStopsAFan;
+
+        private SegmentedControl _fan;
         private SegmentedControl _lighting;
         private SegmentedControl _hwMouse;
         private SegmentedControl _cpuBoost;
@@ -305,6 +331,9 @@ namespace McenterLite.Widget
 
                 _lighting = new SegmentedControl(LightingSegments, LightingSegmentLabels);
                 _lighting.Selected += OnLightingSelected;
+
+                _fan = new SegmentedControl(FanSegments, FanSegmentLabels);
+                _fan.Selected += OnFanSelected;
 
                 _cpuBoost = new SegmentedControl(CpuBoostSegments,
                     Array.ConvertAll(CpuBoostSegmentOrder, segment => segment.Label));
@@ -675,6 +704,7 @@ namespace McenterLite.Widget
             ChargeLimitSlider.Maximum = caps.MaxChargeLimit;
 
             HwMouseCard.Visibility = Visible(caps.HasHwMouse);
+            FanCard.Visibility = Visible(caps.HasFan);
             LightingCard.Visibility = Visible(caps.HasRgb);
             IntelCard.Visibility = Visible(caps.HasIgcl && _connection.IsAvailable(Function.IntelFpsTier));
         }
@@ -700,6 +730,12 @@ namespace McenterLite.Widget
             // highlighted, or the highlighted button reads as a placeholder for one frame.
             ApplyValue(Function.LightingProfileNames);
             ApplyValue(Function.LightingProfile);
+
+            // Same ordering rule as the lighting pair above, plus one more: the warning depends on
+            // the profile, so it has to be known before the selection paints it.
+            ApplyValue(Function.FanProfileName);
+            ApplyValue(Function.FanProfileStopsAFan);
+            ApplyValue(Function.FanProfile);
 
             ApplyValue(Function.CpuBoost);
             ApplyValue(Function.OsPowerMode);
@@ -746,6 +782,31 @@ namespace McenterLite.Widget
                 case Function.LightingProfile:
                     // The slot index IS the segment index; see LightingSegmentLabels.
                     _lighting.Show(_connection.GetInt(Function.LightingProfile, 0));
+                    break;
+
+                case Function.FanProfileName:
+                {
+                    var name = _connection.Get(Function.FanProfileName);
+                    if (!string.IsNullOrWhiteSpace(name)) _fan.Relabel(FanCustomSegment, name);
+                    break;
+                }
+
+                case Function.FanProfileStopsAFan:
+                    _customFanStopsAFan = _connection.GetBool(Function.FanProfileStopsAFan);
+                    ShowFanWarning();
+                    break;
+
+                case Function.FanProfile:
+                    // The helper answers this by reading the LIVE table, not by echoing what we
+                    // last sent - so this is also how a curve MSI Center M overwrote gets noticed.
+                    // It resets the pending selection on purpose: once the snapshot says what the
+                    // fans are doing, an older un-applied choice is stale, not pending.
+                    _pendingFanSelection = Clamp(
+                        _connection.GetInt(Function.FanProfile, FanAutoSegment),
+                        FanAutoSegment, FanCustomSegment);
+
+                    _fan.Show(_pendingFanSelection);
+                    ShowFanWarning();
                     break;
 
                 case Function.CpuBoost:
@@ -1029,6 +1090,60 @@ namespace McenterLite.Widget
 
             _lighting.Show(segment);
             await SendAsync(Function.LightingProfile, segment);
+        }
+
+        /// <summary>
+        /// Records which fan profile Apply will send. Deliberately writes nothing.
+        /// </summary>
+        /// <remarks>
+        /// The one control on this page whose selection does not reach the hardware. Every other
+        /// segmented control here applies on press, which is right for a mouse mode or a lighting
+        /// profile - they are instant and trivially reversible. A fan curve is neither, so it was
+        /// asked for as an explicit two-step.
+        /// </remarks>
+        private void OnFanSelected(int segment)
+        {
+            if (_applyingFromHelper) return;
+            if (segment < FanAutoSegment || segment > FanCustomSegment) return;
+
+            _pendingFanSelection = segment;
+            _fan.Show(segment);
+            ShowFanWarning();
+        }
+
+        /// <summary>
+        /// Sends the selected fan profile. This is the only thing on the card that writes.
+        /// </summary>
+        /// <remarks>
+        /// Applying the profile that is already loaded is allowed rather than disabled, and that is
+        /// the point of a button separate from the selection: MSI Center M owns the same table and
+        /// can overwrite us, so "put my curve back" has to be reachable without first choosing
+        /// something else and choosing back.
+        /// </remarks>
+        private async void FanApply_Click(object sender, RoutedEventArgs e)
+        {
+            if (_applyingFromHelper) return;
+
+            await SendAsync(Function.FanProfile, _pendingFanSelection);
+        }
+
+        /// <summary>
+        /// Shows the stopped-fan warning when, and only when, it applies to what Apply would send.
+        /// </summary>
+        /// <remarks>
+        /// Tied to the PENDING selection rather than the running one, because the warning's job is
+        /// to be read before the button is pressed. Auto is MSI's own curve and can never stop a
+        /// fan, so the warning is meaningless there and would only teach the user to ignore it.
+        /// </remarks>
+        private void ShowFanWarning()
+        {
+            bool warn = _pendingFanSelection == FanCustomSegment && _customFanStopsAFan;
+
+            FanWarningText.Text = warn
+                ? "This profile sets a fan to 0%, which stops it. The firmware allows this."
+                : "";
+
+            FanWarningText.Visibility = warn ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private async void OnHwMouseSelected(int segment)

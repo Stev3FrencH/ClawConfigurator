@@ -39,6 +39,7 @@ namespace McenterLite.Hardware.Fake
                 MaxChargeLimit = 100,
                 HasHwMouse = simulateClaw8Ex,
                 HasRgb = simulateClaw8Ex,
+                HasFan = simulateClaw8Ex,
                 HasIgcl = simulateClaw8Ex,
             };
 
@@ -46,6 +47,7 @@ namespace McenterLite.Hardware.Fake
             ChargeLimit = new FakeChargeLimit(simulateClaw8Ex, Caps);
             HwMouse = new FakeHwMouse(simulateClaw8Ex);
             Rgb = new FakeRgb(simulateClaw8Ex);
+            Fan = new FakeFan(simulateClaw8Ex);
             Igcl = new FakeIgcl(simulateClaw8Ex);
 
             // Real on purpose. CPU boost and the power-mode overlay are plain Windows APIs, so
@@ -59,10 +61,66 @@ namespace McenterLite.Hardware.Fake
         public IChargeLimitProvider ChargeLimit { get; }
         public IHwMouseProvider HwMouse { get; }
         public IRgbProvider Rgb { get; }
+        public IFanProvider Fan { get; }
         public IPowerProvider Power { get; }
         public IIgclProvider Igcl { get; }
 
         public bool IsMsiCenterRunning() => false;
+    }
+
+    /// <summary>
+    /// Holds two duty tables in memory, starting on the factory curve.
+    /// </summary>
+    /// <remarks>
+    /// Starts on <see cref="FanProfile.Factory"/> because that is what a device that has never been
+    /// touched reports, and the widget's "is the factory curve loaded" check must be exercisable
+    /// without a Claw. Clamps to 0-100 the way the real provider does, so a profile that would be
+    /// truncated on hardware is truncated here too.
+    /// </remarks>
+    internal sealed class FakeFan : IFanProvider
+    {
+        private readonly bool _available;
+        private readonly FanProfile _state = FanProfile.Factory();
+
+        public FakeFan(bool available) => _available = available;
+
+        public bool Available => _available;
+        public string UnavailableReason => _available ? null : "No fan control on this device.";
+
+        public bool TryRead(out FanProfile current)
+        {
+            current = null;
+            if (!_available) return false;
+
+            var copy = new FanProfile { Name = "Current" };
+            for (int fan = 1; fan <= FanProfile.FanCount; fan++)
+                Array.Copy(_state.Duties(fan), copy.Duties(fan), FanProfile.DutyCount);
+
+            current = copy;
+            return true;
+        }
+
+        public OpResult Apply(FanProfile profile)
+        {
+            if (!_available) return OpResult.Unavailable(UnavailableReason);
+            if (profile == null) return OpResult.Fail("No fan profile was given.");
+
+            for (int fan = 1; fan <= FanProfile.FanCount; fan++)
+            {
+                var source = profile.Duties(fan);
+                var target = _state.Duties(fan);
+
+                for (int i = 0; i < FanProfile.DutyCount; i++)
+                {
+                    int duty = source[i];
+                    if (duty < FanProfile.MinDuty) duty = FanProfile.MinDuty;
+                    if (duty > FanProfile.MaxDuty) duty = FanProfile.MaxDuty;
+                    target[i] = duty;
+                }
+            }
+
+            return OpResult.Success();
+        }
     }
 
     internal sealed class FakeTdp : ITdpProvider
