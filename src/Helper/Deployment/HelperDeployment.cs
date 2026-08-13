@@ -172,8 +172,16 @@ namespace McenterLite.Helper.Deployment
             }
         }
 
-        /// <summary>Removes the task and the deployed copy. Called during uninstall.</summary>
-        public static bool RunTeardown()
+        /// <summary>
+        /// Removes the task and the deployed copy. Called during uninstall.
+        /// </summary>
+        /// <param name="afterStop">
+        /// Runs once the task is unregistered and any running helper is stopped, but BEFORE
+        /// anything is deleted. This is the only moment a restore can safely happen: earlier and the
+        /// service is still live and holding the hardware, later and this method has deleted the
+        /// executable that would do the work. Failures inside it must not prevent the teardown.
+        /// </param>
+        public static bool RunTeardown(Action afterStop = null)
         {
             bool ok = ScheduledTaskRegistrar.Unregister();
 
@@ -181,6 +189,8 @@ namespace McenterLite.Helper.Deployment
             {
                 // A running instance holds its own binary open, so it must go first.
                 StopRunningHelper();
+
+                afterStop?.Invoke();
 
                 if (Directory.Exists(DeployedDirectory))
                 {

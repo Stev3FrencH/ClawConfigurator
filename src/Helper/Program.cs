@@ -51,7 +51,7 @@ namespace McenterLite.Helper
             try
             {
                 if (options.Setup) return RunSetupRole();
-                if (options.Uninstall) return RunUninstallRole();
+                if (options.Uninstall) return RunUninstallRole(options);
 
                 // Dev and test runs skip deployment entirely and serve in place, so the whole
                 // IPC and UI stack can be exercised without touching persistence or elevation.
@@ -132,7 +132,25 @@ namespace McenterLite.Helper
             return HelperDeployment.RunSetup() ? 0 : 1;
         }
 
-        private static int RunUninstallRole()
+        /// <summary>
+        /// Puts the machine back to <see cref="FeatureDefaults"/>, then removes the task and the
+        /// deployed copy.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>The restore is the point of this role, and until 2026-08-13 it did not happen.</b>
+        /// This called <c>RunTeardown</c> and nothing else, while the README promised it "restores
+        /// captured system values". The restore existed, but the only way to reach it was the
+        /// <c>PrepareForUninstall</c> pipe message, which nothing but the test script ever sent.
+        /// </para>
+        /// <para>
+        /// <b>Run this BEFORE removing the app, not after.</b> The deployed helper and
+        /// <c>settings.json</c> both live in the package's LocalCache, so removing the app deletes
+        /// the executable this role needs and every setting it would read. The README used to
+        /// document the opposite order, which cannot work.
+        /// </para>
+        /// </remarks>
+        private static int RunUninstallRole(CommandLineOptions options)
         {
             if (!Elevation.IsElevated())
             {
@@ -140,7 +158,33 @@ namespace McenterLite.Helper
                 return exitCode ?? 3;
             }
 
-            return HelperDeployment.RunTeardown() ? 0 : 1;
+            return HelperDeployment.RunTeardown(() => RestoreDefaults(options)) ? 0 : 1;
+        }
+
+        /// <summary>
+        /// Applies every default during uninstall, reporting problems rather than throwing.
+        /// </summary>
+        /// <remarks>
+        /// A failed restore must not abort the teardown. Leaving a scheduled task and a deployed
+        /// helper behind because one hardware write failed is strictly worse than an un-restored
+        /// setting the user can still change by hand - and a task pointing at a deleted executable
+        /// is exactly the debris MSI Center M's own uninstaller left on this machine.
+        /// </remarks>
+        private static void RestoreDefaults(CommandLineOptions options)
+        {
+            try
+            {
+                var hardware = BuildHardware(options);
+                var problems = SettingsRestorer.RestoreAll(hardware, Log.Info);
+
+                Log.Info(problems.Count == 0
+                    ? "Restored every feature to its default."
+                    : "Some values could not be restored: " + string.Join("; ", problems));
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Could not restore defaults during uninstall", ex);
+            }
         }
 
         // ── Service ─────────────────────────────────────────────────────────────

@@ -65,9 +65,16 @@ $PipeName = 'McenterLiteHelper'
 # RETIRED, deliberately absent: 20-23 (fan), 30/31 (charge limit), 40 (lighting) and 81 (Intel
 # thermal, which only existed to keep Intel's stack off the fan). All removed 2026-08-08 and their
 # ordinals must never be reused - listing them here would invite exactly that.
+#
+# Fan, charge limit and lighting came BACK on 2026-08-12 on new ordinals, exactly as that rule
+# requires: 24-26, 32, and 41/42. This map missed them until 2026-08-13, so -Restore could not read
+# back most of what it had just changed.
 $Fn = @{
     Hello = 1; Snapshot = 2; DeviceCaps = 3; WidgetVisible = 4; PrepareForUninstall = 5
     Pl1 = 10; Pl2 = 11; TdpBackend = 12; PerfMode = 13
+    FanProfile = 24; FanProfileName = 25; FanProfileStopsAFan = 26
+    ChargeLimitPercent = 32
+    LightingProfile = 41; LightingProfileNames = 42
     HwMouseMode = 50
     CpuBoost = 60; OsPowerMode = 61
     IntelFpsTier = 70; IntelLowLatency = 71; IntelFrameSync = 72
@@ -237,11 +244,20 @@ try {
 
 
     if ($Restore) {
+        # Sends the same message an uninstall now sends. Since 2026-08-13 this applies
+        # FeatureDefaults - 17/19 W, charge 100%, fans Auto, controller Gamepad, boost on,
+        # Balanced - rather than replaying captured Original_* values, which no longer exist.
+        # Lighting is deliberately left alone.
         Write-Host ''
-        Write-Host '=== Restoring captured original values ===' -ForegroundColor Cyan
+        Write-Host '=== Restoring every feature to its default ===' -ForegroundColor Cyan
         Show-Reply 'Restore' (Invoke-Helper -Cmd $CmdSet -Function $Fn.PrepareForUninstall -Val '1')
         Show-Reply 'Pl1' (Invoke-Helper -Cmd $CmdGet -Function $Fn.Pl1)
         Show-Reply 'Pl2' (Invoke-Helper -Cmd $CmdGet -Function $Fn.Pl2)
+        Show-Reply 'ChargeLimit' (Invoke-Helper -Cmd $CmdGet -Function $Fn.ChargeLimitPercent)
+        Show-Reply 'FanProfile' (Invoke-Helper -Cmd $CmdGet -Function $Fn.FanProfile)
+        Show-Reply 'HwMouseMode' (Invoke-Helper -Cmd $CmdGet -Function $Fn.HwMouseMode)
+        Show-Reply 'CpuBoost' (Invoke-Helper -Cmd $CmdGet -Function $Fn.CpuBoost)
+        Show-Reply 'OsPowerMode' (Invoke-Helper -Cmd $CmdGet -Function $Fn.OsPowerMode)
         Show-TdpRegistry
         return
     }

@@ -9,9 +9,10 @@ AI+ (Panther Lake, `CG3EM` / board `1T91`), delivered as an Xbox Game Bar widget
 > controller's vendor HID channel. Neither needs MSI Center M running, and neither should need it
 > installed. See [docs/hardware-notes.md](docs/hardware-notes.md).
 >
-> **Not yet proven:** that these paths survive an actual MSI Center M *uninstall*. Everything so far
-> was verified with its stack **stopped**, which is not the same thing. MSI Center M is deliberately
-> kept installed for now, both to compare against and because that assumption is untested.
+> **Proven 2026-08-13: MSI Center M is uninstalled and all five features still work.** The app, its
+> Game Bar widget and the SDK are gone, and after a reboot the helper probed and re-applied every
+> feature — `MSI_ACPI` comes from the ACPI tables through Windows' own WMI mapper, not from anything
+> MSI ships. See [`Diagnostics/msi-center-m-after.md`](Diagnostics/msi-center-m-after.md).
 
 > **Status: the widget builds, packages, installs, and runs on the real Claw.** Power limits,
 > controller mode, CPU Boost and OS Power Mode are all verified working end-to-end, including
@@ -186,8 +187,34 @@ what it does to the scheduled task and how it puts it back.
 
 Logs land at `%LOCALAPPDATA%\Packages\<package family>\LocalCache\McenterLite\helper.log`.
 
-To uninstall: remove the app from *Settings > Apps*, then run the deployed helper once with
-`--uninstall` to remove its scheduled task and restore any captured original values.
+### Uninstalling
+
+**Order matters, and it is the opposite of what you would guess.** Run the helper's `--uninstall`
+**first**, then remove the app:
+
+```powershell
+& "$env:LOCALAPPDATA\Packages\McenterLite_xq4frxrkckec6\LocalCache\McenterLite\Helper\McenterLite.Helper.exe" --uninstall
+```
+
+That puts every feature back to its default, unregisters the scheduled task and removes the deployed
+copy. Then remove **M Center Lite** from *Settings > Apps*.
+
+Doing it the other way round cannot work: the deployed helper and its settings both live inside the
+package's `LocalCache`, so removing the app first deletes the executable that would do the restore.
+That leaves the scheduled task orphaned against a missing file and the device on whatever limits
+were last set, with nothing left able to change them.
+
+What the restore puts back — chosen values, not whatever happened to be there before:
+
+| | Default |
+|---|---|
+| Power limits | 17 W / 19 W |
+| Battery charge limit | 100% — charge to full |
+| Fans | Auto: MSI's factory table, fans handed back to the firmware |
+| Controller mode | Gamepad |
+| CPU boost | On |
+| OS power mode | Balanced |
+| Lighting | **left alone** — it lives in the controller's RAM and a power cycle clears it anyway |
 
 This only applies to the MSI Claw 8 EX AI+ (see [Scope](#scope)) — on any other device the
 hardware-specific cards stay hidden, and only CPU Boost and OS Power Mode do anything.
@@ -326,8 +353,10 @@ The mitigations that apply are structural rather than advisory:
   packages, so slider bounds are a convenience and the helper is the enforcement point.
 - **Every write is read back** and the actual value returned. A write the hardware ignored is
   reported as a failure, not as success.
-- **Power limits are captured before the first write** and restored on uninstall, so the device
-  does not keep our numbers forever.
+- **Uninstalling restores every feature to a known default**, so the device does not keep our
+  numbers forever. See [Uninstalling](#uninstalling) — the restore replaces an earlier scheme that
+  replayed captured "original" values, which on this machine meant replaying whatever MSI Center M
+  held at one arbitrary moment.
 - **The device gate is exact.** Another Claw generation is treated as unsupported rather than close
   enough — the power ceilings differ, and a wrong limit is a real write to real firmware.
 

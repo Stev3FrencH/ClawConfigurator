@@ -98,29 +98,19 @@ namespace McenterLite.Helper.Settings
 
         public void SetInt(string key, int value) => Set(key, value.ToString(CultureInfo.InvariantCulture));
 
-        /// <summary>
-        /// Records a pre-existing system value the first time we are about to change it, and only
-        /// then. Uninstall replays these.
-        /// </summary>
-        /// <remarks>
-        /// Write-once is the whole point. Capturing on every start would, on the second start,
-        /// record the value WE set as if it were the user's - and uninstall would then "restore"
-        /// the device to our settings forever, which is not a restore at all.
-        /// </remarks>
-        public void CaptureOriginal(string key, string value)
-        {
-            lock (_gate)
-            {
-                var originalKey = "Original_" + key;
-                if (_values.ContainsKey(originalKey)) return;
-                if (value == null) return;
-                _values[originalKey] = value;
-            }
-            Save();
-            Log.Info($"Captured the original value of {key}.");
-        }
-
-        public string GetOriginal(string key) => Get("Original_" + key);
+        // CaptureOriginal / GetOriginal lived here until 2026-08-13. They recorded the value each
+        // setting held the first time this app was about to change it, and uninstall replayed them.
+        //
+        // Removed with the mechanism, not merely unused: while MSI Center M was installed, "the
+        // value before we wrote" meant whatever MSI Center M happened to hold at that arbitrary
+        // moment, so a restore returned the machine to a snapshot of a program that is now
+        // uninstalled. On this device it would have replayed 15 W / 17 W, a 60% charge limit and
+        // Best performance - none of them a neutral state. The Original_* keys were also stored in
+        // settings.json inside the package's LocalCache, which Windows deletes when the app is
+        // removed, so the one event they existed for was the event that destroyed them.
+        //
+        // Restore now applies FeatureDefaults, a table in code that cannot be lost. See
+        // SettingsRestorer.
 
         private void Save()
         {

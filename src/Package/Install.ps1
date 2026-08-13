@@ -219,15 +219,18 @@ catch [Exception] {
     if (-not $installed) { throw }
 
     # Removing the package deletes its LocalCache, and the helper's settings.json lives there -
-    # including the Original_* values captured before this app first touched the hardware. Those
-    # are what a real uninstall replays to put the device back, so losing them to a routine dev
-    # reinstall would silently strand the machine on whatever limits were last set.
+    # every power limit, charge limit, fan and lighting choice the user has made. A routine dev
+    # reinstall would otherwise silently reset all of them.
+    #
+    # This used to be justified by the Original_* captured values as well. Those are gone as of
+    # 2026-08-13: uninstall now restores FeatureDefaults, a table in code, precisely because values
+    # stored here could not survive the event they existed for.
     $settings = Join-Path $env:LOCALAPPDATA "Packages\$($installed.PackageFamilyName)\LocalCache\McenterLite\settings.json"
     $preserved = $null
     if (Test-Path $settings) {
         $preserved = Join-Path $env:TEMP 'McenterLite.settings.preserved.json'
         Copy-Item $settings $preserved -Force
-        Write-Host "  preserved settings.json (captured original values)" -ForegroundColor DarkGray
+        Write-Host "  preserved settings.json (the user's chosen values)" -ForegroundColor DarkGray
     }
 
     Remove-AppxPackage -Package $installed.PackageFullName

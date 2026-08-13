@@ -236,9 +236,6 @@ namespace McenterLite.Helper
             if (!_hw.Tdp.TryRead(out int pl1, out int pl2))
                 return PipeEnvelope.Failure(request.Id, request.Fn, "Could not read the current power limits.");
 
-            _settings.CaptureOriginal(SettingsKeys.Pl1, PipeEnvelope.FromInt(pl1));
-            _settings.CaptureOriginal(SettingsKeys.Pl2, PipeEnvelope.FromInt(pl2));
-
             // PL1 and PL2 are one hardware operation with a coupling rule between them, so a
             // change to either is applied as a pair rather than independently.
             if (request.Fn == Function.Pl1) pl1 = request.AsInt(pl1);
@@ -275,8 +272,6 @@ namespace McenterLite.Helper
 
             if (!_hw.ChargeLimit.TryRead(out int current))
                 return PipeEnvelope.Failure(request.Id, request.Fn, "Could not read the current charge limit.");
-
-            _settings.CaptureOriginal(SettingsKeys.ChargeLimit, PipeEnvelope.FromInt(current));
 
             int percent = request.AsInt(current);
             _hw.Caps.ClampChargeLimit(ref percent);
@@ -458,9 +453,6 @@ namespace McenterLite.Helper
         {
             bool enabled = request.AsBool();
 
-            if (_hw.Power.TryReadCpuBoost(out bool existing))
-                _settings.CaptureOriginal(SettingsKeys.CpuBoost, PipeEnvelope.FromBool(existing));
-
             var result = _hw.Power.ApplyCpuBoost(enabled);
             if (!result.Ok) return PipeEnvelope.Failure(request.Id, request.Fn, result.Error);
 
@@ -477,9 +469,6 @@ namespace McenterLite.Helper
         private PipeEnvelope SetPowerMode(PipeEnvelope request)
         {
             var mode = request.AsEnum(OsPowerMode.Balanced);
-
-            if (_hw.Power.TryReadPowerMode(out var existing))
-                _settings.CaptureOriginal(SettingsKeys.OsPowerMode, PipeEnvelope.FromEnum(existing));
 
             var result = _hw.Power.ApplyPowerMode(mode);
             if (!result.Ok) return PipeEnvelope.Failure(request.Id, request.Fn, result.Error);
@@ -509,53 +498,16 @@ namespace McenterLite.Helper
         }
 
         /// <summary>
-        /// Puts back every system value we captured before changing it, for a clean uninstall.
+        /// Puts every feature back to <see cref="FeatureDefaults"/>, for a clean uninstall.
         /// </summary>
+        /// <remarks>
+        /// The work lives in <see cref="SettingsRestorer"/> because <c>--uninstall</c> needs it too,
+        /// and used not to have it: this message was the only way in, and nothing but
+        /// <c>Test-Helper.ps1 -Restore</c> ever sent it.
+        /// </remarks>
         private PipeEnvelope RestoreEverything(PipeEnvelope request)
         {
-            var problems = new List<string>();
-
-            // Power limits. Captured on the first write, restored here - without this the device
-            // keeps whatever limit was last set forever, including after an uninstall, and the
-            // user has no way back to the value they started with.
-            var originalPl1 = _settings.GetOriginal(SettingsKeys.Pl1);
-            var originalPl2 = _settings.GetOriginal(SettingsKeys.Pl2);
-            if (originalPl1 != null && originalPl2 != null
-                && int.TryParse(originalPl1, out int pl1) && int.TryParse(originalPl2, out int pl2)
-                && _hw.Tdp.Available)
-            {
-                _hw.Caps.ClampPowerLimits(ref pl1, ref pl2);
-                var r = _hw.Tdp.Apply(pl1, pl2);
-                if (!r.Ok) problems.Add($"power limits: {r.Error}");
-            }
-
-            // Charge limit. Captured on the first write, like the power limits, and restored for
-            // the same reason - it is a setting that persists in firmware and outlives the app.
-            // That matters more once MSI Center M is gone, because then nothing else can put it
-            // back.
-            var originalCharge = _settings.GetOriginal(SettingsKeys.ChargeLimit);
-            if (originalCharge != null && int.TryParse(originalCharge, out int chargePercent)
-                && _hw.ChargeLimit.Available)
-            {
-                _hw.Caps.ClampChargeLimit(ref chargePercent);
-                var r = _hw.ChargeLimit.Apply(chargePercent);
-                if (!r.Ok) problems.Add($"charge limit: {r.Error}");
-            }
-
-            var originalBoost = _settings.GetOriginal(SettingsKeys.CpuBoost);
-            if (originalBoost != null)
-            {
-                var r = _hw.Power.ApplyCpuBoost(originalBoost == "1");
-                if (!r.Ok) problems.Add($"CPU boost: {r.Error}");
-            }
-
-            var originalMode = _settings.GetOriginal(SettingsKeys.OsPowerMode);
-            if (originalMode != null && int.TryParse(originalMode, out int modeValue) &&
-                Enum.IsDefined(typeof(OsPowerMode), modeValue))
-            {
-                var r = _hw.Power.ApplyPowerMode((OsPowerMode)modeValue);
-                if (!r.Ok) problems.Add($"power mode: {r.Error}");
-            }
+            var problems = SettingsRestorer.RestoreAll(_hw, Log.Info);
 
             if (problems.Count > 0)
             {
@@ -564,7 +516,7 @@ namespace McenterLite.Helper
                 return PipeEnvelope.Failure(request.Id, request.Fn, message);
             }
 
-            Log.Info("Restored all captured original values.");
+            Log.Info("Restored every feature to its default.");
             return Ok(request, "1");
         }
 
