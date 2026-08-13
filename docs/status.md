@@ -7,8 +7,12 @@ notes behind the roadmap below.
 
 ## The headline
 
-**The MSI Center M dependency is gone.** All five hardware features talk to the firmware directly
-and need MSI Center M neither running nor installed:
+**MSI Center M is uninstalled, and everything still works.** Done on 2026-08-13 — the app, its Game
+Bar widget and the SDK, followed by a reboot. All five hardware features probed and re-applied on the
+first boot without it. That claim used to be a design argument; it is now a measurement. See
+[`msi-center-m-after.md`](../Diagnostics/msi-center-m-after.md).
+
+All five talk to the firmware directly and need MSI Center M neither running nor installed:
 
 - **Power limits** via `MSI_ACPI.Set_SlaveBattery` (ACPI-WMI), merged 2026-08-11.
 - **Controller mode** via the controller's vendor HID channel, merged 2026-08-12.
@@ -256,21 +260,26 @@ Still open, and both about *persistence* rather than mechanism:
 > reading zero. The app warns and does not refuse — a deliberate decision, matching what MSI
 > Center M itself permits.
 
-## Cleanup waiting on the uninstall
+## Cleanup — no longer waiting, as of 2026-08-13
 
 - **`RegistryTdpProvider` and `RegistryHwMouseProvider`** are both inert and both provably weaker
-  than the firmware paths that replaced them. Delete once MSI Center M is uninstalled and both
-  firmware paths are confirmed without it. That is also what finally removes `PerfMode`,
+  than the firmware paths that replaced them. **The condition on deleting them has been met**: MSI
+  Center M is uninstalled, and both firmware paths were confirmed without it — the helper chose
+  `Wmi` and `firmware (vendor HID)` on the first boot after. The registry values they read still
+  exist as orphaned keys under `WOW6432Node\MSI` and are now exactly what they were suspected of
+  being: records with nothing behind them. Deleting these is also what finally removes `PerfMode`,
   `TdpBackendKind.RegistryMirror` and `IsMsiCenterRunning`.
 - **Automate the package version bump.** Worth doing *before* three features' worth of install
   cycles.
 
 ## Still unverified
 
-- **That `MSI_ACPI` survives an actual MSI Center M uninstall.** Everything so far was proven with
-  its stack *stopped*, which is not the same thing. **This is the assumption the entire plan rests
-  on**, and the cheapest way to settle it is to uninstall MSI Center M on a spare image, or accept
-  the risk and keep the registry fallbacks until the real uninstall happens.
+- [x] ~~**That `MSI_ACPI` survives an actual MSI Center M uninstall.**~~ **Settled 2026-08-13 by
+  doing it.** MSI Center M, the MSI Quick Settings widget and the SDK were uninstalled and the
+  machine rebooted; `MSI_ACPI` still carries all 38 methods, and the helper's own elevated start
+  probed and re-applied every feature on a machine with none of it installed. **Both registry
+  mirrors lost to the firmware paths** — `Power limits: Wmi`, `Controller mode: firmware (vendor
+  HID)`. Full before/after in [`msi-center-m-after.md`](../Diagnostics/msi-center-m-after.md).
 - **That desktop mode works on the UAC secure desktop.** This is the whole premise of the firmware
   route over software cursor injection, and it has never been tested. Trigger any elevation prompt
   and try to move the cursor.
