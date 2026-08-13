@@ -37,10 +37,16 @@
     Compare every snapshot on disk and report what moved on each surface.
 
 .PARAMETER Selectors
-    Sub-function values to try in input byte 0. Default 0-7.
+    Sub-function values to try in input byte 0. Defaults to 0-2, the only ones that carry fan data.
 
 .PARAMETER Method
-    Restrict the ACPI sweep. Default is the fan-relevant Get_* methods plus Get_AP as a control.
+    Restrict the ACPI sweep. Defaults to the four methods known to carry fan state.
+
+.PARAMETER Wide
+    Restores the original discovery sweep - six methods across sub-functions 0-7. That is roughly
+    96 ACPI control-method calls per snapshot, into sub-functions the firmware may never be asked
+    for in normal operation. It found the table; it is no longer the default. Use it only when
+    looking for something the narrow set does not explain.
 
 .PARAMETER EcAddresses
     Additionally read these EC addresses through Get_EC. Off by default because Get_EC's first byte
@@ -71,10 +77,14 @@ param(
     [switch]$Diff,
 
     [Parameter(ParameterSetName = 'Capture')]
-    [int[]]$Selectors = @(0, 1, 2, 3, 4, 5, 6, 7),
+    [int[]]$Selectors,
 
     [Parameter(ParameterSetName = 'Capture')]
     [string[]]$Method,
+
+    # Restores the original discovery sweep: every fan-adjacent Get_* across sub-functions 0-7.
+    [Parameter(ParameterSetName = 'Capture')]
+    [switch]$Wide,
 
     [Parameter(ParameterSetName = 'Capture')]
     [int[]]$EcAddresses
@@ -86,10 +96,29 @@ $Namespace = 'root/wmi'
 $AcpiClass = 'MSI_ACPI'
 $ScenarioKey = 'HKLM:\SOFTWARE\WOW6432Node\MSI\MSI Center M\Component\User Scenario'
 
-# Get_AP is not a fan method. It is here as a control: the charge limit lives in byte 5 of it and
-# is already proven, so if a whole run finds nothing at all, this row still shows the harness reads
-# real data rather than silently failing.
-$DefaultMethods = @('Get_Fan', 'Get_Thermal', 'Get_Thermal_64', 'Get_Temperature', 'Get_Device', 'Get_AP')
+# NARROWED 2026-08-12, after the discovery run answered the question this script was written for.
+#
+# The first version swept six methods across sub-functions 0-7 - about 96 ACPI control-method calls
+# per snapshot, most of them into sub-functions the firmware was probably never asked for. That was
+# defensible while looking for the table and is not defensible now that it has been found: these
+# execute in kernel context against an undocumented implementation, and calls that return nothing
+# are pure risk once they have been shown to return nothing.
+#
+# The device hard-locked shortly after a run on 2026-08-12. The cause was almost certainly a
+# storage dropout unrelated to this - controller errors on secondary disks predate the fan work by
+# four days, and no fan or thermal path can remove an NVMe device - but "almost certainly" is not a
+# reason to keep sweeping blind. See docs/hardware-notes.md, Gate G2.
+#
+# Get_AP is not a fan method. It is kept as a control: the charge limit lives in byte 5, and it also
+# carries the suspected fan-mode flag at sub-function 1 byte 1.
+$NarrowMethods = @('Get_Fan', 'Get_Temperature', 'Get_Thermal', 'Get_AP')
+$NarrowSelectors = @(0, 1, 2)
+
+$WideMethods = @('Get_Fan', 'Get_Thermal', 'Get_Thermal_64', 'Get_Temperature', 'Get_Device', 'Get_AP')
+$WideSelectors = @(0, 1, 2, 3, 4, 5, 6, 7)
+
+$DefaultMethods = if ($Wide) { $WideMethods } else { $NarrowMethods }
+if (-not $Selectors) { $Selectors = if ($Wide) { $WideSelectors } else { $NarrowSelectors } }
 
 function Test-Elevated {
     $identity  = [Security.Principal.WindowsIdentity]::GetCurrent()

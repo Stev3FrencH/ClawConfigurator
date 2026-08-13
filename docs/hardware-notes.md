@@ -658,6 +658,35 @@ misleading and should not be read as a guarantee.
 **Consequence: any custom profile this app applies must clamp its own minimum.** There is no layer
 underneath that will do it. This is the single most important fact in this section.
 
+#### Incident: hard lock on 2026-08-12, and why the sweep was narrowed
+
+The device hard-locked and had to be cold-booted shortly after the capture run. The SSD vanished
+and did not return until a full shutdown.
+
+**Most likely unrelated to this work**, on the evidence:
+
+- `disk` event 11 (controller error) appears on `Harddisk1`, `2` and `3` on **8 August**, four days
+  before this branch existed, and again on 8/11 and on 8/12 three hours before the lock. The `DR`
+  numbers shift between sessions, which is what removable devices being re-enumerated look like.
+  The internal drive is `DeviceId 0` and is not among them.
+- **No fan or thermal path can remove an NVMe device.** A fan fault throttles or shuts down
+  cleanly. The fans were on `Fan = 1` with the factory table intact throughout.
+- There is no crash dump and **no System-log entry at all** for the seventeen minutes before the
+  lock. That is the signature, not missing evidence: Windows cannot flush the event log or write a
+  dump to a disk that is gone, so it hangs instead of bugchecking.
+
+**What is not ruled out.** The capture ran elevated and made roughly 96 ACPI control-method calls
+per snapshot, into sub-functions the firmware may never be asked for in normal operation. Those
+execute in kernel context against an undocumented implementation. Nothing points at it, and the
+timing is a poor fit, but it is the only thing in this workstream that touched firmware.
+
+**What changed as a result.** `Watch-Fan.ps1` now defaults to four methods across sub-functions
+0–2 — the ones measured to carry fan state — and the original sweep is behind `-Wide`. A broad
+sweep is worth its risk while hunting for a table and is not worth it once the table is known.
+
+**The standing rule this reinforces:** never sweep a firmware surface wider or longer than the
+question requires, and narrow the tool as soon as it has answered.
+
 #### What the factory table is, for restore
 
 Auto is fully captured, which satisfies the "capture before any write" item this gate has carried
