@@ -79,9 +79,34 @@ namespace McenterLite.Shared.Model
         // FanProfile.Factory() written to both tables with the control flag cleared. That is a
         // measured constant with its own home in FanProfile, not a product choice.
 
-        // Lighting has no constant here either, and is deliberately NOT restored. It lives in the
-        // controller's RAM, so the state before we touched it was itself written by whatever ran
-        // last, and a power cycle clears it regardless. Decision 2026-08-13: leave the lights on.
-        // Turning them off on the way out would be inventing a state rather than returning one.
+        // Lighting has no RESTORE constant either, and is deliberately not restored. It lives in
+        // the controller's RAM, so the state before we touched it was itself written by whatever
+        // ran last, and a power cycle clears it regardless. Decision 2026-08-13: leave the lights
+        // on. Turning them off on the way out would be inventing a state rather than returning one.
+
+        /// <summary>
+        /// The lighting profile a <b>fresh install</b> applies. Slot 1, seeded as "Purple".
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>First-run, not restore — the two differ on purpose.</b> Uninstalling leaves the lights
+        /// exactly as they are, because there is no prior state to return to. Installing is the
+        /// opposite situation: the controller keeps lighting in RAM and forgets it on a power cycle,
+        /// so a new install that wrote nothing would leave the LEDs on whatever the firmware
+        /// defaults to while the widget's own card claimed something else.
+        /// </para>
+        /// <para>
+        /// The <i>slot</i> is the decision, not the colour. Slot 1 is seeded as Purple, but the
+        /// profile files are the user's to rename and edit, so this must never be described as "the
+        /// purple default" anywhere it could later be a lie.
+        /// </para>
+        /// <para>
+        /// <b>A restore makes the next start look like a fresh install</b>, because it clears the
+        /// saved selections — so the helper will apply this profile then too. That is coherent for a
+        /// reset, but it does mean "restore leaves the lights alone" holds only until the next
+        /// helper start.
+        /// </para>
+        /// </remarks>
+        public const int FirstRunLightingProfile = 1;
     }
 }

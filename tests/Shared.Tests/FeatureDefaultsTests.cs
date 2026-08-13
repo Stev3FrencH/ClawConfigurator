@@ -104,6 +104,25 @@ namespace McenterLite.Shared.Tests
         // ── What is deliberately absent ──────────────────────────────────────────
 
         [Fact]
+        public void FirstRunLightingProfile_IsARealSlot()
+        {
+            // Must be a profile slot, never OffSlot: a fresh install choosing "off" would look
+            // identical to lighting being broken.
+            Assert.InRange(
+                FeatureDefaults.FirstRunLightingProfile, 1, LightingProfileStore.ProfileCount);
+            Assert.NotEqual(LightingProfileStore.OffSlot, FeatureDefaults.FirstRunLightingProfile);
+        }
+
+        [Fact]
+        public void FirstRunLightingProfile_IsSeededAsPurple()
+        {
+            // The SLOT is the decision, not the colour - the profile files are the user's to
+            // rename and edit. This pins what a fresh install gets out of the box, and would catch
+            // the seeded defaults being reordered underneath it.
+            Assert.Equal("Purple", LightingProfile.Default(FeatureDefaults.FirstRunLightingProfile).Name);
+        }
+
+        [Fact]
         public void FanDefault_IsTheFactoryTable()
         {
             // Fan has no constant of its own: Auto is FanProfile.Factory() with the control flag

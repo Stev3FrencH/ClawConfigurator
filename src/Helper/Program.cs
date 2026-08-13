@@ -670,42 +670,63 @@ namespace McenterLite.Helper
             if (hardware.Rgb.Available)
             {
                 int slot = settings.GetInt(SettingsKeys.LightingProfile, -1);
-                if (slot >= LightingProfileStore.OffSlot && slot <= LightingProfileStore.ProfileCount)
-                {
-                    var profile = slot == LightingProfileStore.OffSlot
-                        ? new LightingProfile { Name = "Off", Style = LightingStyle.Off }
-                        : lighting.Load(slot, Log.Warn);
 
-                    var result = hardware.Rgb.Apply(LightingRenderer.Render(profile));
-                    Log.Info(result.Ok
-                        ? $"Re-applied lighting profile {slot} '{profile.Name}'."
-                        : $"Could not re-apply the lighting: {result.Error}");
+                // First run: no choice recorded yet, so pick one rather than leaving the LEDs on
+                // whatever the firmware defaults to while the card claims otherwise. Recorded
+                // immediately, so this is a starting point the user then owns rather than a value
+                // reasserted on every start.
+                bool firstRun = slot < LightingProfileStore.OffSlot || slot > LightingProfileStore.ProfileCount;
+                if (firstRun)
+                {
+                    slot = FeatureDefaults.FirstRunLightingProfile;
+                    settings.SetInt(SettingsKeys.LightingProfile, slot);
                 }
+
+                var profile = slot == LightingProfileStore.OffSlot
+                    ? new LightingProfile { Name = "Off", Style = LightingStyle.Off }
+                    : lighting.Load(slot, Log.Warn);
+
+                var result = hardware.Rgb.Apply(LightingRenderer.Render(profile));
+                Log.Info(result.Ok
+                    ? (firstRun ? "First run: applied " : "Re-applied ")
+                      + $"lighting profile {slot} '{profile.Name}'."
+                    : $"Could not apply the lighting: {result.Error}");
             }
 
-            // Fan curve, only if the user has actually chosen one through this app. Re-applied for
-            // the same reason as the charge limit above, and one more that is specific to fans:
-            // MSI Center M is still installed, owns the same table, and does not know about us. A
-            // custom curve it overwrote would otherwise stay overwritten until the user noticed the
-            // noise and pressed Apply again.
+            // Fan curve. Re-applied for the same reason as the charge limit above, and one more
+            // that is specific to fans: anything else that owns the same duty tables - MSI Center M
+            // while it was installed, ClawTweaks, Intel's thermal stack - does not know about us. A
+            // custom curve one of them overwrote would otherwise stay overwritten until the user
+            // noticed the noise.
             //
-            // Auto is re-applied too, not skipped as a no-op. "Auto" here means MSI's factory
-            // table, and if something else has since written a different one, putting it back is
-            // exactly what the user asked for when they chose it.
+            // Auto is applied too, not skipped as a no-op. "Auto" here means MSI's factory table
+            // AND the control flag cleared, so if something else has written a different table or
+            // taken the fans, putting it back is exactly what the user asked for.
+            //
+            // First run picks Auto rather than writing nothing. The fans are the one feature where
+            // "leave whatever is there" can be actively wrong: an install inherits whatever curve
+            // and control flag the last owner left behind, and on this device that was a custom
+            // table the user could no longer see or change.
             if (hardware.Fan.Available)
             {
                 int selection = settings.GetInt(SettingsKeys.FanProfile, -1);
-                if (selection >= 0)
-                {
-                    bool custom = selection == FeatureDispatcher.FanCustom;
-                    var profile = custom ? fans.Load(Log.Warn) : FanProfile.Factory();
 
-                    var result = hardware.Fan.Apply(profile, custom);
-                    Log.Info(result.Ok
-                        ? $"Re-applied fan profile '{profile.Name}'; "
-                          + (custom ? "fans follow this table." : "fans left to the firmware.")
-                        : $"Could not re-apply the fan profile: {result.Error}");
+                bool firstRun = selection < 0;
+                if (firstRun)
+                {
+                    selection = FeatureDispatcher.FanAuto;
+                    settings.SetInt(SettingsKeys.FanProfile, selection);
                 }
+
+                bool custom = selection == FeatureDispatcher.FanCustom;
+                var profile = custom ? fans.Load(Log.Warn) : FanProfile.Factory();
+
+                var result = hardware.Fan.Apply(profile, custom);
+                Log.Info(result.Ok
+                    ? (firstRun ? "First run: applied " : "Re-applied ")
+                      + $"fan profile '{profile.Name}'; "
+                      + (custom ? "fans follow this table." : "fans left to the firmware.")
+                    : $"Could not apply the fan profile: {result.Error}");
             }
 
             // CPU boost is only re-applied once the user has actually chosen a value. Writing a

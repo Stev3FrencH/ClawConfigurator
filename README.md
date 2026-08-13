@@ -187,6 +187,15 @@ what it does to the scheduled task and how it puts it back.
 
 Logs land at `%LOCALAPPDATA%\Packages\<package family>\LocalCache\McenterLite\helper.log`.
 
+**What a fresh install changes.** Almost nothing: the widget reads your current power limits, charge
+limit and controller mode off the hardware and leaves them alone. Two exceptions, both applied once
+and then yours to change:
+
+| | First run applies | Why not "leave it alone" |
+|---|---|---|
+| Fans | **Auto** | An install otherwise inherits whatever curve and control flag the last owner left behind — including one you can no longer see or change |
+| Lighting | **profile 1**, seeded as Purple | The controller keeps lighting in RAM and forgets it on a power cycle, so writing nothing leaves the LEDs on a firmware default while the card claims something else |
+
 ### Uninstalling
 
 **Order matters, and it is the opposite of what you would guess.** Run the helper's `--uninstall`
@@ -236,6 +245,10 @@ What the restore puts back — chosen values, not whatever happened to be there 
 | CPU boost | On |
 | OS power mode | Balanced |
 | Lighting | **left alone** — it lives in the controller's RAM and a power cycle clears it anyway |
+
+After `--restore` the saved selections are gone, so the next helper start looks like a fresh install
+and applies the first-run defaults above — including the lighting profile. "Leaves the lights alone"
+is true at the moment of the restore, not forever.
 
 This only applies to the MSI Claw 8 EX AI+ (see [Scope](#scope)) — on any other device the
 hardware-specific cards stay hidden, and only CPU Boost and OS Power Mode do anything.
