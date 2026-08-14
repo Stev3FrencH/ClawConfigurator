@@ -283,11 +283,23 @@ namespace McenterLite.Helper
                 Log.Info($"Fan profile: {fans.Directory}");
             }
 
+            // Seeded like the other editable files. Defaults to doing nothing: the button did
+            // nothing before this existed, and a fresh install quietly acquiring a button that
+            // changes fan curves would be a surprise rather than a feature.
+            var buttonActions = new ButtonActionStore(Path.Combine(dataDirectory, "Button"));
+            buttonActions.EnsureSeeded(Log.Info);
+            Log.Info($"Button action: {buttonActions.Directory}");
+
             var dispatcher = new FeatureDispatcher(hardware, settings, lighting, fans);
 
             // Apply persisted settings BEFORE accepting connections, so the widget's first
             // snapshot describes a device already in its intended state.
             StartupApplier.ApplyAll(hardware, settings, lighting, fans);
+
+            // The hardware button. Independent of the widget - it works whether or not the Game Bar
+            // is open, which is most of its value.
+            using var button = new ButtonListener(hardware, dispatcher, buttonActions, lighting);
+            button.Start();
 
             using var server = new PipeServer(dispatcher.Handle);
 
