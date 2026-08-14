@@ -321,6 +321,38 @@ which profile is running from the firmware itself and re-reads it every few seco
 is open, so if anything ever does take the fans back, the card changes to **Auto** rather than going
 on claiming your curve.
 
+### The hardware button
+
+The MSI button appeared to die with MSI Center M. **It didn't.** It raises a firmware event and does
+nothing else — it reports, and leaves the decision to software. MSI Center M was the only thing
+subscribed, so removing it left the event firing into an empty room.
+
+Put one action name in the file, edit and press — it is read at the moment of the press:
+
+```
+%LOCALAPPDATA%\Packages\McenterLite_xq4frxrkckec6\LocalCache\McenterLite\Button\Button.txt
+```
+
+| | |
+|---|---|
+| `none` | Do nothing. **The default** — a fresh install gains no new behaviour. |
+| `rtss-overlay` | Toggle RivaTuner Statistics Server's on-screen display. |
+| `fan-profile` | Cycle the fan profile: Auto, custom, Auto… |
+| `performance-mode` | Cycle the performance mode: Endurance, AI Engine, Manual. |
+| `lighting` | Cycle the lighting: off, then each profile in turn. |
+| `controller-mode` | Toggle the controller between Gamepad and Desktop. |
+
+Every press is logged whatever the outcome, so "nothing happened" is diagnosable — look for lines
+starting `Button` in `helper.log` two folders up. A press that never reaches the log is a different
+problem from one that reaches it and fails.
+
+> **`rtss-overlay` does not send RTSS's hotkey**, though RTSS has one and doing so would have been
+> simpler. It calls the same function RTSS's own hotkey handler calls, so nothing reaches the input
+> layer. A synthesised keystroke goes into the *system* input queue, where the foreground game
+> receives it too, flagged as injected — and this button exists to be pressed while games are
+> running, so that exposure would be constant rather than occasional. For the same reason there is
+> deliberately no "send a hotkey" action.
+
 ## Running
 
 For development and discovery, without installing the packaged app — against simulated hardware,

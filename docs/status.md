@@ -85,6 +85,13 @@ this machine no longer has.
 verified on device:
 
 0. **Found and fixed the TDP gate** — the headline item, below.
+0. **Gave the hardware button something to do.** It was never broken: it raises `MSI_Event`
+   `0x220029` once per press and leaves the decision to software, and MSI Center M was simply the
+   only subscriber. `Button/Button.txt` picks the action, in the same hand-edited shape as the fan
+   and lighting profiles, defaulting to `none`. **The first thing found here that MSI Center M added
+   rather than mediated**, and the only feature that cannot conflict with the firmware — filling a
+   vacancy rather than taking something over. Verified on device 2026-08-14 toggling the RTSS
+   overlay.
 
 1. **Rewrote the uninstall/restore flow**, which verification found could not work at all —
    `--uninstall` tore down without restoring anything, and the documented order deleted the helper
