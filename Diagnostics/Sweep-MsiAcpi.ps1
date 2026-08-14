@@ -75,7 +75,12 @@ function Test-Elevated {
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-if (-not (Test-Elevated)) { throw 'Run this elevated. root\wmi vendor classes are not readable otherwise.' }
+# Capture only. -Diff reads the JSON files on disk and never touches the hardware, so demanding
+# elevation for it was a real obstacle rather than a safety measure - it blocked reading a result
+# that had already been captured.
+if (-not $Diff -and -not (Test-Elevated)) {
+    throw 'Run this elevated. root\wmi vendor classes are not readable otherwise.'
+}
 
 # ── Diff mode ───────────────────────────────────────────────────────────────
 

@@ -1,14 +1,66 @@
-# Status — 2026-08-12
+# Status — 2026-08-13
 
 A snapshot for picking this back up: what's built, what's confirmed on the real Claw, and exactly
 what to do next. See [`hardware-notes.md`](hardware-notes.md) for gate-by-gate detail, and its
 [What's next](hardware-notes.md#whats-next--fan-charge-limit-and-rgb) section for the technical
 notes behind the roadmap below.
 
+> ## Next session: cut the Release build
+>
+> On branch `release/rc1`, currently at **0.2.0.32, Debug**. Everything in this project has ever
+> only been built and run in **Debug** — no Release configuration build exists.
+>
+> **Expect it not to work first time.** A UWP C# project builds Release through the **.NET Native**
+> toolchain rather than CoreCLR: a different compiler and a different runtime, and historically the
+> place where reflection, serialization and marshalling quietly behave differently. This widget
+> round-trips enums over a text pipe; the helper marshals WMI embedded instances and P/Invokes HID.
+>
+> The helper is a separate self-contained .NET 8 publish and is **not** affected — only the widget
+> goes through .NET Native — so a Release-only fault is far more likely in the widget than in the
+> hardware layer. Swap `/p:Configuration=Debug` for `Release` in the usual MSBuild line; the
+> signing, bundling and sideload steps are otherwise identical, and the version still bumps by hand.
+>
+> Verify on device rather than trusting a clean build: the cards, the fans by ear, one power-limit
+> change.
+>
+> ### Then: install and uninstall for other people
+>
+> Queued behind the Release build, not before it. Documentation plus a script, so someone who did
+> not build this can install and remove it.
+>
+> **Certificate: decided 2026-08-13 — ship the self-signed cert with an import step.** This is a
+> hobby build. Export `CN=msi-mcenter-lite` as a **`.cer`, public key only, never the `.pfx`**, and
+> have the script import it into `LocalMachine\TrustedPeople` (needs elevation). The docs must say
+> in words what that means: Windows will trust anything signed by that key, forever.
+>
+> **That keeps the package identity fixed, which is the real win.** MSIX identity is `Name` + a hash
+> of the `Publisher` DN, and `Publisher` must match the certificate subject exactly. Staying
+> self-signed keeps the Package Family Name at `ClawConfigurator_xq4frxrkckec6` — the path holding
+> settings, the deployed helper and the user's profile files. A different certificate would change
+> the DN, change the PFN, and make Windows treat this as a **different app**: no upgrade path, the
+> old task and helper still running, profiles stranded, and every hardcoded path in the README and
+> `Install.ps1` wrong.
+>
+> If it ever outgrows a hobby audience, [Azure Artifact
+> Signing](https://azure.microsoft.com/en-gb/pricing/details/trusted-signing/) is ~$9.99/month,
+> publicly trusted, no hardware token, open to individuals. **Decide that before wide distribution**
+> — switching afterwards means writing and testing a migration.
+>
+> A script also has to cover sideloading being permitted at all, and should state the device gate up
+> front rather than let someone install this on a non-Claw and find an empty widget.
+>
+> The uninstall half is mostly already prose in the README — the counter-intuitive order, the
+> non-zero exit that is not a failure, not opening the Game Bar between the steps, and the profile
+> files that go with `LocalCache`. The script is what makes that not need reading.
+
 ## The headline
 
-**The MSI Center M dependency is gone.** All five hardware features talk to the firmware directly
-and need MSI Center M neither running nor installed:
+**MSI Center M is uninstalled, and everything still works.** Done on 2026-08-13 — the app, its Game
+Bar widget and the SDK, followed by a reboot. All five hardware features probed and re-applied on the
+first boot without it. That claim used to be a design argument; it is now a measurement. See
+[`msi-center-m-after.md`](../Diagnostics/msi-center-m-after.md).
+
+All five talk to the firmware directly and need MSI Center M neither running nor installed:
 
 - **Power limits** via `MSI_ACPI.Set_SlaveBattery` (ACPI-WMI), merged 2026-08-11.
 - **Controller mode** via the controller's vendor HID channel, merged 2026-08-12.
@@ -16,13 +68,87 @@ and need MSI Center M neither running nor installed:
 - **RGB lighting** via the vendor HID profile block, merged 2026-08-12.
 - **Fan control** via `MSI_ACPI.Set_Fan` (ACPI-WMI), 2026-08-12.
 
-**Every feature on the roadmap is now built.** What remains is not new features but removal: the
-cleanup that waits on MSI Center M actually being uninstalled — deleting `RegistryTdpProvider` and
-`RegistryHwMouseProvider`, which are mirrors rather than real paths.
+**Every feature on the roadmap is built, and the MSI Center M scaffolding is gone.**
+`RegistryTdpProvider`, `RegistryHwMouseProvider`, `TdpBackendKind.RegistryMirror` and
+`IsMsiCenterRunning` were all deleted on 2026-08-13, once the uninstall proved the firmware paths
+stand on their own. There is one backend per feature now, and no fallback that depends on software
+this machine no longer has.
+
+> **`PerfMode` went with them and came straight back.** Deleting it was the one mistake in that
+> sweep, and it took a shutdown to surface — see [The TDP regression](#the-tdp-regression-and-what-it-cost)
+> below. The performance mode is not MSI Center M's idea; it is in the firmware, and it gates
+> whether the power limits mean anything.
 
 ## Current build
 
-**0.2.0.24, Debug.** The fan-control flag on the telemetry tick. 0.2.0.23 read the flag from the
+**0.2.0.33, Debug**, on branch `release/rc1`. Since 0.2.0.24 this branch has done five things, all
+verified on device:
+
+0. **Found and fixed the TDP gate** — the headline item, below.
+0. **Gave the hardware button something to do.** It was never broken: it raises `MSI_Event`
+   `0x220029` once per press and leaves the decision to software, and MSI Center M was simply the
+   only subscriber. `Button/Button.txt` picks the action, in the same hand-edited shape as the fan
+   and lighting profiles, defaulting to `none`. **The first thing found here that MSI Center M added
+   rather than mediated**, and the only feature that cannot conflict with the firmware — filling a
+   vacancy rather than taking something over. Verified on device 2026-08-14 toggling the RTSS
+   overlay.
+
+1. **Rewrote the uninstall/restore flow**, which verification found could not work at all —
+   `--uninstall` tore down without restoring anything, and the documented order deleted the helper
+   and its settings *before* the step meant to use them. It now restores `FeatureDefaults` — chosen
+   values (17/19 W, charge 100%, fans Auto, controller Gamepad, boost on, Balanced), not replayed
+   captures — and clears the saved selections so the restore survives the next start.
+2. **Added `--restore`**, because the restore was otherwise verifiable only by performing an
+   uninstall. The pipe serves one client and the widget never releases it, so `Test-Helper.ps1`
+   cannot reach the helper once the Game Bar has been opened.
+3. **Deleted the MSI Center M scaffolding** — see the headline above.
+4. **First-run defaults**: a fresh install applies fan **Auto** and lighting **profile 1**, and
+   nothing else. Power limits, charge limit and controller mode are read off the hardware and left
+   alone.
+
+A full uninstall → remove → reinstall cycle was run on 2026-08-13 and both halves behaved: no
+`Re-applied` lines on the fresh install, two `First run:` lines, and profile files re-seeded.
+
+> **A first-run controller-mode write was added and removed the same day.** The device already boots
+> as Gamepad, and the write needed a marker key and a once-only gate purely to avoid undoing the
+> physical MSI button — machinery whose whole job was containing the feature it enabled. Uninstall
+> still sets Gamepad; that one earns its exception.
+
+### The TDP regression, and what it cost
+
+**Symptom, 2026-08-13:** after the first full shutdown following MSI Center M's uninstall, the widget
+wrote 15/17 W, `Get_SlaveBattery|1` read back 15/17, the helper logged a confirmed write — and the
+CPU drew 37 W bursts settling to 25 W. Every layer reported success.
+
+**Cause:** `Get_AP`/`Set_AP` sub-function 0, byte 3, low nibble is the performance mode, and it gates
+the limits. `6` = User Scenario honours them; `2` = Endurance and `1` = AI Engine do not. The EC holds
+it across warm reboots but resets to AI Engine on a true power cycle, and **MSI Center M's service had
+been restoring it at every boot** — which is why this project never had to write it and never noticed
+the dependency. Under AI Engine the same register carries `19 25` = 25/37, so the CPU was not ignoring
+a limit; it was obeying a different one.
+
+**Fixed in 0.2.0.33**, and verified by doing the thing that broke it: MSI Center M uninstalled, full
+shutdown, cold boot. The log shows `Re-applied PL1=13W PL2=15W.` then `Re-applied performance mode
+UserScenario.`, `--perf-gate` reads `0xC6`, and live package power reads 15 W against a 25 W
+automatic floor.
+
+**Three things this episode is worth remembering for:**
+
+- **It is the fan-control flag, exactly.** A value written faithfully into a register nothing was
+  reading, with a separate enable byte elsewhere deciding whether it counted. Second time. When a
+  write reads back perfectly and the device does not change, **look for the gate** before doubting
+  the register.
+- **The deletion that caused it cited the right evidence for the wrong claim.** `PerfMode` was
+  removed because `WmiTdpProvider.TryReadMode` "could only ever answer yes" — true, and the reason
+  was that it was hard-coded, not that the hardware was ungated. A constant implementation is
+  evidence about the code, never about the device.
+- **The removal commit contained the answer.** `32c9021` noted the registry backend "forces MSI into
+  User Scenario mode itself before writing a limit." The gate was named, in the commit that deleted
+  the concept, and walked past twice.
+
+### Earlier on this branch — 0.2.0.24
+
+**The fan-control flag on the telemetry tick.** 0.2.0.23 read the flag from the
 firmware — the right source — but only once, in the connect-time snapshot, so an open widget could
 not notice anything else moving the fans. The helper now re-reads it while the widget is visible and
 pushes `FanProfile` as an event, like the power and controller modes.
@@ -85,7 +211,7 @@ powershell -ExecutionPolicy Bypass -File .\Diagnostics\Start-FakeHelper.ps1
 > **neither message mentions the helper**. Learned the slow way on 2026-08-12, after `0x80073CF3`
 > was first misread as a missing framework dependency.
 >
-> Killing the process is not enough either: the `McenterLiteHelper` scheduled task owns its
+> Killing the process is not enough either: the `ClawConfiguratorHelper` scheduled task owns its
 > lifetime and can restart it mid-install. `Install.ps1` now stops *and disables* the task, then
 > re-enables it in a `finally`. Same supervisor trap as `MSI_Center_M_Server`, on our own code.
 
@@ -256,28 +382,64 @@ Still open, and both about *persistence* rather than mechanism:
 > reading zero. The app warns and does not refuse — a deliberate decision, matching what MSI
 > Center M itself permits.
 
-## Cleanup waiting on the uninstall
+## Cleanup — no longer waiting, as of 2026-08-13
 
-- **`RegistryTdpProvider` and `RegistryHwMouseProvider`** are both inert and both provably weaker
-  than the firmware paths that replaced them. Delete once MSI Center M is uninstalled and both
-  firmware paths are confirmed without it. That is also what finally removes `PerfMode`,
-  `TdpBackendKind.RegistryMirror` and `IsMsiCenterRunning`.
+- [x] ~~**`RegistryTdpProvider` and `RegistryHwMouseProvider`**~~ **Deleted 2026-08-13**, with
+  `PerfMode`, `TdpBackendKind.RegistryMirror` and `IsMsiCenterRunning`. Both were inert and both
+  provably weaker than the firmware paths that replaced them — the HID one especially, since the
+  registry value it read was a mirror MSI Center M maintained *by watching that same channel*, a
+  copy of the answer rather than a second way to get it. The condition was met by the uninstall:
+  the helper chose `Wmi` and `firmware (vendor HID)` on the first boot without MSI Center M.
+
+  Two of the removed pieces were never load-bearing at all, which only became visible on the way
+  out. `PerfMode` modelled MSI's Endurance/User Scenario/AI Engine triple, but the WMI backend is
+  not gated by it — its implementation answered `UserScenario` unconditionally and no-opped the
+  write, so the interface method had no honest implementation left. `MsiCenterRunning` was carried
+  in every snapshot and **read by no widget build, ever**.
+
+  Ordinals **13** (`PerfMode`) and **80** (`MsiCenterRunning`) are retired and must never be
+  reused, along with `TdpBackendKind` value **2**. `RetiredOrdinalTests` now pins all of them,
+  replacing the `PerfModeTests` that went with the enum.
 - **Automate the package version bump.** Worth doing *before* three features' worth of install
   cycles.
 
 ## Still unverified
 
-- **That `MSI_ACPI` survives an actual MSI Center M uninstall.** Everything so far was proven with
-  its stack *stopped*, which is not the same thing. **This is the assumption the entire plan rests
-  on**, and the cheapest way to settle it is to uninstall MSI Center M on a spare image, or accept
-  the risk and keep the registry fallbacks until the real uninstall happens.
+- [x] ~~**That `MSI_ACPI` survives an actual MSI Center M uninstall.**~~ **Settled 2026-08-13 by
+  doing it.** MSI Center M, the MSI Quick Settings widget and the SDK were uninstalled and the
+  machine rebooted; `MSI_ACPI` still carries all 38 methods, and the helper's own elevated start
+  probed and re-applied every feature on a machine with none of it installed. **Both registry
+  mirrors lost to the firmware paths** — `Power limits: Wmi`, `Controller mode: firmware (vendor
+  HID)`. Full before/after in [`msi-center-m-after.md`](../Diagnostics/msi-center-m-after.md).
 - **That desktop mode works on the UAC secure desktop.** This is the whole premise of the firmware
   route over software cursor injection, and it has never been tested. Trigger any elevation prompt
   and try to move the cursor.
-- **Uninstall/restore flow**, never tested end-to-end. Lower stakes than it sounds while MSI Center
-  M is still installed, but that changes when it is not: once MSI Center M is gone, this app is the
-  only way back to a default. Controller mode is deliberately never restored — the physical button
-  owns that state as much as we do.
+- **Uninstall/restore flow.** Rewritten 2026-08-13 after verification found it could not work:
+  `--uninstall` tore down without restoring anything, and the documented order deleted the helper
+  and its settings before the step that was supposed to use them. It now restores
+  `FeatureDefaults` — chosen values, not replayed captures — with the order reversed in the README.
+  Controller mode **is** now restored, reversing the old "the button owns it" rule for the uninstall
+  case only.
+
+  **The restore half is verified on device (0.2.0.28).** All six values written and read back, the
+  saved settings cleared, and — the actual proof — **no `Re-applied` lines at all** on the next
+  helper start. Two bugs were caught by running it rather than by reading it:
+
+  1. *The restore did not survive.* It wrote all six defaults correctly and six seconds later
+     `StartupApplier` read `settings.json` and put the old values straight back, having reported
+     success on the way. Writing the hardware was only half of putting the machine back.
+  2. *A card lied.* Clearing `LightingProfile` left the Lighting card reading **Off** while the LEDs
+     still ran 'Wave'. Lighting is the one feature whose card cannot read back from the hardware, so
+     that setting is the only record of what is lit — and the restore deliberately does not change
+     the lights. A record cleared for something that was never touched.
+
+  **Still to run:** the real `--uninstall`, which is the same restore plus the teardown.
+
+  > **The pipe serves one client and the widget never releases it.** `maxNumberOfServerInstances: 1`,
+  > and `"Widget disconnected."` appears **zero** times in a full day of logs — Windows suspends the
+  > widget with its handle open. So `Test-Helper.ps1` cannot connect on any machine where the Game
+  > Bar has been opened since the helper started, which is what `--restore` exists to work around.
+  > Fine for the product, since there is one widget; a real limit on the diagnostic script.
 
 ## Widget placement in the Game Bar — answered
 

@@ -18,8 +18,14 @@ namespace McenterLite.Helper.Deployment
     /// </summary>
     internal static class ScheduledTaskRegistrar
     {
-        public const string TaskFolder = "McenterLite";
-        public const string TaskName = "McenterLiteHelper";
+        // Renamed with the app on 2026-08-14. This one is visible: anyone opening Task Scheduler to
+        // work out what is running elevated at logon should find a name matching the app they
+        // installed.
+        //
+        // An install of the OLD name leaves \McenterLite\McenterLiteHelper behind, because Unregister
+        // deletes by name and the old package no longer knows this one. Remove the old app first.
+        public const string TaskFolder = "ClawConfigurator";
+        public const string TaskName = "ClawConfiguratorHelper";
         public const string FullTaskPath = @"\" + TaskFolder + @"\" + TaskName;
 
         /// <summary>

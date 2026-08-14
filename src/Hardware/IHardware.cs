@@ -62,19 +62,26 @@ namespace McenterLite.Hardware
         /// </summary>
         OpResult Apply(int pl1, int pl2);
 
-        /// <summary>MSI's current performance mode, which gates whether the limits are honoured.</summary>
+        /// <summary>
+        /// The performance mode, which decides whether <see cref="Apply"/> means anything.
+        /// </summary>
+        /// <remarks>
+        /// <b>Removed and restored on 2026-08-13.</b> These were deleted on the belief that the WMI
+        /// path was ungated, and the implementation that "proved" it answered
+        /// <see cref="PerfMode.UserScenario"/> unconditionally and no-opped the write. It was not
+        /// describing the hardware; it was describing the assumption. The mode is real, it is in the
+        /// firmware rather than in MSI Center M, and a device sitting in Endurance or AI Engine
+        /// accepts a power limit, reads it back unchanged, and runs its own numbers instead.
+        /// </remarks>
         bool TryReadMode(out PerfMode mode);
 
         /// <summary>
-        /// Switches MSI's performance mode.
+        /// Switches the performance mode.
         /// </summary>
         /// <remarks>
-        /// The widget has no control for this any more - it only ever wants
-        /// <see cref="PerfMode.UserScenario"/>, the one mode that honours a manual limit, and
-        /// <see cref="Apply"/> calls this itself when the device is in a different mode. Kept as
-        /// its own method rather than folded into <see cref="Apply"/> because the two write
-        /// different registry values and the registry-mirror implementation needs to call it from
-        /// more than one place.
+        /// Kept separate from <see cref="Apply"/> rather than folded into it. Forcing the mode on
+        /// every limit write would silently overrule a user who chose an automatic mode on purpose -
+        /// and the mode is now a control of its own, so that choice is theirs to make and see.
         /// </remarks>
         OpResult ApplyMode(PerfMode mode);
     }
@@ -222,7 +229,9 @@ namespace McenterLite.Hardware
         IPowerProvider Power { get; }
         IIgclProvider Igcl { get; }
 
-        /// <summary>True when MSI Center M is running and may be contending for the EC or HID.</summary>
-        bool IsMsiCenterRunning();
+        // IsMsiCenterRunning is gone as of 2026-08-13. It reported whether MSI Center M's servers
+        // were up so the widget could warn about contention for the EC and HID. MSI Center M is
+        // uninstalled, no feature depends on it, and nothing ever consumed the answer - the widget
+        // never referenced it in any build.
     }
 }

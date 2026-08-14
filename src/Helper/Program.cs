@@ -35,6 +35,18 @@ namespace McenterLite.Helper
         /// Prevents two builds from driving the same embedded controller at once - the failure
         /// this guards is not a corrupted setting but a hard reset.
         /// </summary>
+        /// <remarks>
+        /// <b>Deliberately NOT renamed when the app became Claw Configurator on 2026-08-14, and this
+        /// is load-bearing.</b> That rename changed the package identity, the scheduled task and the
+        /// pipe — so an install of the old name and one of the new no longer collide anywhere else.
+        /// This mutex is the only thing left that stops both helpers running at once and writing the
+        /// same EC, which is precisely the failure above.
+        ///
+        /// <para>
+        /// It looks like an inconsistency and it is not. Renaming it to match would remove the last
+        /// interlock during exactly the changeover that needs one.
+        /// </para>
+        /// </remarks>
         private const string SingleInstanceMutex = @"Global\McenterLiteHelper_SingleInstance";
 
         private static readonly CancellationTokenSource Shutdown = new CancellationTokenSource();
@@ -51,7 +63,8 @@ namespace McenterLite.Helper
             try
             {
                 if (options.Setup) return RunSetupRole();
-                if (options.Uninstall) return RunUninstallRole();
+                if (options.Uninstall) return RunUninstallRole(options);
+                if (options.Restore) return RunRestoreRole(options);
 
                 // Dev and test runs skip deployment entirely and serve in place, so the whole
                 // IPC and UI stack can be exercised without touching persistence or elevation.
@@ -72,6 +85,7 @@ namespace McenterLite.Helper
         {
             if (options.Setup) return "setup";
             if (options.Uninstall) return "uninstall";
+            if (options.Restore) return "restore";
             if (options.FakeHardware || options.NoDeploy) return "service(dev)";
             return HelperDeployment.IsRunningFromDeployedLocation() ? "service" : "bootstrap";
         }
@@ -132,7 +146,25 @@ namespace McenterLite.Helper
             return HelperDeployment.RunSetup() ? 0 : 1;
         }
 
-        private static int RunUninstallRole()
+        /// <summary>
+        /// Puts the machine back to <see cref="FeatureDefaults"/>, then removes the task and the
+        /// deployed copy.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>The restore is the point of this role, and until 2026-08-13 it did not happen.</b>
+        /// This called <c>RunTeardown</c> and nothing else, while the README promised it "restores
+        /// captured system values". The restore existed, but the only way to reach it was the
+        /// <c>PrepareForUninstall</c> pipe message, which nothing but the test script ever sent.
+        /// </para>
+        /// <para>
+        /// <b>Run this BEFORE removing the app, not after.</b> The deployed helper and
+        /// <c>settings.json</c> both live in the package's LocalCache, so removing the app deletes
+        /// the executable this role needs and every setting it would read. The README used to
+        /// document the opposite order, which cannot work.
+        /// </para>
+        /// </remarks>
+        private static int RunUninstallRole(CommandLineOptions options)
         {
             if (!Elevation.IsElevated())
             {
@@ -140,7 +172,71 @@ namespace McenterLite.Helper
                 return exitCode ?? 3;
             }
 
-            return HelperDeployment.RunTeardown() ? 0 : 1;
+            return HelperDeployment.RunTeardown(() => RestoreDefaults(options)) ? 0 : 1;
+        }
+
+        /// <summary>
+        /// Applies every default and stops, leaving the app installed. The uninstall's restore,
+        /// runnable on its own.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>Exists because the restore was otherwise untestable.</b> The only other way to reach
+        /// it without uninstalling is the <c>PrepareForUninstall</c> pipe message, and the pipe is
+        /// <c>maxNumberOfServerInstances: 1</c> — the widget connects on first show and never
+        /// disconnects, so on any machine where the Game Bar has been opened since the helper
+        /// started, no second client can connect at all. A flow this consequential should not be
+        /// verifiable only by performing it.
+        /// </para>
+        /// <para>
+        /// Unlike <c>--uninstall</c> this does not stop the service first, so the widget should be
+        /// closed before running it — not for safety, since the service writes only when commanded,
+        /// but so the card values on screen are not left disagreeing with the device.
+        /// </para>
+        /// </remarks>
+        private static int RunRestoreRole(CommandLineOptions options)
+        {
+            if (!Elevation.IsElevated())
+            {
+                var exitCode = Elevation.RelaunchElevated("--restore");
+                return exitCode ?? 3;
+            }
+
+            RestoreDefaults(options);
+            return 0;
+        }
+
+        /// <summary>
+        /// Applies every default during uninstall, reporting problems rather than throwing.
+        /// </summary>
+        /// <remarks>
+        /// A failed restore must not abort the teardown. Leaving a scheduled task and a deployed
+        /// helper behind because one hardware write failed is strictly worse than an un-restored
+        /// setting the user can still change by hand - and a task pointing at a deleted executable
+        /// is exactly the debris MSI Center M's own uninstaller left on this machine.
+        /// </remarks>
+        private static void RestoreDefaults(CommandLineOptions options)
+        {
+            try
+            {
+                var hardware = BuildHardware(options);
+                var problems = SettingsRestorer.RestoreAll(hardware, Log.Info);
+
+                Log.Info(problems.Count == 0
+                    ? "Restored every feature to its default."
+                    : "Some values could not be restored: " + string.Join("; ", problems));
+
+                // Writing the hardware is only half of it. The saved choices have to go too, or
+                // the next helper start reads them and re-applies everything straight back over
+                // the restore - measured on device, six seconds after a successful one.
+                var settings = new SettingsStore(AppPaths.ResolveDataDirectory());
+                settings.Load();
+                settings.ClearFeatureSettings();
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Could not restore defaults", ex);
+            }
         }
 
         // ── Service ─────────────────────────────────────────────────────────────
@@ -199,11 +295,23 @@ namespace McenterLite.Helper
                 Log.Info($"Fan profile: {fans.Directory}");
             }
 
+            // Seeded like the other editable files. Defaults to doing nothing: the button did
+            // nothing before this existed, and a fresh install quietly acquiring a button that
+            // changes fan curves would be a surprise rather than a feature.
+            var buttonActions = new ButtonActionStore(Path.Combine(dataDirectory, "Button"));
+            buttonActions.EnsureSeeded(Log.Info);
+            Log.Info($"Button action: {buttonActions.Directory}");
+
             var dispatcher = new FeatureDispatcher(hardware, settings, lighting, fans);
 
             // Apply persisted settings BEFORE accepting connections, so the widget's first
             // snapshot describes a device already in its intended state.
             StartupApplier.ApplyAll(hardware, settings, lighting, fans);
+
+            // The hardware button. Independent of the widget - it works whether or not the Game Bar
+            // is open, which is most of its value.
+            using var button = new ButtonListener(hardware, dispatcher, buttonActions, lighting);
+            button.Start();
 
             using var server = new PipeServer(dispatcher.Handle);
 
@@ -253,10 +361,11 @@ namespace McenterLite.Helper
                 ? $"Power limits: {hardware.Tdp.Backend}."
                 : $"Power limits unavailable: {hardware.Tdp.UnavailableReason}");
 
-            // Which backend won matters more than it looks. Both work while MSI Center M is
-            // installed, so a silent fall back to the registry mirror is invisible until MSI
-            // Center M is uninstalled - at which point controller mode stops working and nothing
-            // in the log says why.
+            // There is one backend now. This line used to name which of two had won, because a
+            // silent fall back to the registry mirror was invisible until MSI Center M went - at
+            // which point controller mode stopped working and nothing in the log said why. The
+            // mirror is deleted; the name is kept because "firmware (vendor HID)" in the log is
+            // still what distinguishes a working probe from an unavailable one.
             Log.Info(hardware.HwMouse.Available
                 ? $"Controller mode: {DescribeHwMouseBackend(hardware.HwMouse)}."
                 : $"Controller mode unavailable: {hardware.HwMouse.UnavailableReason}");
@@ -281,7 +390,6 @@ namespace McenterLite.Helper
         private static string DescribeHwMouseBackend(IHwMouseProvider provider) => provider switch
         {
             McenterLite.Hardware.Windows.HidHwMouseProvider => "firmware (vendor HID)",
-            McenterLite.Hardware.Windows.RegistryHwMouseProvider => "MSI Center registry mirror",
             _ => provider.GetType().Name,
         };
 
@@ -413,6 +521,27 @@ namespace McenterLite.Helper
                     }
                 }
 
+                // The performance mode, on the same slower beat as the fan flag below and for the
+                // same reason. It is not ours alone: the firmware resets it to AI Engine on a power
+                // cycle, and anything else driving this EC can move it. A stale "Manual" on the
+                // card would show sliders that do nothing - the exact failure this feature exists
+                // to make visible.
+                if (hardware.Tdp.Available && ticksSinceFanRead + 1 >= FanTelemetryEveryNTicks)
+                {
+                    try
+                    {
+                        if (hardware.Tdp.TryReadMode(out var perfMode))
+                        {
+                            server.Send(PipeEnvelope.Event(
+                                Function.PerfMode, PipeEnvelope.FromEnum(perfMode)));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warn($"Performance-mode telemetry read failed: {ex.Message}");
+                    }
+                }
+
                 // The fan-control flag, on a slower beat - see the rate note above.
                 //
                 // Same problem as the controller mode, from a different direction: MSI Center M is
@@ -454,6 +583,12 @@ namespace McenterLite.Helper
         /// <summary>Remove the scheduled task and the deployed copy, then exit.</summary>
         public bool Uninstall { get; private set; }
 
+        /// <summary>
+        /// Apply every default and exit, leaving the app installed. What <c>--uninstall</c> does
+        /// first, on its own, so the restore can be verified without performing an uninstall.
+        /// </summary>
+        public bool Restore { get; private set; }
+
         /// <summary>Serve in place without deploying. For debugging against real hardware.</summary>
         public bool NoDeploy { get; private set; }
 
@@ -469,6 +604,7 @@ namespace McenterLite.Helper
                     case "--fake-hardware": options.FakeHardware = true; break;
                     case "--setup": options.Setup = true; break;
                     case "--uninstall": options.Uninstall = true; break;
+                    case "--restore": options.Restore = true; break;
                     case "--no-deploy": options.NoDeploy = true; break;
                 }
             }
@@ -480,6 +616,16 @@ namespace McenterLite.Helper
     /// <summary>Where the helper keeps its settings, log and heartbeat.</summary>
     internal static class AppPaths
     {
+        /// <summary>
+        /// The folder name under LocalCache, renamed with the app on 2026-08-14.
+        /// </summary>
+        /// <remarks>
+        /// A constant rather than four string literals, which is what it was. Renaming the app was
+        /// free here only because the identity change resets this directory anyway - there is no
+        /// data to migrate, because Windows hands the new identity an empty LocalCache.
+        /// </remarks>
+        private const string DataFolderName = "ClawConfigurator";
+
         /// <summary>
         /// Resolves a writable data directory.
         /// </summary>
@@ -495,14 +641,14 @@ namespace McenterLite.Helper
             {
                 var exeDir = AppContext.BaseDirectory ?? "";
 
-                // Deployed layout: ...\Packages\<PFN>\LocalCache\McenterLite\Helper\
+                // Deployed layout: ...\Packages\<PFN>\LocalCache\ClawConfigurator\Helper\
                 // Settings belong beside it, one level up from the Helper folder.
                 var marker = Path.DirectorySeparatorChar + "LocalCache" + Path.DirectorySeparatorChar;
                 int index = exeDir.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
                 if (index >= 0)
                 {
                     var localCache = exeDir.Substring(0, index + marker.Length);
-                    return Path.Combine(localCache, "McenterLite");
+                    return Path.Combine(localCache, DataFolderName);
                 }
 
                 // Running from inside the package: resolve the package's own LocalCache, so the
@@ -512,19 +658,19 @@ namespace McenterLite.Helper
                 {
                     var packages = Path.Combine(
                         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "Packages", familyName, "LocalCache", "McenterLite");
+                        "Packages", familyName, "LocalCache", DataFolderName);
                     return packages;
                 }
 
                 var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
                 if (!string.IsNullOrEmpty(appData))
-                    return Path.Combine(appData, "McenterLite");
+                    return Path.Combine(appData, DataFolderName);
 
                 return Path.Combine(exeDir, "data");
             }
             catch (Exception)
             {
-                return Path.Combine(Path.GetTempPath(), "McenterLite");
+                return Path.Combine(Path.GetTempPath(), DataFolderName);
             }
         }
     }
@@ -538,6 +684,11 @@ namespace McenterLite.Helper
         {
             // TDP: the EC forgets across sleep and power-source changes, so this is re-applied
             // rather than assumed to have survived.
+            //
+            // LIMITS FIRST, THEN THE MODE - the same order as the fan tables and their control
+            // flag, for the same reason. The mode is what makes the limits take effect, so putting
+            // it first would run the machine on whatever pair the register held from last time for
+            // as long as the two writes take.
             if (hardware.Tdp.Available)
             {
                 int pl1 = settings.GetInt(SettingsKeys.Pl1, -1);
@@ -549,6 +700,23 @@ namespace McenterLite.Helper
                     Log.Info(result.Ok
                         ? $"Re-applied PL1={pl1}W PL2={pl2}W."
                         : $"Could not re-apply power limits: {result.Error}");
+                }
+
+                // The performance mode, and this one is NOT insurance - it is required.
+                //
+                // The EC keeps the mode across a warm reboot but resets to AI Engine on a true
+                // power cycle. MSI Center M's service used to put it back at every boot, so nothing
+                // here ever had to. With MSI Center M uninstalled, the first full shutdown left the
+                // machine on the firmware's automatic 25/37 W pair while the widget went on
+                // reporting the limits it had written - accepted, read back, and ignored.
+                int storedMode = settings.GetInt(SettingsKeys.PerfMode, -1);
+                if (storedMode >= 0 && Enum.IsDefined(typeof(PerfMode), storedMode))
+                {
+                    var mode = (PerfMode)storedMode;
+                    var result = hardware.Tdp.ApplyMode(mode);
+                    Log.Info(result.Ok
+                        ? $"Re-applied performance mode {mode}."
+                        : $"Could not re-apply the performance mode: {result.Error}");
                 }
             }
 
@@ -579,43 +747,82 @@ namespace McenterLite.Helper
             if (hardware.Rgb.Available)
             {
                 int slot = settings.GetInt(SettingsKeys.LightingProfile, -1);
-                if (slot >= LightingProfileStore.OffSlot && slot <= LightingProfileStore.ProfileCount)
-                {
-                    var profile = slot == LightingProfileStore.OffSlot
-                        ? new LightingProfile { Name = "Off", Style = LightingStyle.Off }
-                        : lighting.Load(slot, Log.Warn);
 
-                    var result = hardware.Rgb.Apply(LightingRenderer.Render(profile));
-                    Log.Info(result.Ok
-                        ? $"Re-applied lighting profile {slot} '{profile.Name}'."
-                        : $"Could not re-apply the lighting: {result.Error}");
+                // First run: no choice recorded yet, so pick one rather than leaving the LEDs on
+                // whatever the firmware defaults to while the card claims otherwise. Recorded
+                // immediately, so this is a starting point the user then owns rather than a value
+                // reasserted on every start.
+                bool firstRun = slot < LightingProfileStore.OffSlot || slot > LightingProfileStore.ProfileCount;
+                if (firstRun)
+                {
+                    slot = FeatureDefaults.FirstRunLightingProfile;
+                    settings.SetInt(SettingsKeys.LightingProfile, slot);
                 }
+
+                var profile = slot == LightingProfileStore.OffSlot
+                    ? new LightingProfile { Name = "Off", Style = LightingStyle.Off }
+                    : lighting.Load(slot, Log.Warn);
+
+                var result = hardware.Rgb.Apply(LightingRenderer.Render(profile));
+                Log.Info(result.Ok
+                    ? (firstRun ? "First run: applied " : "Re-applied ")
+                      + $"lighting profile {slot} '{profile.Name}'."
+                    : $"Could not apply the lighting: {result.Error}");
             }
 
-            // Fan curve, only if the user has actually chosen one through this app. Re-applied for
-            // the same reason as the charge limit above, and one more that is specific to fans:
-            // MSI Center M is still installed, owns the same table, and does not know about us. A
-            // custom curve it overwrote would otherwise stay overwritten until the user noticed the
-            // noise and pressed Apply again.
+            // Fan curve. Re-applied for the same reason as the charge limit above, and one more
+            // that is specific to fans: anything else that owns the same duty tables - MSI Center M
+            // while it was installed, ClawTweaks, Intel's thermal stack - does not know about us. A
+            // custom curve one of them overwrote would otherwise stay overwritten until the user
+            // noticed the noise.
             //
-            // Auto is re-applied too, not skipped as a no-op. "Auto" here means MSI's factory
-            // table, and if something else has since written a different one, putting it back is
-            // exactly what the user asked for when they chose it.
+            // Auto is applied too, not skipped as a no-op. "Auto" here means MSI's factory table
+            // AND the control flag cleared, so if something else has written a different table or
+            // taken the fans, putting it back is exactly what the user asked for.
+            //
+            // First run picks Auto rather than writing nothing. The fans are the one feature where
+            // "leave whatever is there" can be actively wrong: an install inherits whatever curve
+            // and control flag the last owner left behind, and on this device that was a custom
+            // table the user could no longer see or change.
             if (hardware.Fan.Available)
             {
                 int selection = settings.GetInt(SettingsKeys.FanProfile, -1);
-                if (selection >= 0)
-                {
-                    bool custom = selection == FeatureDispatcher.FanCustom;
-                    var profile = custom ? fans.Load(Log.Warn) : FanProfile.Factory();
 
-                    var result = hardware.Fan.Apply(profile, custom);
-                    Log.Info(result.Ok
-                        ? $"Re-applied fan profile '{profile.Name}'; "
-                          + (custom ? "fans follow this table." : "fans left to the firmware.")
-                        : $"Could not re-apply the fan profile: {result.Error}");
+                bool firstRun = selection < 0;
+                if (firstRun)
+                {
+                    selection = FeatureDispatcher.FanAuto;
+                    settings.SetInt(SettingsKeys.FanProfile, selection);
                 }
+
+                bool custom = selection == FeatureDispatcher.FanCustom;
+                var profile = custom ? fans.Load(Log.Warn) : FanProfile.Factory();
+
+                var result = hardware.Fan.Apply(profile, custom);
+                Log.Info(result.Ok
+                    ? (firstRun ? "First run: applied " : "Re-applied ")
+                      + $"fan profile '{profile.Name}'; "
+                      + (custom ? "fans follow this table." : "fans left to the firmware.")
+                    : $"Could not apply the fan profile: {result.Error}");
             }
+
+            // Controller mode is deliberately NOT applied here, on first run or ever.
+            //
+            // It was, briefly, on 2026-08-13: a fresh install put the device in Gamepad, gated on a
+            // marker key so it could not repeat and undo the physical MSI button. Removed the same
+            // day, by the same decision that added it. The device already boots as Gamepad and the
+            // firmware and button own the state between them, so the write was asserting something
+            // that was almost always already true - and it came with a marker key, a once-only
+            // gate, and a failure mode of its own purely to avoid fighting the button.
+            //
+            // It also failed on the single occasion it ran, reporting "Switched the controller mode
+            // but could not read it back" at startup timing, while the widget's toggle through the
+            // same Apply worked reliably. That is not why it was removed - one unreproduced flake
+            // is thin evidence - but it is a fair illustration of the cost.
+            //
+            // Uninstall still sets Gamepad. See FeatureDefaults.HwMouseDesktopMode: leaving the
+            // machine in desktop-mouse mode with the app that switched it now gone is a real harm,
+            // where a fresh install inheriting the mode the user was already in is not.
 
             // CPU boost is only re-applied once the user has actually chosen a value. Writing a
             // default here would silently overwrite a system-wide setting we do not own and were

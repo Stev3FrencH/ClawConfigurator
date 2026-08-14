@@ -7,10 +7,10 @@ change them.
 ## Where the files are
 
 ```
-%LOCALAPPDATA%\Packages\McenterLite_xq4frxrkckec6\LocalCache\McenterLite\Lighting
+%LOCALAPPDATA%\Packages\ClawConfigurator_xq4frxrkckec6\LocalCache\ClawConfigurator\Lighting
 ```
 
-`McenterLite_xq4frxrkckec6` is the package family name — a hash of the `Identity` name and publisher
+`ClawConfigurator_xq4frxrkckec6` is the package family name — a hash of the `Identity` name and publisher
 in `src/Package/Package.appxmanifest`, so it is stable across versions and machines. If either has
 been changed, `(Get-AppxPackage McenterLite).PackageFamilyName` prints the real one.
 

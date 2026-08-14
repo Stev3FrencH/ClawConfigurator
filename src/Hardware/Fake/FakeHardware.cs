@@ -64,8 +64,6 @@ namespace McenterLite.Hardware.Fake
         public IFanProvider Fan { get; }
         public IPowerProvider Power { get; }
         public IIgclProvider Igcl { get; }
-
-        public bool IsMsiCenterRunning() => false;
     }
 
     /// <summary>
@@ -160,23 +158,31 @@ namespace McenterLite.Hardware.Fake
             _pl1 = pl1;
             _pl2 = pl2;
 
-            // No mode gate: this models WmiTdpProvider, the default simulated backend (see
-            // FakeHardware's TdpBackend = TdpBackendKind.Wmi above), which writes the EC directly
-            // and is not gated by MSI's Endurance/AI Engine/Manual triple at all.
+            // The write is accepted whatever the mode, exactly as the firmware does - and exactly
+            // as the firmware then ignores it outside UserScenario. Modelling "accepted but not
+            // obeyed" faithfully matters here: a fake that refused the write outside Manual would
+            // be kinder than the hardware and would hide the bug this feature exists to fix.
             return OpResult.Success();
         }
 
-        // Always reports UserScenario / no-ops on write, matching WmiTdpProvider - see its
-        // TryReadMode remarks for why "the one mode that means limits are honoured" is reported
-        // unconditionally rather than tracking a real mode.
         public bool TryReadMode(out PerfMode mode)
         {
-            mode = Available ? PerfMode.UserScenario : PerfMode.Unknown;
+            mode = Available ? _mode : PerfMode.Unknown;
             return Available;
         }
 
-        public OpResult ApplyMode(PerfMode mode) =>
-            Available ? OpResult.Success() : OpResult.Unavailable(UnavailableReason);
+        public OpResult ApplyMode(PerfMode mode)
+        {
+            if (!Available) return OpResult.Unavailable(UnavailableReason);
+            if (mode == PerfMode.Unknown) return OpResult.Fail("There is no performance mode 'Unknown' to switch to.");
+
+            _mode = mode;
+            return OpResult.Success();
+        }
+
+        // Starts in UserScenario so the simulated widget shows its sliders without a first press.
+        // The real device starts wherever the EC left off, which after a cold boot is AiEngine.
+        private PerfMode _mode = PerfMode.UserScenario;
     }
 
     internal sealed class FakeChargeLimit : IChargeLimitProvider

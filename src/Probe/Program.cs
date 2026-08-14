@@ -63,6 +63,9 @@ namespace McenterLite.Probe
                 case "fan": return Commands.Fan.Read(rest);
                 case "set-fan": return Commands.Fan.Set(rest);
                 case "set-fan-control": return Commands.Fan.SetControl(rest);
+                case "watch-events": return Commands.EventWatcher.Run(rest);
+                case "perf-gate": return Commands.PerfGate.Read(rest);
+                case "set-perf-gate": return Commands.PerfGate.Set(rest);
 
                 default:
                     Console.Error.WriteLine($"Unknown command: {args[0]}");
@@ -105,9 +108,23 @@ READ
   --hid-listen [secs]       Listen on the vendor command channel only, with no enumeration
                             polling. Change lighting in MSI Center M during a run to see
                             what, if anything, the device reports back.
+  --watch-events [secs]     Subscribe to MSI_Event and print every firmware notification, with
+                            its MSIEvt code. This is how a hardware button most likely reports
+                            itself - MSI Center M was probably just the subscriber, which would
+                            mean the buttons that stopped working are simply unlistened-to.
+                            Read-only in the strongest sense: subscribing cannot write.
 
   --charge-limit            Read the battery charge limit (MSI_ACPI.Get_AP, byte 5) and dump
                             the whole package, so a change anywhere else is visible.
+  --perf-gate               Read the performance mode: MSI_ACPI.Get_AP sub-function 0, byte 3,
+                            low nibble. THIS GATES THE POWER LIMITS. Measured 2026-08-13 across
+                            MSI Center M's own selector:
+                              6 = User Scenario  manual PL1/PL2 are honoured
+                              2 = Endurance      MSI drives power
+                              1 = AI Engine      MSI drives power
+                            After a full power cycle with MSI Center M uninstalled this reads 1,
+                            and the limits written by --set-power-mode do nothing - the firmware
+                            runs its own 25/37 W pair instead.
   --fan                     Read both fans' duty tables, the fixed temperature breakpoints they
                             are indexed against, and the live tachometers. Two fans, one table
                             each: an idle duty, six curve points, and a ceiling the EC owns.
@@ -143,6 +160,11 @@ WRITE (these change system state)
                             The tables do nothing at all while this reads auto - they store,
                             they read back, and the fans ignore them.
                             e.g.  --set-fan-control custom
+  --set-perf-gate <manual|endurance|ai>
+                            Set the performance mode that gates the power limits; see --perf-gate.
+                            Defaults to 'manual' (User Scenario), the only mode in which PL1/PL2
+                            are honoured. Writes ONLY the low nibble of byte 3, echoing the rest
+                            of the package, and confirms with a separate read.
   --set-charge-limit <20-100>
                             Set the battery charge limit via MSI_ACPI.Set_AP. Echoes back the
                             package it just read with only byte 5 changed, and confirms with a

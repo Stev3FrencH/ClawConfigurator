@@ -100,10 +100,10 @@ are two different claims.
 
 ### Housekeeping that should happen alongside
 
-- **`RegistryTdpProvider` and `RegistryHwMouseProvider` are both inert** while their firmware paths
-  work, and both are provably the weaker option. Delete them once MSI Center M is actually
-  uninstalled and both firmware paths are confirmed on a machine without it. That deletion is also
-  what finally removes `PerfMode`, `TdpBackendKind.RegistryMirror` and `IsMsiCenterRunning`.
+- [x] ~~**`RegistryTdpProvider` and `RegistryHwMouseProvider` are both inert**~~ — **deleted
+  2026-08-13**, with `PerfMode`, `TdpBackendKind.RegistryMirror` and `IsMsiCenterRunning`. MSI
+  Center M was uninstalled and both firmware paths resolved on the first boot without it. See
+  [`status.md`](status.md#cleanup--no-longer-waiting-as-of-2026-08-13).
 - **The package version is bumped by hand** and nothing catches a missed bump. Both documented
   MSBuild overrides are proven not to work with this template. Worth solving *before* three
   features' worth of install cycles, not after.
@@ -177,8 +177,10 @@ enumerable without MSI Center**. Sibling classes: `MSI_AP`, `MSI_CPU`, `MSI_Devi
 > still stands.
 >
 > **Consequence for `IsMsiCenterRunning()`:** it must detect the *server*, not the window. Matching
-> the UWP process would report "MSI Center is not running" on a machine where everything works, and
-> the widget would show a warning the hardware contradicts.
+> the UWP process would report "MSI Center is not running" on a machine where everything works.
+> (The `IHardware` member was removed on 2026-08-13 — no widget build ever read it. The
+> `DeviceDetection` static survives for the probe's `--device`, where the useful question is now the
+> reverse one: has MSI Center M come back?)
 
 ### Registry map
 
@@ -214,6 +216,46 @@ mapping is solid rather than inferred from a single sample:
 
 Verified round-trip: User Scenario → AI Engine → Endurance → User Scenario returns every value to
 its starting number.
+
+#### The mode is in the FIRMWARE too, and it gates the power limits — measured 2026-08-13
+
+**`Get_AP` / `Set_AP` sub-function 0, byte 3, low nibble.** The registry values above are MSI Center
+M's own model; this is the same concept in the EC, and it is the one that decides whether
+`Get_SlaveBattery|1`'s manual PL1/PL2 mean anything.
+
+| Mode | low nibble | Manual PL1/PL2 |
+|---|---|---|
+| **User Scenario** | **6** | **honoured** |
+| Endurance | 2 | ignored — MSI drives power |
+| AI Engine | 1 | ignored — MSI drives power |
+
+High nibble read `C` throughout, so the byte reads `C6` / `C2` / `C1`. Measured by reinstalling MSI
+Center M and sweeping every `Get_*` register across its three modes — byte 3 is the **only**
+non-telemetry byte that tracks the selector. Snapshots: `Diagnostics/acpi-snapshot-msi-*.json`.
+
+> **Note the encoding is its own.** The nibble is 6 / 2 / 1, which is *not* `ShiftMode` (6 / 3 / 2),
+> `Mode` (4 / 3 / 5) or `GamingEvent` (4 / 1 / 2). Only the User Scenario value coincides with
+> `ShiftMode`, and reading that coincidence as the mapping was the first wrong guess made here.
+
+**This is what broke TDP on 2026-08-13.** After the first full power cycle following MSI Center M's
+uninstall, byte 3 read `C1` — AI Engine. The widget wrote 15/17 W, `Get_SlaveBattery|1` read back
+15/17, every layer reported success, and the package still drew 37 W bursts settling to 25 W. It was
+not ignoring a limit: **under AI Engine that same register carries `19 25` = 25/37**, so the firmware
+was obeying its own automatic pair. Same shape as the fan-control flag — a value stored faithfully in
+a register nothing was reading.
+
+**MSI Center M sets this from its service, not its UI.** A sweep taken after reinstalling, without
+ever opening the window, already read `C6`. That is why this project never had to write it, and why
+the dependency stayed invisible: the EC held the byte across every warm reboot, and only a true
+power-down cleared it.
+
+> **Corrected here:** the charge-limit section below calls bytes 3 and 4 "presumed to identify the
+> register" and constant across captures. They were constant only because nothing had power-cycled
+> the EC. Byte 3 is a live mode field. The charge-limit write echoes it unchanged, which is why that
+> feature was never affected — echoing an unexplained byte turned out to be load-bearing rather than
+> merely cautious.
+
+Read it with `--perf-gate`; set it with `--set-perf-gate manual`, which writes only the low nibble.
 
 **Two consequences that matter more than the mapping itself.**
 
@@ -297,9 +339,9 @@ DC pair — 25 W PL1 / 30 W PL2 — on the theory that an 8-inch handheld runnin
 empties itself fast. Confirmed on device that this was never a firmware limit: MSI Center's own UI
 offers the same PL1/PL2 range on battery as on AC, and `WmiTdpProvider` (the preferred TDP
 backend, see the "Confirmed 2026-08-11" section above) writes a single EC register with no AC/DC
-distinction at all. `RegistryTdpProvider`, now only a fallback, writes the same value to both the
-AC and DC registry pairs rather than deriving a lower one — there is nothing left to derive.
-`DeviceCaps.MaxPl1Dc`/`MaxPl2Dc` and `ClampPowerLimitsForBattery` were removed with it.
+distinction at all. `DeviceCaps.MaxPl1Dc`/`MaxPl2Dc` and `ClampPowerLimitsForBattery` were removed
+with the theory. (`RegistryTdpProvider` wrote the same value to both the AC and DC registry pairs
+rather than deriving a lower one; it was deleted entirely on 2026-08-13.)
 
 ### Fan — the EX model is not the model we implemented
 
@@ -1387,9 +1429,23 @@ The button toggles `0x01` ↔ `0x04` only; DirectInput was never observed from i
 a read can disagree with our last write at any moment through no fault of ours. Two consequences,
 both deliberate:
 
-- **Nothing re-applies a stored mode at startup**, and nothing is captured for uninstall restore.
-  We do not own this state, so "putting it back" would mean overwriting whatever the user or the
-  button last chose with a value from an arbitrary earlier moment.
+- **Nothing re-applies a stored mode at startup**, and no mode is stored to re-apply. We do not own
+  this state during normal running, so reasserting it would overwrite whatever the user or the
+  button last chose.
+
+  **One exception, added 2026-08-13: uninstall applies Gamepad.** Leaving the machine in
+  desktop-mouse mode with the app that switched it now gone strands the user in the one state where
+  a handheld does not behave like one. That is not a claim of ownership — it is the last thing this
+  app does before it stops existing.
+
+  A **first-run** write of Gamepad was added and removed the same day. The device already boots as
+  Gamepad, so it asserted what was usually already true, and it needed a marker key and a once-only
+  gate purely to avoid undoing the button on every start. It also failed the single time it ran —
+  `Switched the controller mode but could not read it back`, at startup timing — while the widget's
+  toggle through the same `Apply` worked reliably before and after. **That read-back failure is
+  unexplained and unreproduced**, and worth remembering if it recurs: `Apply` queries on the same
+  handle it switched on, which would be the first thing to suspect if a mode change re-enumerates
+  the device.
 - **The helper pushes the mode on its ~1 Hz telemetry tick** while the widget is visible, so the
   buttons follow the hardware. Without that the widget would show whatever was true at connect
   time and silently disagree with the device after one button press.
@@ -1441,6 +1497,42 @@ any table written. The escape hatch ships **before** any EC write.
 The panic action therefore has a smaller job than planned: one service and one PnP device, not
 three services. `Diagnostics/Get-DeviceReport.ps1` still filters on the old `INTC106A` string and
 only found this by also matching `TFN1` — worth correcting before it misses something.
+
+---
+
+## The hardware button — measured 2026-08-14
+
+**The button was never broken.** It stopped doing anything when MSI Center M was uninstalled because
+MSI Center M was the only thing *listening*. The button raises a firmware event and leaves the
+decision to software; with no subscriber, the event fires into an empty room.
+
+| Fact | Value |
+|---|---|
+| Class | **`MSI_Event`** in `root\wmi`, GUID `{5B3CC38A-40D9-7245-8AE6-1145B751BE3F}` |
+| Kind | Derives `WMIEvent` → `__ExtrinsicEvent` — a real WMI event, not a pollable table |
+| Payload | **`MSIEvt`**, `UInt32` |
+| Button code | **`0x220029`** (2228265) |
+| Source instance | `ACPI\PNP0C14\0_0` — Windows' own ACPI-WMI mapper, the same `_WDG` bridge as `MSI_ACPI` |
+| Repeatability | Six presses, six events, identical code every time |
+
+Read it with `--watch-events`. Subscribing is the strongest kind of read-only: it receives and
+cannot write.
+
+**Why this is the good case for repurposing.** Every other feature in this project had to take
+something over from MSI Center M and hold it. This one is a vacant slot: nothing else is subscribed,
+nothing has to be wrested away, and a subscriber cannot conflict with a firmware behaviour the way a
+register write can. It is also the first thing found here that MSI Center M *added* rather than
+mediated.
+
+### Still open
+
+- **Press versus press-and-release.** Six events for "a few presses" is consistent with one event per
+  press, but the exact number of presses was not recorded. Worth pinning before anything acts on it,
+  since a repurposed button that fires twice per press would be visibly wrong.
+- **Whether other codes exist on this channel.** Only one button was pressed. The volume rocker,
+  power button and the MSI button's controller-mode switch may or may not report here.
+- **Whether the code carries structure.** `0x00220029` splits plausibly as `0x0022` / `0x0029`, but
+  with a single observed value there is nothing to compare against. Do not read meaning into it.
 
 ---
 

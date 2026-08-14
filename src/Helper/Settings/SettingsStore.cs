@@ -94,33 +94,96 @@ namespace McenterLite.Helper.Settings
             Save();
         }
 
+        /// <summary>
+        /// Forgets every remembered feature choice, so the next start re-applies nothing.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>Restoring the hardware is only half of putting the machine back.</b> Measured on
+        /// device 2026-08-13: <c>--restore</c> wrote all six defaults correctly, and six seconds
+        /// later the helper started, <c>StartupApplier</c> read these keys and re-applied 15/17 W,
+        /// an 80% charge limit and the custom fan curve straight over the top. The restore was
+        /// undone before the user could see it, and reported success on the way.
+        /// </para>
+        /// <para>
+        /// This also protects the gap in a real uninstall, between <c>--uninstall</c> and removing
+        /// the app: opening the Game Bar in that window redeploys the helper, and without this it
+        /// would re-apply everything that was just restored.
+        /// </para>
+        /// </remarks>
+        public void ClearFeatureSettings()
+        {
+            lock (_gate)
+            {
+                foreach (var key in FeatureKeys) _values.Remove(key);
+
+                // Intel settings are written under a prefix rather than at fixed names, so they
+                // have to be found rather than listed. Original_* are dead keys from the removed
+                // capture scheme, swept here so a restored install leaves a clean file.
+                var prefixed = new List<string>();
+                foreach (var key in _values.Keys)
+                {
+                    if (key.StartsWith(SettingsKeys.IntelPrefix, StringComparison.Ordinal)
+                        || key.StartsWith("Original_", StringComparison.Ordinal))
+                        prefixed.Add(key);
+                }
+
+                foreach (var key in prefixed) _values.Remove(key);
+            }
+
+            Save();
+            Log.Info("Cleared the saved feature settings; nothing will be re-applied at startup.");
+        }
+
+        /// <summary>
+        /// Every key <see cref="StartupApplier"/> reads <b>for a feature the restore actually
+        /// changes</b>. Adding a re-applied setting without adding it here would leave that one
+        /// feature reverting after a restore.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b><see cref="SettingsKeys.LightingProfile"/> is excluded, and that is load-bearing.</b>
+        /// The restore deliberately leaves the lights on, so clearing the record of which profile is
+        /// running does not undo anything — it just makes the record wrong. Every other card reads
+        /// its value back from the hardware and so cannot lie; lighting cannot, because the
+        /// controller stores flattened keyframes with no profile number in them, making this setting
+        /// the only record of what is on the LEDs.
+        /// </para>
+        /// <para>
+        /// Observed on device 2026-08-13: clearing it left the Lighting card showing <b>Off</b>
+        /// while the LEDs were still running 'Wave'. A record cleared for something that was never
+        /// changed.
+        /// </para>
+        /// </remarks>
+        private static readonly string[] FeatureKeys =
+        {
+            SettingsKeys.Pl1,
+            SettingsKeys.Pl2,
+            SettingsKeys.PerfMode,
+            SettingsKeys.ChargeLimit,
+            SettingsKeys.FanProfile,
+            SettingsKeys.CpuBoost,
+            SettingsKeys.CpuBoostUserModified,
+            SettingsKeys.OsPowerMode,
+        };
+
         public void SetBool(string key, bool value) => Set(key, value ? "1" : "0");
 
         public void SetInt(string key, int value) => Set(key, value.ToString(CultureInfo.InvariantCulture));
 
-        /// <summary>
-        /// Records a pre-existing system value the first time we are about to change it, and only
-        /// then. Uninstall replays these.
-        /// </summary>
-        /// <remarks>
-        /// Write-once is the whole point. Capturing on every start would, on the second start,
-        /// record the value WE set as if it were the user's - and uninstall would then "restore"
-        /// the device to our settings forever, which is not a restore at all.
-        /// </remarks>
-        public void CaptureOriginal(string key, string value)
-        {
-            lock (_gate)
-            {
-                var originalKey = "Original_" + key;
-                if (_values.ContainsKey(originalKey)) return;
-                if (value == null) return;
-                _values[originalKey] = value;
-            }
-            Save();
-            Log.Info($"Captured the original value of {key}.");
-        }
-
-        public string GetOriginal(string key) => Get("Original_" + key);
+        // CaptureOriginal / GetOriginal lived here until 2026-08-13. They recorded the value each
+        // setting held the first time this app was about to change it, and uninstall replayed them.
+        //
+        // Removed with the mechanism, not merely unused: while MSI Center M was installed, "the
+        // value before we wrote" meant whatever MSI Center M happened to hold at that arbitrary
+        // moment, so a restore returned the machine to a snapshot of a program that is now
+        // uninstalled. On this device it would have replayed 15 W / 17 W, a 60% charge limit and
+        // Best performance - none of them a neutral state. The Original_* keys were also stored in
+        // settings.json inside the package's LocalCache, which Windows deletes when the app is
+        // removed, so the one event they existed for was the event that destroyed them.
+        //
+        // Restore now applies FeatureDefaults, a table in code that cannot be lost. See
+        // SettingsRestorer.
 
         private void Save()
         {
@@ -154,6 +217,18 @@ namespace McenterLite.Helper.Settings
         public const string Pl2 = "Pl2";
         public const string TdpBackend = "TdpBackend";
 
+        /// <summary>
+        /// The performance mode, which gates whether <see cref="Pl1"/> and <see cref="Pl2"/> apply.
+        /// </summary>
+        /// <remarks>
+        /// Persisted because the firmware forgets it: the EC holds the mode across warm reboots and
+        /// resets to AI Engine on a true power cycle. MSI Center M used to restore it from its
+        /// service at every boot, which is why nothing here ever had to — and why the first full
+        /// shutdown after uninstalling it silently returned the machine to automatic power with the
+        /// sliders still showing values that no longer did anything.
+        /// </remarks>
+        public const string PerfMode = "PerfMode";
+
         public const string ChargeLimit = "ChargeLimit";
 
         /// <summary>
@@ -181,6 +256,15 @@ namespace McenterLite.Helper.Settings
 
         public const string CpuBoost = "CpuBoost";
         public const string OsPowerMode = "OsPowerMode";
+
+        // HwMouseFirstRunApplied existed for a few hours on 2026-08-13, gating a first-run write of
+        // Gamepad so it could not repeat and undo the physical MSI button. Both went the same day:
+        // the device already boots as Gamepad, so the write asserted what was usually already true
+        // and needed a marker key and a once-only gate purely to stay out of the button's way.
+        //
+        // Controller mode remains the one feature with NO stored value, which is the point - the
+        // button owns it, and a remembered mode would fight it on every start. Uninstall still sets
+        // Gamepad, from FeatureDefaults, with no marker involved.
 
         public const string IntelPrefix = "Intel_";
 

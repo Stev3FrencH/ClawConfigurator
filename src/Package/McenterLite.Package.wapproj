@@ -76,6 +76,29 @@
       goes stale (e.g. a fresh machine); see docs/building-the-widget.md step 6.
     -->
     <PackageCertificateThumbprint>B1A696115DB9CA9B6F952306F266667DEAE1656A</PackageCertificateThumbprint>
+
+    <!--
+      Countersign with a trusted timestamp. Added 2026-08-14, when `signtool verify /pa /v` on the
+      first Release bundle reported "File is not timestamped."
+
+      Without a timestamp, an MSIX signature is only valid while the signing certificate is valid.
+      This certificate expires 2027-08-11. On 2027-08-12 every copy of every package ever built
+      here stops installing - including ones already sitting on someone else's USB drive, because
+      the check happens at install time against the clock, not against when the file was made. The
+      failure is 0x800B0101 (CERT_E_EXPIRED) and says nothing about timestamps.
+
+      A timestamp countersignature records that the signing happened while the certificate was
+      still valid, so the package keeps installing afterwards. It costs one network call at build
+      time and nothing at install time - the timestamp travels inside the signature, so installing
+      machines need no connectivity.
+
+      This is the difference between "expires in a year" being a diary note and being a cliff, and
+      it matters now rather than later because the next task is handing this to other people.
+      DigiCert's server is used by the Windows SDK's own documentation and requires no account.
+      RFC3161 with SHA256; the older /t Authenticode form is SHA1-only and deprecated.
+    -->
+    <AppxPackageSigningTimestampServerUrl>http://timestamp.digicert.com</AppxPackageSigningTimestampServerUrl>
+    <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
     <NoWarn>$(NoWarn);NU1702</NoWarn>
     <EntryPointProjectUniqueName>..\Widget\McenterLite.Widget.csproj</EntryPointProjectUniqueName>
   </PropertyGroup>
@@ -98,7 +121,7 @@
     The published helper is added to the package by AddPublishedHelperToPackage below, NOT by a
     static Content item here.
 
-    This used to be a single <Content Include="Helper\McenterLite.Helper.exe" />, and it shipped a
+    This used to be a single <Content Include="Helper\ClawConfigurator.Helper.exe" />, and it shipped a
     package containing exactly that one file out of the 196 a self-contained publish produces. The
     apphost cannot start without hostfxr, hostpolicy and coreclr beside it, so the helper died
     before any managed code ran - which means before Log.Initialize, so it left no log and no data
@@ -138,20 +161,59 @@
 
     <Message Importance="high" Text="Publishing the helper self-contained into $(HelperOutput)..." />
 
+    <!--
+      DELETE THE OUTPUT FIRST. Do not remove this because the build got slower.
+
+      "dotnet publish -o" does not empty its destination, and its copy step skips files it judges
+      up to date. The result is that the folder accumulates whatever any PREVIOUS publish put there
+      and a later publish can decline to overwrite it. On 2026-08-14 the first Release package was
+      built this way and shipped a helper dll byte-identical to the DEBUG publish output - the
+      compiler had produced a correct Release binary in bin\Release\, and the copy into this folder
+      simply never happened. Every check passed: the build succeeded, the Error conditions below
+      found the exe and hostfxr present, MakeAppx was happy, and the package installed. The only
+      way to see it was to hash the packaged dll against both configurations.
+
+      This is the same failure the comment above the ItemGroup describes, one layer down: there the
+      packaged helper went stale across HOURS, here it goes stale across CONFIGURATIONS, and in
+      both cases a stale binary is still a valid binary so nothing downstream objects.
+
+      Deleting also prunes files a rename left behind - the trap that made MakeAppx fail with
+      0x8007000b when both ClawConfigurator.Helper.exe and the old McenterLite.Helper.exe were
+      present - so the package contains exactly what this build produced and nothing else.
+    -->
+    <RemoveDir Directories="$(HelperOutput)" />
+
     <Exec Command="dotnet publish &quot;$(HelperProject)&quot; -c $(Configuration) -r win-x64 --self-contained true -o &quot;$(HelperOutput)&quot;"
           WorkingDirectory="$(MSBuildThisFileDirectory)" />
 
-    <Error Condition="!Exists('$(HelperOutput)\McenterLite.Helper.exe')"
+    <Error Condition="!Exists('$(HelperOutput)\ClawConfigurator.Helper.exe')"
            Text="The helper did not publish to $(HelperOutput). The package would ship without it." />
 
     <!--
-      Self-contained means the runtime ships beside the exe. If this is missing the publish was
-      framework-dependent, and the packaged helper would fail to start on a machine with no .NET -
-      which is every target device. Checked because the failure is silent: the apphost dies before
-      it can log anything.
+      Assert the runtime actually shipped. If it did not, the packaged helper fails to start on a
+      machine with no .NET - which is every target device - and the failure is silent, because the
+      apphost dies before any managed code runs and therefore before Log.Initialize.
+
+      THE CHECK DIFFERS BY CONFIGURATION, because the layout does.
+
+      McenterLite.Helper.csproj sets PublishSingleFile only in Release. So:
+        - Debug   -> ~200 loose files, the runtime among them, hostfxr.dll beside the exe.
+        - Release -> ONE ~66 MB exe with the runtime bundled inside it, and NO hostfxr.dll at all.
+
+      The original check looked for hostfxr.dll unconditionally. In Release that file is correctly
+      absent, so the check was wrong for the only configuration that ships. It never fired only
+      because "dotnet publish -o" did not empty this folder (see RemoveDir above) and a previous
+      Debug publish had left a hostfxr.dll lying there - the guard was passing on a file from a
+      different build of a different configuration. Deleting the folder is what exposed it.
+
+      For Release the equivalent invariant is size: a self-contained single file is tens of MB,
+      whereas a framework-dependent one is around 1 MB. 20 MB cleanly separates them.
     -->
-    <Error Condition="!Exists('$(HelperOutput)\hostfxr.dll')"
+    <Error Condition="'$(Configuration)' != 'Release' And !Exists('$(HelperOutput)\hostfxr.dll')"
            Text="The helper published WITHOUT the .NET runtime (no hostfxr.dll in $(HelperOutput)). It would not start on a device with no .NET installed." />
+
+    <Exec Condition="'$(Configuration)' == 'Release'"
+          Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;$e = Get-Item '$(HelperOutput)\ClawConfigurator.Helper.exe'; if ($e.Length -lt 20MB) { Write-Host ('The helper published WITHOUT the .NET runtime: {0} is only {1:N1} MB. A self-contained single-file publish is tens of MB; this one is framework-dependent and would not start on a device with no .NET installed.' -f $e.Name, ($e.Length/1MB)); exit 1 }&quot;" />
   </Target>
 
   <!--
@@ -160,7 +222,7 @@
     used to do this statically.
 
     Include is relative to this project's directory, so each file's path inside the package mirrors
-    its path on disk and the exe lands at Helper\McenterLite.Helper.exe, matching the Executable
+    its path on disk and the exe lands at Helper\ClawConfigurator.Helper.exe, matching the Executable
     attribute of Package.appxmanifest's windows.fullTrustProcess extension.
   -->
   <Target Name="AddPublishedHelperToPackage" AfterTargets="PublishHelper">

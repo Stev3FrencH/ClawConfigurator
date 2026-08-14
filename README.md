@@ -9,9 +9,10 @@ AI+ (Panther Lake, `CG3EM` / board `1T91`), delivered as an Xbox Game Bar widget
 > controller's vendor HID channel. Neither needs MSI Center M running, and neither should need it
 > installed. See [docs/hardware-notes.md](docs/hardware-notes.md).
 >
-> **Not yet proven:** that these paths survive an actual MSI Center M *uninstall*. Everything so far
-> was verified with its stack **stopped**, which is not the same thing. MSI Center M is deliberately
-> kept installed for now, both to compare against and because that assumption is untested.
+> **Proven 2026-08-13: MSI Center M is uninstalled and all five features still work.** The app, its
+> Game Bar widget and the SDK are gone, and after a reboot the helper probed and re-applied every
+> feature — `MSI_ACPI` comes from the ACPI tables through Windows' own WMI mapper, not from anything
+> MSI ships. See [`Diagnostics/msi-center-m-after.md`](Diagnostics/msi-center-m-after.md).
 
 > **Status: the widget builds, packages, installs, and runs on the real Claw.** Power limits,
 > controller mode, CPU Boost and OS Power Mode are all verified working end-to-end, including
@@ -109,7 +110,12 @@ export PATH="$HOME/.dotnet:$PATH"
 
 ## Installing
 
-There is no pre-built release yet — the widget has to be built, packaged and signed first, on
+> **Installing it, rather than developing it?** See
+> [`docs/install.md`](docs/install.md) — install and uninstall written for someone who did not build
+> this, including what the certificate import actually grants and how to fix a failed framework
+> dependency. The rest of this section is about building and installing from source.
+
+The widget has to be built, packaged and signed first, on
 whatever Windows machine has Visual Studio 2022 set up (see
 [`docs/building-the-widget.md`](docs/building-the-widget.md)). That machine does **not** have to
 be the Claw. Signing happens there too, using that machine's certificate private key — the Claw
@@ -164,6 +170,35 @@ and installs the newest package it finds under `src/Package/AppPackages/`. It re
 under Windows PowerShell 5.1 and elevates on its own, so a plain prompt is fine — but it still has
 to be *loadable*, hence `-ExecutionPolicy Bypass`.
 
+### Giving it to someone else
+
+Hand over three things — the `AppPackages/...` folder, `Install.ps1` and `Uninstall.ps1`, and
+`msi-mcenter-lite.cer`. Never the `.pfx`: that is the signing key itself, and anyone holding it can
+sign anything in this name.
+
+Tell them these four things, because none of them are discoverable and the first one deserves an
+informed decision rather than a click-through:
+
+1. **Importing the certificate means trusting a stranger's signing key.** This app is signed with a
+   self-signed certificate rather than one from a certificate authority, so Windows will not install
+   it until the machine is told to trust that key. `Install.ps1` does that, with elevation, by
+   importing the `.cer` into `LocalMachine\TrustedPeople`. From then on the machine will accept
+   **anything** signed by that key, not just this app, until the certificate is removed or it expires
+   on 2027-08-11. `Uninstall.ps1 -RemoveCertificate` removes it again. It goes into `TrustedPeople`
+   and never into `Root` — a root CA would be trusted for every purpose, including impersonating web
+   sites.
+2. **Sideloading has to be allowed.** *Settings → Privacy & security → For developers → Developer
+   Mode*. Without it the install fails on policy grounds and the error does not mention sideloading.
+3. **This is an MSI Claw 8 EX AI+ build.** On any other machine the device gate hides every hardware
+   card and only CPU Boost and OS Power Mode do anything, so it is worth saying up front rather than
+   letting someone install it and find a near-empty widget.
+4. **The one elevation prompt on first run is not optional.** The helper uses it to deploy itself and
+   register its scheduled task; decline it and every hardware control stays dead with no obvious
+   reason why.
+
+To uninstall, they run `Uninstall.ps1` — not *Settings → Apps*, which does only half the job and
+leaves the device on this app's settings. See [Uninstalling](#uninstalling).
+
 ### Seeing the UI on a machine that is not a Claw
 
 The device gate hides every hardware card on anything that is not a Claw 8 EX, leaving only the
@@ -179,15 +214,91 @@ what it does to the scheduled task and how it puts it back.
 
 ### After installing
 
-1. Open the Game Bar (**Win+G**) and pin **M Center Lite**.
+1. Open the Game Bar (**Win+G**) and pin **Claw Configurator**.
 2. Accept the one elevation prompt on first run — the helper uses it to deploy itself and
    register a scheduled task. Hardware controls do not work until this is accepted.
 3. The widget reconnects on its own a few seconds after the prompt.
 
-Logs land at `%LOCALAPPDATA%\Packages\<package family>\LocalCache\McenterLite\helper.log`.
+Logs land at `%LOCALAPPDATA%\Packages\<package family>\LocalCache\ClawConfigurator\helper.log`.
 
-To uninstall: remove the app from *Settings > Apps*, then run the deployed helper once with
-`--uninstall` to remove its scheduled task and restore any captured original values.
+**What a fresh install changes.** Your power limits, charge limit and controller mode are read off
+the hardware and left exactly as they are. Two things are set once, and are then yours to change:
+
+| | First run applies | Why not "leave it alone" |
+|---|---|---|
+| Fans | **Auto** | An install otherwise inherits whatever curve and control flag the last owner left behind — including one you can no longer see or change |
+| Lighting | **profile 1**, seeded as Purple | The controller keeps lighting in RAM and forgets it on a power cycle, so writing nothing leaves the LEDs on a firmware default while the card claims something else |
+
+**Controller mode is never written except on uninstall.** The physical MSI button switches the same
+mode and the firmware handles it alone, so this app does not assert it at startup or on install — a
+mode of ours would silently undo the button. Uninstall is the exception, because being left in
+desktop-mouse mode with the app that switched you gone is a state worth rescuing you from.
+
+### Uninstalling
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Uninstall.ps1
+```
+
+That does the whole thing in the right order, closes the widget so it cannot undo the first step
+half way through, and saves your profile files and the final `helper.log` to a folder on the Desktop
+before the app removal deletes them. Add `-RemoveCertificate` to also stop trusting the signing key,
+or `-SkipBackup` if you want nothing kept.
+
+The rest of this section is what the script is doing, and is worth reading if you ever have to do it
+by hand.
+
+**Order matters, and it is the opposite of what you would guess.** Run the helper's `--uninstall`
+**first**, then remove the app:
+
+```powershell
+& "$env:LOCALAPPDATA\Packages\ClawConfigurator_xq4frxrkckec6\LocalCache\ClawConfigurator\Helper\ClawConfigurator.Helper.exe" --uninstall
+```
+
+That puts every feature back to its default, unregisters the scheduled task and removes the deployed
+copy. Then remove **Claw Configurator** from *Settings > Apps*.
+
+Doing it the other way round cannot work: the deployed helper and its settings both live inside the
+package's `LocalCache`, so removing the app first deletes the executable that would do the restore.
+That leaves the scheduled task orphaned against a missing file and the device on whatever limits
+were last set, with nothing left able to change them.
+
+> **Don't open the Game Bar between the two steps.** The widget would redeploy the helper and
+> re-register its task, undoing the first step. The restore clears the saved settings as well as
+> writing the hardware, so nothing would be re-applied — but you would be back to having an app to
+> uninstall.
+
+To see what the restore does **without** uninstalling anything, close the Game Bar and run the same
+code path on its own:
+
+```powershell
+& "$env:LOCALAPPDATA\Packages\ClawConfigurator_xq4frxrkckec6\LocalCache\ClawConfigurator\Helper\ClawConfigurator.Helper.exe" --restore
+```
+
+It applies every default, **forgets your saved choices**, and exits with the app still installed —
+so the next time the helper starts it re-applies nothing and the defaults stand. Treat it as a reset:
+your power limits, charge limit, and fan and lighting selections are cleared, though the profile
+*files* themselves are untouched.
+
+(`Test-Helper.ps1 -Restore` sends the same message over the pipe, but the pipe serves one client at a
+time and the widget never releases it, so that route only works if the Game Bar has not been opened
+since the helper started.)
+
+What the restore puts back — chosen values, not whatever happened to be there before:
+
+| | Default |
+|---|---|
+| Power limits | 17 W / 19 W |
+| Battery charge limit | 100% — charge to full |
+| Fans | Auto: MSI's factory table, fans handed back to the firmware |
+| Controller mode | Gamepad |
+| CPU boost | On |
+| OS power mode | Balanced |
+| Lighting | **left alone** — it lives in the controller's RAM and a power cycle clears it anyway |
+
+After `--restore` the saved selections are gone, so the next helper start looks like a fresh install
+and applies the first-run defaults above — including the lighting profile. "Leaves the lights alone"
+is true at the moment of the restore, not forever.
 
 This only applies to the MSI Claw 8 EX AI+ (see [Scope](#scope)) — on any other device the
 hardware-specific cards stay hidden, and only CPU Boost and OS Power Mode do anything.
@@ -199,10 +310,10 @@ the widget on purpose — the profiles are plain text files you edit outside it.
 Explorer address bar:
 
 ```
-%LOCALAPPDATA%\Packages\McenterLite_xq4frxrkckec6\LocalCache\McenterLite\Lighting
+%LOCALAPPDATA%\Packages\ClawConfigurator_xq4frxrkckec6\LocalCache\ClawConfigurator\Lighting
 ```
 
-`McenterLite_xq4frxrkckec6` is the package family name. It is a hash of the `Identity` name and
+`ClawConfigurator_xq4frxrkckec6` is the package family name. It is a hash of the `Identity` name and
 publisher in `src/Package/Package.appxmanifest`, so it is the same on every machine and across
 versions — but if you have changed either, `(Get-AppxPackage McenterLite).PackageFamilyName` prints
 yours. `helper.log` is one folder up, in `McenterLite\`.
@@ -231,7 +342,7 @@ The **Fans** card has two buttons — **Auto** and your custom profile. Pressing
   the button.
 
 ```
-%LOCALAPPDATA%\Packages\McenterLite_xq4frxrkckec6\LocalCache\McenterLite\Fan
+%LOCALAPPDATA%\Packages\ClawConfigurator_xq4frxrkckec6\LocalCache\ClawConfigurator\Fan
 ```
 
 The device has **two fans**, and each holds an idle duty used below 47 °C plus one duty at each of
@@ -256,13 +367,45 @@ which profile is running from the firmware itself and re-reads it every few seco
 is open, so if anything ever does take the fans back, the card changes to **Auto** rather than going
 on claiming your curve.
 
+### The hardware button
+
+The MSI button appeared to die with MSI Center M. **It didn't.** It raises a firmware event and does
+nothing else — it reports, and leaves the decision to software. MSI Center M was the only thing
+subscribed, so removing it left the event firing into an empty room.
+
+Put one action name in the file, edit and press — it is read at the moment of the press:
+
+```
+%LOCALAPPDATA%\Packages\ClawConfigurator_xq4frxrkckec6\LocalCache\ClawConfigurator\Button\Button.txt
+```
+
+| | |
+|---|---|
+| `none` | Do nothing. **The default** — a fresh install gains no new behaviour. |
+| `rtss-overlay` | Toggle RivaTuner Statistics Server's on-screen display. |
+| `fan-profile` | Cycle the fan profile: Auto, custom, Auto… |
+| `performance-mode` | Cycle the performance mode: Endurance, AI Engine, Manual. |
+| `lighting` | Cycle the lighting: off, then each profile in turn. |
+| `controller-mode` | Toggle the controller between Gamepad and Desktop. |
+
+Every press is logged whatever the outcome, so "nothing happened" is diagnosable — look for lines
+starting `Button` in `helper.log` two folders up. A press that never reaches the log is a different
+problem from one that reaches it and fails.
+
+> **`rtss-overlay` does not send RTSS's hotkey**, though RTSS has one and doing so would have been
+> simpler. It calls the same function RTSS's own hotkey handler calls, so nothing reaches the input
+> layer. A synthesised keystroke goes into the *system* input queue, where the foreground game
+> receives it too, flagged as injected — and this button exists to be pressed while games are
+> running, so that exposure would be constant rather than occasional. For the same reason there is
+> deliberately no "send a hotkey" action.
+
 ## Running
 
 For development and discovery, without installing the packaged app — against simulated hardware,
 on any Windows machine:
 
 ```
-McenterLite.Helper.exe --fake-hardware
+ClawConfigurator.Helper.exe --fake-hardware
 ```
 
 Discovery and verification, on the Claw, elevated:
@@ -326,8 +469,10 @@ The mitigations that apply are structural rather than advisory:
   packages, so slider bounds are a convenience and the helper is the enforcement point.
 - **Every write is read back** and the actual value returned. A write the hardware ignored is
   reported as a failure, not as success.
-- **Power limits are captured before the first write** and restored on uninstall, so the device
-  does not keep our numbers forever.
+- **Uninstalling restores every feature to a known default**, so the device does not keep our
+  numbers forever. See [Uninstalling](#uninstalling) — the restore replaces an earlier scheme that
+  replayed captured "original" values, which on this machine meant replaying whatever MSI Center M
+  held at one arbitrary moment.
 - **The device gate is exact.** Another Claw generation is treated as unsupported rather than close
   enough — the power ceilings differ, and a wrong limit is a real write to real firmware.
 

@@ -41,8 +41,8 @@ param()
 
 $ErrorActionPreference = 'Stop'
 
-$TaskPath = '\McenterLite\'
-$TaskName = 'McenterLiteHelper'
+$TaskPath = '\ClawConfigurator\'
+$TaskName = 'ClawConfiguratorHelper'
 
 function Test-Elevated {
     $identity  = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -55,7 +55,7 @@ if (-not (Test-Elevated)) {
 }
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$helper = Join-Path $repoRoot 'src\Helper\bin\x64\Debug\net8.0-windows\McenterLite.Helper.exe'
+$helper = Join-Path $repoRoot 'src\Helper\bin\x64\Debug\net8.0-windows\ClawConfigurator.Helper.exe'
 
 if (-not (Test-Path $helper)) {
     throw "Helper not built at $helper - run:  dotnet build McenterLite.sln"
@@ -64,12 +64,12 @@ if (-not (Test-Path $helper)) {
 # Warn when the installed widget predates the helper about to serve it. Retired Function ordinals
 # mean an old widget and a new helper do not agree on the wire, and the symptom is a card that
 # silently never populates rather than an error.
-$package = Get-AppxPackage -Name McenterLite -ErrorAction SilentlyContinue
+$package = Get-AppxPackage -Name ClawConfigurator -ErrorAction SilentlyContinue
 $helperBuilt = (Get-Item $helper).LastWriteTime
 if ($package) {
     Write-Host "Installed widget package: $($package.Version)" -ForegroundColor DarkGray
 } else {
-    Write-Warning 'No McenterLite package is installed. Install one first, or there is no widget to connect.'
+    Write-Warning 'No Claw Configurator package is installed. Install one first, or there is no widget to connect.'
 }
 Write-Host "Helper build: $($helperBuilt.ToString('yyyy-MM-dd HH:mm'))" -ForegroundColor DarkGray
 

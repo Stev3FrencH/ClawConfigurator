@@ -26,14 +26,29 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap uap3 desktop rescap">
 
+  <!--
+    RENAMED 2026-08-14, identity included. "M Center Lite" was chosen when this was a front-end for
+    MSI Center M's registry model; it no longer is, and the name described something untrue.
+
+    Changing Identity Name changes the Package Family Name, so Windows treats this as a different
+    app: existing installs do not upgrade, and settings, profiles and the deployed helper start
+    fresh under the new path. That was the point rather than the price - the next task is proving a
+    from-nothing install on a fresh Windows 11 machine, and this forces exactly that on a device
+    where it can be diagnosed.
+
+    Publisher is deliberately UNCHANGED. The signing certificate's subject must match it exactly, so
+    moving it would mean a new cert, a new .cer for users to trust, and re-opening a distribution
+    decision already settled. The publisher hash is the second half of the PFN, so it stays
+    xq4frxrkckec6 and only the prefix moves: ClawConfigurator_xq4frxrkckec6.
+  -->
   <Identity
-    Name="McenterLite"
+    Name="ClawConfigurator"
     Publisher="CN=msi-mcenter-lite"
-    Version="0.2.0.24" />
+    Version="0.2.0.40" />
 
   <Properties>
-    <DisplayName>M Center Lite</DisplayName>
-    <PublisherDisplayName>msi-mcenter-lite</PublisherDisplayName>
+    <DisplayName>Claw Configurator</DisplayName>
+    <PublisherDisplayName>Claw Configurator</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
@@ -60,8 +75,8 @@
         belong in the Start menu or in app search.
       -->
       <uap:VisualElements
-        DisplayName="M Center Lite"
-        Description="Power controls for the MSI Claw 8 EX AI+"
+        DisplayName="Claw Configurator"
+        Description="Power, fan, lighting and controller settings for the MSI Claw 8 EX AI+"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"
@@ -76,11 +91,19 @@
           The Game Bar widget registration.
         -->
         <uap3:Extension Category="windows.appExtension">
+          <!--
+            DisplayName here is the text Game Bar draws in the widget's title bar and in the widget
+            list. There is no title in MainWidget.xaml - the header row there shows the DEVICE, not
+            the app - so this is the only place that string lives.
+
+            Id is deliberately NOT renamed: Game Bar keys pin and favourite state off it, so moving
+            it would silently unpin the widget for no visible gain.
+          -->
           <uap3:AppExtension
             Name="microsoft.gameBarUIExtension"
             Id="McenterLiteWidget"
             PublicFolder="Public"
-            DisplayName="M Center Lite">
+            DisplayName="Claw Configurator">
             <uap3:Properties>
               <GameBarWidget Type="Standard">
                 <HomeMenuVisible>true</HomeMenuVisible>
@@ -140,7 +163,7 @@
         -->
         <desktop:Extension
           Category="windows.fullTrustProcess"
-          Executable="Helper\McenterLite.Helper.exe" />
+          Executable="Helper\ClawConfigurator.Helper.exe" />
 
       </Extensions>
     </Application>

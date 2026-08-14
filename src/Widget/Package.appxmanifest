@@ -15,14 +15,19 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap rescap">
 
+  <!--
+    Kept in step with src/Package/Package.appxmanifest, which is the one that actually ships. This
+    manifest is used only when the widget project is built on its own, and two manifests that drift
+    is how a rename half-lands.
+  -->
   <Identity
-    Name="McenterLite"
+    Name="ClawConfigurator"
     Publisher="CN=msi-mcenter-lite"
     Version="0.2.0.0" />
 
   <Properties>
-    <DisplayName>M Center Lite</DisplayName>
-    <PublisherDisplayName>msi-mcenter-lite</PublisherDisplayName>
+    <DisplayName>Claw Configurator</DisplayName>
+    <PublisherDisplayName>Claw Configurator</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
@@ -39,8 +44,8 @@
       Executable="$targetnametoken$.exe"
       EntryPoint="McenterLite.Widget.App">
       <uap:VisualElements
-        DisplayName="M Center Lite"
-        Description="Power controls for the MSI Claw 8 EX AI+"
+        DisplayName="Claw Configurator"
+        Description="Power, fan, lighting and controller settings for the MSI Claw 8 EX AI+"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"

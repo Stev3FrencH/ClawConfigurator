@@ -24,7 +24,7 @@ depends on.
 |---|---|---|
 | `src/Widget` | `McenterLite.Widget` — the UWP AppContainer UI | VS 2022 + UWP workload |
 | `src/Package` | the signed `.msix` that actually installs | Windows Application Packaging Project |
-| `src/Helper` | `McenterLite.Helper.exe`, bundled into the package | plain .NET SDK |
+| `src/Helper` | `ClawConfigurator.Helper.exe`, bundled into the package | plain .NET SDK |
 
 The helper is already proven on the device. This session is about the UI and the packaging
 around it.
@@ -129,7 +129,7 @@ confidence — it embeds absolute-ish tooling paths and a project GUID.
 
 ### Getting the helper into the package
 
-The manifest declares `Executable="Helper\McenterLite.Helper.exe"`, so the helper must land in a
+The manifest declares `Executable="Helper\ClawConfigurator.Helper.exe"`, so the helper must land in a
 `Helper` folder inside the package, published **self-contained** — the package cannot rely on a
 .NET runtime being present on the Claw.
 
@@ -142,7 +142,7 @@ executable is not there afterwards. Nothing manual is required.
 > while every build succeeded and every package looked correct. A stale binary is still a valid
 > binary, so nothing warns you — the symptom surfaces only on device, as a card that never
 > populates or an IPC `Function` ordinal the widget and helper disagree about. If you ever suspect
-> it again, check the timestamp of `src/Package/Helper/McenterLite.Helper.exe` against your last
+> it again, check the timestamp of `src/Package/Helper/ClawConfigurator.Helper.exe` against your last
 > helper change.
 
 A ProjectReference cannot replace that target: it would bring in a framework-dependent build, and
@@ -202,17 +202,17 @@ from persistence malware — the reference project documents exactly that being 
 
 ## 8. First run
 
-1. Open the Game Bar with **Win+G** and pin **M Center Lite**.
+1. Open the Game Bar with **Win+G** and pin **Claw Configurator**.
 2. The widget calls `FullTrustProcessLauncher`, which starts the helper from inside the package.
 3. That instance sees nothing deployed, relaunches itself elevated with `--setup` — **one UAC
-   prompt** — copies itself to `LocalCache\McenterLite\Helper\`, registers the scheduled task,
+   prompt** — copies itself to `LocalCache\ClawConfigurator\Helper\`, registers the scheduled task,
    and exits.
 4. The task starts the deployed helper, which opens the pipe.
 5. The widget reconnects on its own. This can take a few seconds after the prompt is accepted.
 
 If the prompt is declined the widget says so and offers a retry; it does not re-prompt in a loop.
 
-Logs: `%LOCALAPPDATA%\Packages\<package family>\LocalCache\McenterLite\helper.log`
+Logs: `%LOCALAPPDATA%\Packages\<package family>\LocalCache\ClawConfigurator\helper.log`
 
 ---
 
@@ -277,9 +277,9 @@ can be compiled here to find out. Every key `MainWidget.xaml` references is defi
   plain string, rendered by a `DataTemplate` that binds `{Binding}` and appends a chevron. If the
   buttons come out blank, that binding is the first thing to check — `{Binding}` against a
   `ContentPresenter` resolves to the content itself, which is correct but easy to break.
-- **Selector option lists live in `MainWidget.xaml.cs`, not in XAML.** `OptionCycler` is
-  constructed with them, and **the index is the wire value** — cast straight to `PerfMode`,
-  `FanPreset` and so on. Reordering a list silently changes what the helper is told.
+- **Selector option lists live in `MainWidget.xaml.cs`, not in XAML.** `SegmentedControl` is
+  constructed with them, and **the index is the wire value** — the lighting slot, the fan
+  selection, and so on. Reordering a list silently changes what the helper is told.
 
 ### Sizing: the numbers and where they come from
 
@@ -379,7 +379,7 @@ These are real tests even with no MSI hardware present:
 - **The AppContainer can open the helper's pipe.** This is the single most likely thing to fail
   silently. If it does, check the `S-1-15-2-1` ACE in `PipeServer.BuildSecurity`.
 - One UAC prompt, not several.
-- The scheduled task exists at `\McenterLite\McenterLiteHelper` and survives a reboot.
+- The scheduled task exists at `\ClawConfigurator\ClawConfiguratorHelper` and survives a reboot.
 - **CPU boost and power mode work for real** — they are plain Windows APIs.
   Cross-check with `powercfg /q SCHEME_CURRENT SUB_PROCESSOR PERFBOOSTMODE`.
 - `--uninstall` removes the task and the deployed folder.
@@ -401,7 +401,7 @@ Run the helper with `--fake-hardware` for everything above; simulated hardware r
 `Supported=false`, so the hardware cards stay hidden and nothing pretends to work. That also
 exercises the initial-focus fallback, since it has to skip the hidden cards.
 
-Logs: `%LOCALAPPDATA%\Packages\<package family>\LocalCache\McenterLite\helper.log`
+Logs: `%LOCALAPPDATA%\Packages\<package family>\LocalCache\ClawConfigurator\helper.log`
 
 ---
 
@@ -417,7 +417,7 @@ Symptoms whose cause is not obvious from the message.
 | **`MakeAppx` fails naming a PNG** | Assets not generated. Run `New-PlaceholderAssets.ps1`, and copy the folder into the packaging project too. |
 | Package builds but **will not install** | Certificate subject does not match the manifest `Publisher` exactly. Both must be `CN=msi-mcenter-lite`. |
 | Package installs but **the widget never appears in the Game Bar** | The generated manifest was used instead of `src/Package/Package.appxmanifest`, so the `microsoft.gameBarUIExtension` registration is missing. |
-| Widget appears but says **"could not reach the helper"** forever | Either the helper is not at `Helper\McenterLite.Helper.exe` inside the package, or the elevation prompt was declined. Check `helper.log`. |
+| Widget appears but says **"could not reach the helper"** forever | Either the helper is not at `Helper\ClawConfigurator.Helper.exe` inside the package, or the elevation prompt was declined. Check `helper.log`. |
 | Widget renders but **every card is hidden** | Expected on a machine that is not a Claw 8 EX — `DeviceCaps.Supported` is false and hardware cards hide themselves. CPU boost and power mode should still show. |
 | **Cards appear, controls do nothing** | The pipe connected but the AppContainer cannot write. Check the `S-1-15-2-1` ACE in `PipeServer.BuildSecurity`. |
 | Widget crashes **immediately on open** | Almost certainly an unresolved `StaticResource`. Those are runtime failures, not build failures. |

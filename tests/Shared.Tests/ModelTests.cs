@@ -1,5 +1,6 @@
 using McenterLite.Shared.Ipc;
 using McenterLite.Shared.Model;
+using System;
 using System.Collections.Generic;
 using Xunit;
 
@@ -396,47 +397,100 @@ namespace McenterLite.Shared.Tests
         }
     }
 
-    public class PerfModeTests
+    /// <summary>
+    /// Guards the ordinals retired on 2026-08-13, when the registry-mirror backend went.
+    /// </summary>
+    /// <remarks>
+    /// <c>PerfModeTests</c> lived here and tested the enum's ordinals, its wire round-trip and its
+    /// place in the TDP group. All of it went with the enum. What replaces it is the one thing that
+    /// still matters about those numbers: <b>nothing may take them.</b> An old widget meeting a new
+    /// helper would otherwise route a stale message onto whatever claimed the ordinal, and these
+    /// numbers reach an embedded controller.
+    /// </remarks>
+    public class RetiredOrdinalTests
     {
-        [Fact]
-        public void OrdinalsMatchTheWidgetDropdownOrder()
-        {
-            // The widget sets SelectedIndex from the enum value directly, so the dropdown order
-            // in MainWidget.xaml is part of this contract: Endurance, User Scenario, AI Engine.
-            Assert.Equal(0, (int)PerfMode.Endurance);
-            Assert.Equal(1, (int)PerfMode.UserScenario);
-            Assert.Equal(2, (int)PerfMode.AiEngine);
-        }
-
-        [Fact]
-        public void UnknownIsOutsideTheDropdownRange()
-        {
-            // Unknown must never be a selectable index, or a mode we do not model would be
-            // painted as one we do.
-            Assert.True((int)PerfMode.Unknown > 2);
-        }
-
         [Theory]
-        [InlineData(PerfMode.Endurance)]
-        [InlineData(PerfMode.UserScenario)]
-        [InlineData(PerfMode.AiEngine)]
-        [InlineData(PerfMode.Unknown)]
-        public void RoundTripsThroughTheWire(PerfMode mode)
+        [InlineData(13)]  // PerfMode - removed with the registry mirror, then CAME BACK on 14
+        [InlineData(80)]  // MsiCenterRunning - contention warning, consumed by nothing
+        [InlineData(20)]  // FanEnabled  \
+        [InlineData(21)]  // FanPreset    | the 2026-08-08 preset model, never written to hardware
+        [InlineData(22)]  // FanState     |
+        [InlineData(23)]  // FanFullSpeed /
+        [InlineData(30)]  // charge limit, old model
+        [InlineData(31)]  // charge limit, old model
+        [InlineData(40)]  // lighting, old model
+        [InlineData(81)]  // IntelThermalCmd - guarded EC fan writes that no longer existed
+        public void RetiredOrdinalsAreNotDefined(int ordinal)
         {
-            var wire = PipeEnvelope.FromEnum(mode);
-            var envelope = new PipeEnvelope(1, Command.Response, Function.PerfMode, wire);
-
-            Assert.Equal(mode, envelope.AsEnum(PerfMode.Unknown));
+            Assert.False(
+                Enum.IsDefined(typeof(Function), ordinal),
+                $"Ordinal {ordinal} is retired and must never be reused. "
+                + $"It is now {Enum.GetName(typeof(Function), ordinal)}.");
         }
 
         [Fact]
-        public void PerfModeHasItsOwnOrdinalInTheTdpGroup()
+        public void LiveTdpOrdinalsAreUnchanged()
         {
-            // Ordinals are never reused. PerfMode belongs to the TDP group because it gates it.
-            Assert.Equal(13, (int)Function.PerfMode);
-            Assert.NotEqual((int)Function.Pl1, (int)Function.PerfMode);
-            Assert.NotEqual((int)Function.Pl2, (int)Function.PerfMode);
-            Assert.NotEqual((int)Function.TdpBackend, (int)Function.PerfMode);
+            // The survivors of the TDP group. Retiring 13 must not have shifted anything.
+            Assert.Equal(10, (int)Function.Pl1);
+            Assert.Equal(11, (int)Function.Pl2);
+            Assert.Equal(12, (int)Function.TdpBackend);
+        }
+
+        [Fact]
+        public void PerfModeReturnedOnANewOrdinal()
+        {
+            // Removed on 2026-08-13 and restored the same day, once the mode turned out to live in
+            // the firmware rather than in MSI Center M. It must NOT have reclaimed 13 - the whole
+            // point of retiring an ordinal is that a stale message from an old widget cannot land
+            // on a live function, and this one reaches an embedded controller.
+            Assert.Equal(14, (int)Function.PerfMode);
+            Assert.NotEqual(13, (int)Function.PerfMode);
+        }
+
+        [Fact]
+        public void PerfModeOrdinalsRoundTripOnTheWire()
+        {
+            foreach (var mode in new[]
+                     { PerfMode.Endurance, PerfMode.UserScenario, PerfMode.AiEngine, PerfMode.Unknown })
+            {
+                var envelope = new PipeEnvelope(
+                    1, Command.Response, Function.PerfMode, PipeEnvelope.FromEnum(mode));
+
+                Assert.Equal(mode, envelope.AsEnum(PerfMode.Unknown));
+            }
+        }
+
+        [Fact]
+        public void UnknownPerfModeIsNotOneOfTheThreeSelectable()
+        {
+            // Unknown is a READ result - "the firmware reported a nibble we do not model". If it
+            // ever collided with a real mode, an unrecognised device state would be painted as a
+            // mode the user could have chosen.
+            Assert.NotEqual((int)PerfMode.Endurance, (int)PerfMode.Unknown);
+            Assert.NotEqual((int)PerfMode.UserScenario, (int)PerfMode.Unknown);
+            Assert.NotEqual((int)PerfMode.AiEngine, (int)PerfMode.Unknown);
+        }
+
+        [Fact]
+        public void UninstallHandsPowerBackToTheFirmware()
+        {
+            // Restoring Manual would pin the machine to FeatureDefaults' limits with the only app
+            // that could change them uninstalled. AI Engine is what the firmware itself resets to
+            // on a power cycle.
+            Assert.Equal(PerfMode.AiEngine, FeatureDefaults.PerformanceMode);
+            Assert.NotEqual(PerfMode.UserScenario, FeatureDefaults.PerformanceMode);
+        }
+
+        [Fact]
+        public void TdpBackendKindKeepsItsSurvivingValues()
+        {
+            // RegistryMirror = 2 is retired. Auto and Wmi must not have renumbered around it,
+            // since DeviceCaps puts this on the wire.
+            Assert.Equal(0, (int)TdpBackendKind.Auto);
+            Assert.Equal(1, (int)TdpBackendKind.Wmi);
+            Assert.Equal(99, (int)TdpBackendKind.Unavailable);
+            Assert.False(Enum.IsDefined(typeof(TdpBackendKind), 2));
         }
     }
 }

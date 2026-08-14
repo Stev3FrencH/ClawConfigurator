@@ -47,15 +47,23 @@ namespace McenterLite.Shared.Ipc
         /// <summary>Which backend applies TDP. See <see cref="TdpBackendKind"/>.</summary>
         TdpBackend = 12,
 
+        // Ordinal 13 (PerfMode) is RETIRED and must never be reused. It was removed on 2026-08-13
+        // on the belief that no mode gated the WMI path. See below - the feature came back the same
+        // day on a NEW ordinal, which is exactly what this rule is for.
+
         /// <summary>
-        /// MSI's performance mode. See <see cref="PerfMode"/>.
+        /// The performance mode. See <see cref="Ipc.PerfMode"/>.
         /// </summary>
         /// <remarks>
-        /// Lives in the TDP group because it GATES the power limits: MSI only honours
-        /// <see cref="Pl1"/> and <see cref="Pl2"/> in <see cref="PerfMode.UserScenario"/>. In the
-        /// other modes MSI drives power itself and the sliders do nothing.
+        /// Lives in the TDP group because it GATES it: manual <see cref="Pl1"/> and <see cref="Pl2"/>
+        /// are honoured only in <see cref="Ipc.PerfMode.UserScenario"/>. In the other two modes the
+        /// firmware drives power itself and the sliders do nothing, so the widget hides them.
+        /// <para>
+        /// <b>14, not 13.</b> The original ordinal is retired; this is the fourth feature to return
+        /// on a new number after fan control, the charge limit and lighting.
+        /// </para>
         /// </remarks>
-        PerfMode = 13,
+        PerfMode = 14,
 
         // ── 2. Fan control ───────────────────────────────────────────────────────
         //
@@ -203,8 +211,11 @@ namespace McenterLite.Shared.Ipc
         IntelGamma = 76,
 
         // ── Coexistence ──────────────────────────────────────────────────────────
-        /// <summary>Helper -> widget. MSI Center M is running and may be fighting us for the EC/HID.</summary>
-        MsiCenterRunning = 80,
+        //
+        // Ordinal 80 (MsiCenterRunning) is RETIRED and must never be reused. It reported whether
+        // MSI Center M's servers were up and contending for the EC and HID. Removed 2026-08-13:
+        // MSI Center M is uninstalled, and no widget build ever read the value - it was carried in
+        // every snapshot and consumed by nothing.
 
         // Ordinal 81 (IntelThermalCmd) is RETIRED. It existed only to stop Intel's IPF/DTT thermal
         // stack from latching the fan above any table we wrote - an escape hatch for EC fan writes.

@@ -24,8 +24,17 @@ namespace McenterLite.Widget.Ipc
     /// </summary>
     internal sealed class NamedPipeClient : IDisposable
     {
-        /// <summary>Must match the helper exactly. A mismatch is invisible: it looks like "not started yet".</summary>
-        private const string PipePath = @"\\.\pipe\McenterLiteHelper";
+        /// <summary>
+        /// Must match <c>PipeServer.PipeName</c> exactly. A mismatch is invisible: it looks like
+        /// "not started yet".
+        /// </summary>
+        /// <remarks>
+        /// The two are separate constants because the widget cannot reference the helper's assembly
+        /// — it is a UWP AppContainer and the helper is a full-trust desktop app. That is also why
+        /// renaming the pipe on 2026-08-14 nearly shipped broken: the server moved and this did not,
+        /// and the only symptom would have been a widget that never connects.
+        /// </remarks>
+        private const string PipePath = @"\\.\pipe\ClawConfiguratorHelper";
 
         private const uint GenericRead = 0x80000000;
         private const uint GenericWrite = 0x40000000;

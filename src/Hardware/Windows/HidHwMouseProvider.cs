@@ -8,10 +8,12 @@ namespace McenterLite.Hardware.Windows
     /// </summary>
     /// <remarks>
     /// <para>
-    /// This is the firmware route, and it needs MSI Center M neither running nor installed -
-    /// unlike <see cref="RegistryHwMouseProvider"/>, whose registry value turned out to be a
-    /// mirror MSI Center M maintains by watching this very channel. Writing the mode here makes
-    /// that registry value update itself to match.
+    /// This is the firmware route, and it needs MSI Center M neither running nor installed. It had
+    /// a registry-backed fallback until 2026-08-13, deleted once MSI Center M was uninstalled and
+    /// this path resolved without it. That fallback was never a second way to reach the hardware:
+    /// its registry value was a mirror MSI Center M maintained <b>by watching this very channel</b>,
+    /// so it was a copy of this provider's own answer. Writing the mode here made the registry value
+    /// update itself to match, which is how the direction was established.
     /// </para>
     /// <para>
     /// <b>We do not own this state.</b> The physical MSI button switches the same mode, and the
