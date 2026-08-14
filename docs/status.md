@@ -69,15 +69,22 @@ All five talk to the firmware directly and need MSI Center M neither running nor
 - **Fan control** via `MSI_ACPI.Set_Fan` (ACPI-WMI), 2026-08-12.
 
 **Every feature on the roadmap is built, and the MSI Center M scaffolding is gone.**
-`RegistryTdpProvider`, `RegistryHwMouseProvider`, `PerfMode`, `TdpBackendKind.RegistryMirror` and
+`RegistryTdpProvider`, `RegistryHwMouseProvider`, `TdpBackendKind.RegistryMirror` and
 `IsMsiCenterRunning` were all deleted on 2026-08-13, once the uninstall proved the firmware paths
 stand on their own. There is one backend per feature now, and no fallback that depends on software
 this machine no longer has.
 
+> **`PerfMode` went with them and came straight back.** Deleting it was the one mistake in that
+> sweep, and it took a shutdown to surface — see [The TDP regression](#the-tdp-regression-and-what-it-cost)
+> below. The performance mode is not MSI Center M's idea; it is in the firmware, and it gates
+> whether the power limits mean anything.
+
 ## Current build
 
-**0.2.0.32, Debug**, on branch `release/rc1`. Since 0.2.0.24 this branch has done four things, all
+**0.2.0.33, Debug**, on branch `release/rc1`. Since 0.2.0.24 this branch has done five things, all
 verified on device:
+
+0. **Found and fixed the TDP gate** — the headline item, below.
 
 1. **Rewrote the uninstall/restore flow**, which verification found could not work at all —
    `--uninstall` tore down without restoring anything, and the documented order deleted the helper
@@ -99,6 +106,38 @@ A full uninstall → remove → reinstall cycle was run on 2026-08-13 and both h
 > as Gamepad, and the write needed a marker key and a once-only gate purely to avoid undoing the
 > physical MSI button — machinery whose whole job was containing the feature it enabled. Uninstall
 > still sets Gamepad; that one earns its exception.
+
+### The TDP regression, and what it cost
+
+**Symptom, 2026-08-13:** after the first full shutdown following MSI Center M's uninstall, the widget
+wrote 15/17 W, `Get_SlaveBattery|1` read back 15/17, the helper logged a confirmed write — and the
+CPU drew 37 W bursts settling to 25 W. Every layer reported success.
+
+**Cause:** `Get_AP`/`Set_AP` sub-function 0, byte 3, low nibble is the performance mode, and it gates
+the limits. `6` = User Scenario honours them; `2` = Endurance and `1` = AI Engine do not. The EC holds
+it across warm reboots but resets to AI Engine on a true power cycle, and **MSI Center M's service had
+been restoring it at every boot** — which is why this project never had to write it and never noticed
+the dependency. Under AI Engine the same register carries `19 25` = 25/37, so the CPU was not ignoring
+a limit; it was obeying a different one.
+
+**Fixed in 0.2.0.33**, and verified by doing the thing that broke it: MSI Center M uninstalled, full
+shutdown, cold boot. The log shows `Re-applied PL1=13W PL2=15W.` then `Re-applied performance mode
+UserScenario.`, `--perf-gate` reads `0xC6`, and live package power reads 15 W against a 25 W
+automatic floor.
+
+**Three things this episode is worth remembering for:**
+
+- **It is the fan-control flag, exactly.** A value written faithfully into a register nothing was
+  reading, with a separate enable byte elsewhere deciding whether it counted. Second time. When a
+  write reads back perfectly and the device does not change, **look for the gate** before doubting
+  the register.
+- **The deletion that caused it cited the right evidence for the wrong claim.** `PerfMode` was
+  removed because `WmiTdpProvider.TryReadMode` "could only ever answer yes" — true, and the reason
+  was that it was hard-coded, not that the hardware was ungated. A constant implementation is
+  evidence about the code, never about the device.
+- **The removal commit contained the answer.** `32c9021` noted the registry backend "forces MSI into
+  User Scenario mode itself before writing a limit." The gate was named, in the commit that deleted
+  the concept, and walked past twice.
 
 ### Earlier on this branch — 0.2.0.24
 
