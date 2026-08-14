@@ -1500,6 +1500,42 @@ only found this by also matching `TFN1` — worth correcting before it misses so
 
 ---
 
+## The hardware button — measured 2026-08-14
+
+**The button was never broken.** It stopped doing anything when MSI Center M was uninstalled because
+MSI Center M was the only thing *listening*. The button raises a firmware event and leaves the
+decision to software; with no subscriber, the event fires into an empty room.
+
+| Fact | Value |
+|---|---|
+| Class | **`MSI_Event`** in `root\wmi`, GUID `{5B3CC38A-40D9-7245-8AE6-1145B751BE3F}` |
+| Kind | Derives `WMIEvent` → `__ExtrinsicEvent` — a real WMI event, not a pollable table |
+| Payload | **`MSIEvt`**, `UInt32` |
+| Button code | **`0x220029`** (2228265) |
+| Source instance | `ACPI\PNP0C14\0_0` — Windows' own ACPI-WMI mapper, the same `_WDG` bridge as `MSI_ACPI` |
+| Repeatability | Six presses, six events, identical code every time |
+
+Read it with `--watch-events`. Subscribing is the strongest kind of read-only: it receives and
+cannot write.
+
+**Why this is the good case for repurposing.** Every other feature in this project had to take
+something over from MSI Center M and hold it. This one is a vacant slot: nothing else is subscribed,
+nothing has to be wrested away, and a subscriber cannot conflict with a firmware behaviour the way a
+register write can. It is also the first thing found here that MSI Center M *added* rather than
+mediated.
+
+### Still open
+
+- **Press versus press-and-release.** Six events for "a few presses" is consistent with one event per
+  press, but the exact number of presses was not recorded. Worth pinning before anything acts on it,
+  since a repurposed button that fires twice per press would be visibly wrong.
+- **Whether other codes exist on this channel.** Only one button was pressed. The volume rocker,
+  power button and the MSI button's controller-mode switch may or may not report here.
+- **Whether the code carries structure.** `0x00220029` splits plausibly as `0x0022` / `0x0029`, but
+  with a single observed value there is nothing to compare against. Do not read meaning into it.
+
+---
+
 ## Open questions
 
 Ordered by how much they block. The first one decides the architecture.

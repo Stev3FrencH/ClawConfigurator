@@ -63,6 +63,7 @@ namespace McenterLite.Probe
                 case "fan": return Commands.Fan.Read(rest);
                 case "set-fan": return Commands.Fan.Set(rest);
                 case "set-fan-control": return Commands.Fan.SetControl(rest);
+                case "watch-events": return Commands.EventWatcher.Run(rest);
                 case "perf-gate": return Commands.PerfGate.Read(rest);
                 case "set-perf-gate": return Commands.PerfGate.Set(rest);
 
@@ -107,6 +108,11 @@ READ
   --hid-listen [secs]       Listen on the vendor command channel only, with no enumeration
                             polling. Change lighting in MSI Center M during a run to see
                             what, if anything, the device reports back.
+  --watch-events [secs]     Subscribe to MSI_Event and print every firmware notification, with
+                            its MSIEvt code. This is how a hardware button most likely reports
+                            itself - MSI Center M was probably just the subscriber, which would
+                            mean the buttons that stopped working are simply unlistened-to.
+                            Read-only in the strongest sense: subscribing cannot write.
 
   --charge-limit            Read the battery charge limit (MSI_ACPI.Get_AP, byte 5) and dump
                             the whole package, so a change anywhere else is visible.
