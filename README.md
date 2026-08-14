@@ -110,7 +110,12 @@ export PATH="$HOME/.dotnet:$PATH"
 
 ## Installing
 
-There is no pre-built release yet — the widget has to be built, packaged and signed first, on
+> **Installing it, rather than developing it?** See
+> [`docs/install.md`](docs/install.md) — install and uninstall written for someone who did not build
+> this, including what the certificate import actually grants and how to fix a failed framework
+> dependency. The rest of this section is about building and installing from source.
+
+The widget has to be built, packaged and signed first, on
 whatever Windows machine has Visual Studio 2022 set up (see
 [`docs/building-the-widget.md`](docs/building-the-widget.md)). That machine does **not** have to
 be the Claw. Signing happens there too, using that machine's certificate private key — the Claw
