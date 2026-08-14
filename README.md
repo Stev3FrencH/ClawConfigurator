@@ -165,6 +165,35 @@ and installs the newest package it finds under `src/Package/AppPackages/`. It re
 under Windows PowerShell 5.1 and elevates on its own, so a plain prompt is fine — but it still has
 to be *loadable*, hence `-ExecutionPolicy Bypass`.
 
+### Giving it to someone else
+
+Hand over three things — the `AppPackages/...` folder, `Install.ps1` and `Uninstall.ps1`, and
+`msi-mcenter-lite.cer`. Never the `.pfx`: that is the signing key itself, and anyone holding it can
+sign anything in this name.
+
+Tell them these four things, because none of them are discoverable and the first one deserves an
+informed decision rather than a click-through:
+
+1. **Importing the certificate means trusting a stranger's signing key.** This app is signed with a
+   self-signed certificate rather than one from a certificate authority, so Windows will not install
+   it until the machine is told to trust that key. `Install.ps1` does that, with elevation, by
+   importing the `.cer` into `LocalMachine\TrustedPeople`. From then on the machine will accept
+   **anything** signed by that key, not just this app, until the certificate is removed or it expires
+   on 2027-08-11. `Uninstall.ps1 -RemoveCertificate` removes it again. It goes into `TrustedPeople`
+   and never into `Root` — a root CA would be trusted for every purpose, including impersonating web
+   sites.
+2. **Sideloading has to be allowed.** *Settings → Privacy & security → For developers → Developer
+   Mode*. Without it the install fails on policy grounds and the error does not mention sideloading.
+3. **This is an MSI Claw 8 EX AI+ build.** On any other machine the device gate hides every hardware
+   card and only CPU Boost and OS Power Mode do anything, so it is worth saying up front rather than
+   letting someone install it and find a near-empty widget.
+4. **The one elevation prompt on first run is not optional.** The helper uses it to deploy itself and
+   register its scheduled task; decline it and every hardware control stays dead with no obvious
+   reason why.
+
+To uninstall, they run `Uninstall.ps1` — not *Settings → Apps*, which does only half the job and
+leaves the device on this app's settings. See [Uninstalling](#uninstalling).
+
 ### Seeing the UI on a machine that is not a Claw
 
 The device gate hides every hardware card on anything that is not a Claw 8 EX, leaving only the
@@ -202,11 +231,23 @@ desktop-mouse mode with the app that switched you gone is a state worth rescuing
 
 ### Uninstalling
 
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Uninstall.ps1
+```
+
+That does the whole thing in the right order, closes the widget so it cannot undo the first step
+half way through, and saves your profile files and the final `helper.log` to a folder on the Desktop
+before the app removal deletes them. Add `-RemoveCertificate` to also stop trusting the signing key,
+or `-SkipBackup` if you want nothing kept.
+
+The rest of this section is what the script is doing, and is worth reading if you ever have to do it
+by hand.
+
 **Order matters, and it is the opposite of what you would guess.** Run the helper's `--uninstall`
 **first**, then remove the app:
 
 ```powershell
-& "$env:LOCALAPPDATA\Packages\ClawConfigurator_xq4frxrkckec6\LocalCache\ClawConfigurator\Helper\McenterLite.Helper.exe" --uninstall
+& "$env:LOCALAPPDATA\Packages\ClawConfigurator_xq4frxrkckec6\LocalCache\ClawConfigurator\Helper\ClawConfigurator.Helper.exe" --uninstall
 ```
 
 That puts every feature back to its default, unregisters the scheduled task and removes the deployed
@@ -226,7 +267,7 @@ To see what the restore does **without** uninstalling anything, close the Game B
 code path on its own:
 
 ```powershell
-& "$env:LOCALAPPDATA\Packages\ClawConfigurator_xq4frxrkckec6\LocalCache\ClawConfigurator\Helper\McenterLite.Helper.exe" --restore
+& "$env:LOCALAPPDATA\Packages\ClawConfigurator_xq4frxrkckec6\LocalCache\ClawConfigurator\Helper\ClawConfigurator.Helper.exe" --restore
 ```
 
 It applies every default, **forgets your saved choices**, and exits with the app still installed —
@@ -359,7 +400,7 @@ For development and discovery, without installing the packaged app — against s
 on any Windows machine:
 
 ```
-McenterLite.Helper.exe --fake-hardware
+ClawConfigurator.Helper.exe --fake-hardware
 ```
 
 Discovery and verification, on the Claw, elevated:
