@@ -224,6 +224,33 @@ namespace McenterLite.Widget
         };
 
         /// <summary>
+        /// The performance-mode segments, left to right: what each says and the wire value it means.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Everywhere else in this file the segment index IS the wire value. This control is the
+        /// exception: the order here runs automatic-to-manual for the reader, which is not the order
+        /// of <see cref="PerfMode"/>'s ordinals.
+        /// </para>
+        /// <para>
+        /// Label and mode are paired in ONE table rather than two arrays kept in step, so
+        /// rearranging the buttons is a matter of moving whole rows and cannot desynchronise what a
+        /// button says from what it does.
+        /// </para>
+        /// <para>
+        /// <b>"Manual" rather than MSI's "User Scenario"</b>: their name is meaningless out of
+        /// context, and the thing that matters about the mode is that it is the only one where the
+        /// sliders below do anything.
+        /// </para>
+        /// </remarks>
+        private static readonly (PerfMode Mode, string Label)[] PerfModeSegmentOrder =
+        {
+            (PerfMode.Endurance, "Endurance"),
+            (PerfMode.AiEngine, "AI Engine"),
+            (PerfMode.UserScenario, "Manual"),
+        };
+
+        /// <summary>
         /// The CPU-boost segments, left to right. Off first, so the row reads in the same
         /// direction as every other selector here: least intervention on the left.
         /// </summary>
@@ -295,6 +322,7 @@ namespace McenterLite.Widget
 
         private SegmentedControl _fan;
         private SegmentedControl _lighting;
+        private SegmentedControl _perfMode;
         private SegmentedControl _hwMouse;
         private SegmentedControl _cpuBoost;
         private SegmentedControl _powerMode;
@@ -315,6 +343,13 @@ namespace McenterLite.Widget
 
             try
             {
+                // Labels come from the table, so they cannot drift out of step with the modes they
+                // stand for. See PerfModeSegmentOrder - this is the one control where the segment
+                // index is NOT the wire value.
+                _perfMode = new SegmentedControl(PerfModeSegments,
+                    Array.ConvertAll(PerfModeSegmentOrder, segment => segment.Label));
+                _perfMode.Selected += OnPerfModeSelected;
+
                 _hwMouse = new SegmentedControl(HwMouseSegments,
                     Array.ConvertAll(HwMouseSegmentOrder, segment => segment.Label));
                 _hwMouse.Selected += OnHwMouseSelected;
@@ -710,6 +745,8 @@ namespace McenterLite.Widget
 
         private void ApplyAllValues()
         {
+            // Before the sliders: it decides whether they are even shown.
+            ApplyValue(Function.PerfMode);
             ApplyValue(Function.Pl1);
             ApplyValue(Function.Pl2);
             ApplyValue(Function.ChargeLimitPercent);
@@ -736,6 +773,14 @@ namespace McenterLite.Widget
         {
             switch (function)
             {
+                case Function.PerfMode:
+                    // Pushed on the telemetry tick as well as at connect: the firmware resets this
+                    // to AI Engine on a true power cycle, and anything else driving the EC can move
+                    // it. A stale "Manual" here would show sliders that do nothing.
+                    ApplyPerfMode((PerfMode)_connection.GetInt(
+                        Function.PerfMode, (int)PerfMode.UserScenario));
+                    break;
+
                 case Function.Pl1:
                     Pl1Slider.Value = _connection.GetInt(Function.Pl1, (int)Pl1Slider.Minimum);
                     Pl1ValueText.Text = $"{(int)Pl1Slider.Value} W";
@@ -861,6 +906,48 @@ namespace McenterLite.Widget
         // and the flag would otherwise have to be kept in step by hand.
         private int _pendingPl1 = -1;
         private int _pendingPl2 = -1;
+
+        /// <summary>
+        /// Paints the mode and shows or hides the sliders with it.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>Hidden rather than disabled outside Manual.</b> A greyed-out slider next to the mode
+        /// that greyed it arguably explains itself, but on an 8-inch screen it read as clutter. The
+        /// card collapsing to a single row is a clearer signal that the firmware is driving power,
+        /// and three mode buttons directly above make "Manual is the one with sliders" obvious after
+        /// one press.
+        /// </para>
+        /// <para>
+        /// This is not a cosmetic gate. Outside Manual the firmware accepts a power limit, reads it
+        /// back unchanged, and runs its own numbers — so a visible slider would be actively lying.
+        /// </para>
+        /// </remarks>
+        private void ApplyPerfMode(PerfMode mode)
+        {
+            // Unknown is not on the control: the firmware reported a nibble we do not model, so
+            // leave the selection alone rather than misrepresenting it as one of the three we do.
+            int segment = Array.FindIndex(PerfModeSegmentOrder, s => s.Mode == mode);
+            if (segment >= 0) _perfMode.Show(segment);
+
+            PowerLimitControls.Visibility =
+                mode == PerfMode.UserScenario ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private async void OnPerfModeSelected(int segment)
+        {
+            if (_applyingFromHelper) return;
+            if (segment < 0 || segment >= PerfModeSegmentOrder.Length) return;
+
+            var mode = PerfModeSegmentOrder[segment].Mode;
+            ApplyPerfMode(mode);
+            await SendAsync(Function.PerfMode, (int)mode);
+
+            // A mode change moves more than the mode: the limits the firmware reports can change
+            // with it - AI Engine carries its own 25/37 W pair in the same register. Re-sync
+            // everything rather than guessing the blast radius of someone else's state machine.
+            await _connection.RefreshAsync();
+        }
 
         private void Pl1Slider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {

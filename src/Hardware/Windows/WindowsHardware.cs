@@ -146,6 +146,14 @@ namespace McenterLite.Hardware.Windows
         }
 
         public OpResult Apply(int pl1, int pl2) => OpResult.Unavailable(UnavailableReason);
+
+        public bool TryReadMode(out PerfMode mode)
+        {
+            mode = PerfMode.Unknown;
+            return false;
+        }
+
+        public OpResult ApplyMode(PerfMode mode) => OpResult.Unavailable(UnavailableReason);
     }
 
     internal sealed class UnavailableChargeLimit : IChargeLimitProvider

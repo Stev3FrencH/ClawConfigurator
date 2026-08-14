@@ -159,6 +159,7 @@ namespace McenterLite.Helper.Settings
         {
             SettingsKeys.Pl1,
             SettingsKeys.Pl2,
+            SettingsKeys.PerfMode,
             SettingsKeys.ChargeLimit,
             SettingsKeys.FanProfile,
             SettingsKeys.CpuBoost,
@@ -215,6 +216,18 @@ namespace McenterLite.Helper.Settings
         public const string Pl1 = "Pl1";
         public const string Pl2 = "Pl2";
         public const string TdpBackend = "TdpBackend";
+
+        /// <summary>
+        /// The performance mode, which gates whether <see cref="Pl1"/> and <see cref="Pl2"/> apply.
+        /// </summary>
+        /// <remarks>
+        /// Persisted because the firmware forgets it: the EC holds the mode across warm reboots and
+        /// resets to AI Engine on a true power cycle. MSI Center M used to restore it from its
+        /// service at every boot, which is why nothing here ever had to — and why the first full
+        /// shutdown after uninstalling it silently returned the machine to automatic power with the
+        /// sliders still showing values that no longer did anything.
+        /// </remarks>
+        public const string PerfMode = "PerfMode";
 
         public const string ChargeLimit = "ChargeLimit";
 

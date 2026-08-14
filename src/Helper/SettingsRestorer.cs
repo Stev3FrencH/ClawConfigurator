@@ -49,6 +49,9 @@ namespace McenterLite.Helper
 
             // Power limits. Without this the device keeps whatever limit was last set forever,
             // including after an uninstall, and the user has no way back.
+            //
+            // LIMITS FIRST, THEN THE MODE, matching startup and the fan tables' relationship with
+            // their control flag: the mode is what makes the limits mean anything.
             if (hardware.Tdp.Available)
             {
                 int pl1 = FeatureDefaults.Pl1;
@@ -57,6 +60,12 @@ namespace McenterLite.Helper
 
                 Record(problems, log, "power limits",
                     hardware.Tdp.Apply(pl1, pl2), $"Restored PL1={pl1}W PL2={pl2}W.");
+
+                // Hands power back to the firmware. Leaving Manual behind would pin the machine to
+                // the limits above with the only app that could change them now gone.
+                Record(problems, log, "performance mode",
+                    hardware.Tdp.ApplyMode(FeatureDefaults.PerformanceMode),
+                    $"Restored performance mode = {FeatureDefaults.PerformanceMode}.");
             }
 
             // Charge limit. Persists in firmware and outlives the app, which matters more now that

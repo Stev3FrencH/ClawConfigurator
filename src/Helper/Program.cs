@@ -497,6 +497,27 @@ namespace McenterLite.Helper
                     }
                 }
 
+                // The performance mode, on the same slower beat as the fan flag below and for the
+                // same reason. It is not ours alone: the firmware resets it to AI Engine on a power
+                // cycle, and anything else driving this EC can move it. A stale "Manual" on the
+                // card would show sliders that do nothing - the exact failure this feature exists
+                // to make visible.
+                if (hardware.Tdp.Available && ticksSinceFanRead + 1 >= FanTelemetryEveryNTicks)
+                {
+                    try
+                    {
+                        if (hardware.Tdp.TryReadMode(out var perfMode))
+                        {
+                            server.Send(PipeEnvelope.Event(
+                                Function.PerfMode, PipeEnvelope.FromEnum(perfMode)));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warn($"Performance-mode telemetry read failed: {ex.Message}");
+                    }
+                }
+
                 // The fan-control flag, on a slower beat - see the rate note above.
                 //
                 // Same problem as the controller mode, from a different direction: MSI Center M is
@@ -629,6 +650,11 @@ namespace McenterLite.Helper
         {
             // TDP: the EC forgets across sleep and power-source changes, so this is re-applied
             // rather than assumed to have survived.
+            //
+            // LIMITS FIRST, THEN THE MODE - the same order as the fan tables and their control
+            // flag, for the same reason. The mode is what makes the limits take effect, so putting
+            // it first would run the machine on whatever pair the register held from last time for
+            // as long as the two writes take.
             if (hardware.Tdp.Available)
             {
                 int pl1 = settings.GetInt(SettingsKeys.Pl1, -1);
@@ -640,6 +666,23 @@ namespace McenterLite.Helper
                     Log.Info(result.Ok
                         ? $"Re-applied PL1={pl1}W PL2={pl2}W."
                         : $"Could not re-apply power limits: {result.Error}");
+                }
+
+                // The performance mode, and this one is NOT insurance - it is required.
+                //
+                // The EC keeps the mode across a warm reboot but resets to AI Engine on a true
+                // power cycle. MSI Center M's service used to put it back at every boot, so nothing
+                // here ever had to. With MSI Center M uninstalled, the first full shutdown left the
+                // machine on the firmware's automatic 25/37 W pair while the widget went on
+                // reporting the limits it had written - accepted, read back, and ignored.
+                int storedMode = settings.GetInt(SettingsKeys.PerfMode, -1);
+                if (storedMode >= 0 && Enum.IsDefined(typeof(PerfMode), storedMode))
+                {
+                    var mode = (PerfMode)storedMode;
+                    var result = hardware.Tdp.ApplyMode(mode);
+                    Log.Info(result.Ok
+                        ? $"Re-applied performance mode {mode}."
+                        : $"Could not re-apply the performance mode: {result.Error}");
                 }
             }
 

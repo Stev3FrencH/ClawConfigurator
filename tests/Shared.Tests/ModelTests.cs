@@ -410,7 +410,7 @@ namespace McenterLite.Shared.Tests
     public class RetiredOrdinalTests
     {
         [Theory]
-        [InlineData(13)]  // PerfMode - MSI's performance mode, with the registry mirror
+        [InlineData(13)]  // PerfMode - removed with the registry mirror, then CAME BACK on 14
         [InlineData(80)]  // MsiCenterRunning - contention warning, consumed by nothing
         [InlineData(20)]  // FanEnabled  \
         [InlineData(21)]  // FanPreset    | the 2026-08-08 preset model, never written to hardware
@@ -435,6 +435,51 @@ namespace McenterLite.Shared.Tests
             Assert.Equal(10, (int)Function.Pl1);
             Assert.Equal(11, (int)Function.Pl2);
             Assert.Equal(12, (int)Function.TdpBackend);
+        }
+
+        [Fact]
+        public void PerfModeReturnedOnANewOrdinal()
+        {
+            // Removed on 2026-08-13 and restored the same day, once the mode turned out to live in
+            // the firmware rather than in MSI Center M. It must NOT have reclaimed 13 - the whole
+            // point of retiring an ordinal is that a stale message from an old widget cannot land
+            // on a live function, and this one reaches an embedded controller.
+            Assert.Equal(14, (int)Function.PerfMode);
+            Assert.NotEqual(13, (int)Function.PerfMode);
+        }
+
+        [Fact]
+        public void PerfModeOrdinalsRoundTripOnTheWire()
+        {
+            foreach (var mode in new[]
+                     { PerfMode.Endurance, PerfMode.UserScenario, PerfMode.AiEngine, PerfMode.Unknown })
+            {
+                var envelope = new PipeEnvelope(
+                    1, Command.Response, Function.PerfMode, PipeEnvelope.FromEnum(mode));
+
+                Assert.Equal(mode, envelope.AsEnum(PerfMode.Unknown));
+            }
+        }
+
+        [Fact]
+        public void UnknownPerfModeIsNotOneOfTheThreeSelectable()
+        {
+            // Unknown is a READ result - "the firmware reported a nibble we do not model". If it
+            // ever collided with a real mode, an unrecognised device state would be painted as a
+            // mode the user could have chosen.
+            Assert.NotEqual((int)PerfMode.Endurance, (int)PerfMode.Unknown);
+            Assert.NotEqual((int)PerfMode.UserScenario, (int)PerfMode.Unknown);
+            Assert.NotEqual((int)PerfMode.AiEngine, (int)PerfMode.Unknown);
+        }
+
+        [Fact]
+        public void UninstallHandsPowerBackToTheFirmware()
+        {
+            // Restoring Manual would pin the machine to FeatureDefaults' limits with the only app
+            // that could change them uninstalled. AI Engine is what the firmware itself resets to
+            // on a power cycle.
+            Assert.Equal(PerfMode.AiEngine, FeatureDefaults.PerformanceMode);
+            Assert.NotEqual(PerfMode.UserScenario, FeatureDefaults.PerformanceMode);
         }
 
         [Fact]

@@ -62,12 +62,28 @@ namespace McenterLite.Hardware
         /// </summary>
         OpResult Apply(int pl1, int pl2);
 
-        // TryReadMode / ApplyMode are gone as of 2026-08-13, with MSI's whole "performance mode"
-        // concept. They existed for the registry-mirror backend, where a manual limit was only
-        // honoured in User Scenario. The WMI path writes the EC directly and is not gated by that
-        // triple at all - which is why its implementation answered UserScenario unconditionally
-        // and no-opped the write. An interface method whose only honest implementation is a
-        // constant is not describing the hardware.
+        /// <summary>
+        /// The performance mode, which decides whether <see cref="Apply"/> means anything.
+        /// </summary>
+        /// <remarks>
+        /// <b>Removed and restored on 2026-08-13.</b> These were deleted on the belief that the WMI
+        /// path was ungated, and the implementation that "proved" it answered
+        /// <see cref="PerfMode.UserScenario"/> unconditionally and no-opped the write. It was not
+        /// describing the hardware; it was describing the assumption. The mode is real, it is in the
+        /// firmware rather than in MSI Center M, and a device sitting in Endurance or AI Engine
+        /// accepts a power limit, reads it back unchanged, and runs its own numbers instead.
+        /// </remarks>
+        bool TryReadMode(out PerfMode mode);
+
+        /// <summary>
+        /// Switches the performance mode.
+        /// </summary>
+        /// <remarks>
+        /// Kept separate from <see cref="Apply"/> rather than folded into it. Forcing the mode on
+        /// every limit write would silently overrule a user who chose an automatic mode on purpose -
+        /// and the mode is now a control of its own, so that choice is theirs to make and see.
+        /// </remarks>
+        OpResult ApplyMode(PerfMode mode);
     }
 
     /// <summary>

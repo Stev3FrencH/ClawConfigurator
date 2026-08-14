@@ -92,6 +92,11 @@ namespace McenterLite.Helper
                 case Function.TdpBackend:
                     return PipeEnvelope.FromEnum(_hw.Tdp.Backend);
 
+                case Function.PerfMode:
+                    return _hw.Tdp.TryReadMode(out var perfMode)
+                        ? PipeEnvelope.FromEnum(perfMode)
+                        : null;
+
                 case Function.ChargeLimitPercent:
                     return _hw.ChargeLimit.TryRead(out int chargePercent)
                         ? PipeEnvelope.FromInt(chargePercent)
@@ -174,6 +179,9 @@ namespace McenterLite.Helper
                 case Function.Pl2:
                     return SetTdp(request);
 
+                case Function.PerfMode:
+                    return SetPerfMode(request);
+
                 case Function.ChargeLimitPercent:
                     return SetChargeLimit(request);
 
@@ -245,6 +253,48 @@ namespace McenterLite.Helper
             Log.Info($"TDP {request.Fn} -> {pl1}/{pl2} W via {_hw.Tdp.Backend}; hardware reports {actualPl1}/{actualPl2} W.");
 
             return Ok(request, PipeEnvelope.FromInt(request.Fn == Function.Pl1 ? actualPl1 : actualPl2));
+        }
+
+        /// <summary>
+        /// Switches the performance mode — the gate that decides whether the power limits apply.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Persisted, because the firmware forgets it. The EC holds the mode across warm reboots
+        /// but resets to AI Engine on a true power cycle, and MSI Center M — which used to restore
+        /// it from its service at every boot — is uninstalled. Without this setting and the startup
+        /// re-apply that reads it, every full shutdown silently returns the machine to automatic
+        /// power and the sliders stop meaning anything. That is exactly the regression this feature
+        /// was written to fix.
+        /// </para>
+        /// <para>
+        /// Logged on success as well as failure. A mode change is invisible until the machine is
+        /// under load, so "what did we send" cannot be reconstructed afterwards from how it behaves.
+        /// </para>
+        /// </remarks>
+        private PipeEnvelope SetPerfMode(PipeEnvelope request)
+        {
+            if (!_hw.Tdp.Available)
+                return PipeEnvelope.Failure(request.Id, request.Fn, _hw.Tdp.UnavailableReason);
+
+            var mode = request.AsEnum(PerfMode.UserScenario);
+
+            var result = _hw.Tdp.ApplyMode(mode);
+            if (!result.Ok)
+            {
+                Log.Warn($"Performance mode write FAILED: asked for {mode} - {result.Error}");
+                return PipeEnvelope.Failure(request.Id, request.Fn, result.Error);
+            }
+
+            _settings.SetInt(SettingsKeys.PerfMode, (int)mode);
+
+            _hw.Tdp.TryReadMode(out var actual);
+            Log.Info($"Performance mode -> {mode}; hardware reports {actual}."
+                + (actual == PerfMode.UserScenario
+                    ? " Manual power limits apply."
+                    : " The firmware drives power; manual limits are ignored."));
+
+            return Ok(request, PipeEnvelope.FromEnum(actual));
         }
 
         private PipeEnvelope SetChargeLimit(PipeEnvelope request)
@@ -542,6 +592,7 @@ namespace McenterLite.Helper
             Function.Pl1,
             Function.Pl2,
             Function.TdpBackend,
+            Function.PerfMode,
             Function.ChargeLimitPercent,
             Function.HwMouseMode,
             Function.LightingProfile,

@@ -70,6 +70,25 @@ namespace McenterLite.Hardware.Windows
         private const int Pl1Byte = 1;
         private const int Pl2Byte = 2;
 
+        // ── The gate ────────────────────────────────────────────────────────────
+        //
+        // The performance mode lives in a DIFFERENT register from the limits: Get_AP/Set_AP
+        // sub-function 0, byte 3, low nibble. Same package the charge limit uses (byte 5 there),
+        // which is safe because both writes echo the whole package back.
+        //
+        // Measured 2026-08-13 by sweeping every Get_* across MSI Center M's three modes; byte 3 is
+        // the only non-telemetry byte that tracks the selector. The numbers are the firmware's, not
+        // ours, and deliberately do not match MSI's registry ShiftMode - see docs/hardware-notes.md.
+        private const string ModeReadMethod = "Get_AP";
+        private const string ModeWriteMethod = "Set_AP";
+        private const byte ModeSubFunction = 0x00;
+        private const int ModeByte = 3;
+        private const byte ModeMask = 0x0F;
+
+        private const byte NibbleUserScenario = 0x6;
+        private const byte NibbleEndurance = 0x2;
+        private const byte NibbleAiEngine = 0x1;
+
         private readonly string _unavailableReason;
 
         public WmiTdpProvider()
@@ -121,11 +140,87 @@ namespace McenterLite.Hardware.Windows
             return OpResult.Success();
         }
 
-        // TryReadMode / ApplyMode are gone as of 2026-08-13. This path writes the EC directly and
-        // is never gated by MSI's Endurance/AI Engine/Manual triple - confirmed by writing through
-        // it with MSI Center M's whole user-mode stack, and with it any notion of "mode", stopped.
-        // So the implementations answered UserScenario unconditionally and no-opped the write,
-        // which described the interface rather than the hardware.
+        /// <summary>
+        /// Reads the performance mode from <c>Get_AP</c> sub-function 0, byte 3, low nibble.
+        /// </summary>
+        /// <remarks>
+        /// <b>A different register from the power limits themselves</b>, and the same one the charge
+        /// limit lives in — byte 5 there, byte 3 here. Both writes are read-modify-write over the
+        /// whole package, so each preserves the other; that discipline is why the charge limit
+        /// survived a mode byte nobody knew was a mode byte.
+        /// </remarks>
+        public bool TryReadMode(out PerfMode mode)
+        {
+            mode = PerfMode.Unknown;
+
+            var request = new byte[PackageSize];
+            request[0] = ModeSubFunction;
+
+            if (!TryInvoke(ModeReadMethod, request, out var package, out _)) return false;
+            if (package == null || package.Length <= ModeByte) return false;
+
+            mode = DecodeMode(package[ModeByte]);
+            return true;
+        }
+
+        /// <summary>
+        /// Switches the performance mode, writing only the low nibble of byte 3.
+        /// </summary>
+        /// <remarks>
+        /// The high nibble has read <c>C</c> in every observation and is not ours to author, so it
+        /// is echoed. Confirmed with a separate read, like every write on this class.
+        /// </remarks>
+        public OpResult ApplyMode(PerfMode mode)
+        {
+            if (!Available) return OpResult.Unavailable(_unavailableReason);
+
+            byte nibble;
+            switch (mode)
+            {
+                case PerfMode.UserScenario: nibble = NibbleUserScenario; break;
+                case PerfMode.Endurance: nibble = NibbleEndurance; break;
+                case PerfMode.AiEngine: nibble = NibbleAiEngine; break;
+
+                default:
+                    // Unknown is a READ result - "the firmware said something we do not model". It
+                    // is not a mode anyone can ask for, and writing a guess would be worse than
+                    // refusing.
+                    return OpResult.Fail($"There is no performance mode '{mode}' to switch to.");
+            }
+
+            var request = new byte[PackageSize];
+            request[0] = ModeSubFunction;
+
+            if (!TryInvoke(ModeReadMethod, request, out var before, out var readError))
+                return OpResult.Fail("Could not read the performance mode: " + readError);
+
+            if (before == null || before.Length <= ModeByte)
+                return OpResult.Fail($"{ModeReadMethod} returned no usable package.");
+
+            var payload = (byte[])before.Clone();
+            payload[0] = ModeSubFunction;
+            payload[ModeByte] = (byte)((before[ModeByte] & ~ModeMask) | nibble);
+
+            if (!TryInvoke(ModeWriteMethod, payload, out _, out var writeError))
+                return OpResult.Fail("Could not switch the performance mode: " + writeError);
+
+            if (!TryInvoke(ModeReadMethod, request, out var after, out var verifyError))
+                return OpResult.Fail("Switched the performance mode but could not read it back: " + verifyError);
+
+            var actual = DecodeMode(after[ModeByte]);
+            if (actual != mode)
+                return OpResult.Fail($"The performance mode did not stick: asked for {mode}, the device reports {actual}.");
+
+            return OpResult.Success();
+        }
+
+        private static PerfMode DecodeMode(byte gate) => (gate & ModeMask) switch
+        {
+            NibbleUserScenario => PerfMode.UserScenario,
+            NibbleEndurance => PerfMode.Endurance,
+            NibbleAiEngine => PerfMode.AiEngine,
+            _ => PerfMode.Unknown,
+        };
 
         private static byte[] BuildReadPayload()
         {

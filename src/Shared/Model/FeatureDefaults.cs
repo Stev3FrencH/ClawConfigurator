@@ -44,6 +44,28 @@ namespace McenterLite.Shared.Model
         public const int Pl2 = 19;
 
         /// <summary>
+        /// The performance mode an uninstall leaves behind.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>AI Engine, not Manual</b>, and the reason is the whole point of restoring anything:
+        /// this is the mode the firmware itself resets to on a power cycle, so it is what "as if
+        /// this app never ran" actually means on this device.
+        /// </para>
+        /// <para>
+        /// Leaving it in Manual would be the harmful choice. Manual means the firmware obeys
+        /// <see cref="Pl1"/>/<see cref="Pl2"/> — so an uninstall would walk away having pinned the
+        /// machine to 17/19 W with the only app that could change it now gone. AI Engine hands
+        /// power back to the firmware, which is the one actor guaranteed to still be there.
+        /// </para>
+        /// </remarks>
+        /// <remarks>
+        /// Named <c>PerformanceMode</c> and not <c>PowerMode</c>: <see cref="PowerMode"/> is
+        /// already Windows' overlay, and these two are unrelated things a page apart.
+        /// </remarks>
+        public const PerfMode PerformanceMode = PerfMode.AiEngine;
+
+        /// <summary>
         /// Battery charge limit, percent. 100 means charge to full.
         /// </summary>
         /// <remarks>

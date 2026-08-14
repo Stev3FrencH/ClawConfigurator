@@ -47,10 +47,23 @@ namespace McenterLite.Shared.Ipc
         /// <summary>Which backend applies TDP. See <see cref="TdpBackendKind"/>.</summary>
         TdpBackend = 12,
 
-        // Ordinal 13 (PerfMode) is RETIRED and must never be reused. It carried MSI's performance
-        // mode, which mattered only to the registry-mirror backend - manual limits were honoured
-        // in User Scenario alone. Both went on 2026-08-13 with MSI Center M uninstalled; the WMI
-        // path writes the EC directly and no mode gates it.
+        // Ordinal 13 (PerfMode) is RETIRED and must never be reused. It was removed on 2026-08-13
+        // on the belief that no mode gated the WMI path. See below - the feature came back the same
+        // day on a NEW ordinal, which is exactly what this rule is for.
+
+        /// <summary>
+        /// The performance mode. See <see cref="Ipc.PerfMode"/>.
+        /// </summary>
+        /// <remarks>
+        /// Lives in the TDP group because it GATES it: manual <see cref="Pl1"/> and <see cref="Pl2"/>
+        /// are honoured only in <see cref="Ipc.PerfMode.UserScenario"/>. In the other two modes the
+        /// firmware drives power itself and the sliders do nothing, so the widget hides them.
+        /// <para>
+        /// <b>14, not 13.</b> The original ordinal is retired; this is the fourth feature to return
+        /// on a new number after fan control, the charge limit and lighting.
+        /// </para>
+        /// </remarks>
+        PerfMode = 14,
 
         // ── 2. Fan control ───────────────────────────────────────────────────────
         //

@@ -140,38 +140,52 @@
                             <TextBlock Grid.Column="1" Text="TDP Control" Style="{StaticResource CardTitleStyle}" />
                         </Grid>
 
-                        <Grid Margin="0,12,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Sustained" Style="{StaticResource RowLabelStyle}" />
-                            <TextBlock x:Name="Pl1ValueText" Grid.Column="1" Style="{StaticResource ValueStyle}" />
-                        </Grid>
-                        <!-- KeyDown on every slider so Escape RELEASES a gamepad-engaged slider
-                             rather than falling through to Game Bar, which reads it as close. See
-                             Slider_KeyDown; it handles nothing else. -->
-                        <Slider x:Name="Pl1Slider"
-                                Style="{StaticResource CardSliderStyle}"
-                                Minimum="8" Maximum="35" StepFrequency="1"
-                                TickFrequency="1"
-                                KeyDown="Slider_KeyDown"
-                                ValueChanged="Pl1Slider_ValueChanged" />
+                        <!-- Mode sits ABOVE the sliders because it gates them. The firmware honours
+                             manual limits only in the mode shown here as "Manual" (its own name is
+                             User Scenario); in the other two it drives power itself and a limit
+                             written here is accepted, read back, and ignored. Segment order is set
+                             in code by PerfModeSegmentOrder and is deliberately NOT the order of
+                             PerfMode's ordinals. -->
+                        <Grid x:Name="PerfModeSegments" Margin="0,12,0,0" />
 
-                        <Grid Margin="0,4,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Boost" Style="{StaticResource RowLabelStyle}" />
-                            <TextBlock x:Name="Pl2ValueText" Grid.Column="1" Style="{StaticResource ValueStyle}" />
-                        </Grid>
-                        <Slider x:Name="Pl2Slider"
-                                Style="{StaticResource CardSliderStyle}"
-                                Minimum="10" Maximum="45" StepFrequency="1"
-                                TickFrequency="1"
-                                KeyDown="Slider_KeyDown"
-                                ValueChanged="Pl2Slider_ValueChanged" />
+                        <!-- Both sliders and their labels live in one panel so they collapse
+                             together. Outside Manual there is nothing here to set, and the card
+                             shrinking to just the mode row says "the firmware is driving power"
+                             more plainly than a paragraph of warning text did. -->
+                        <StackPanel x:Name="PowerLimitControls" Visibility="Collapsed">
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Sustained" Style="{StaticResource RowLabelStyle}" />
+                                <TextBlock x:Name="Pl1ValueText" Grid.Column="1" Style="{StaticResource ValueStyle}" />
+                            </Grid>
+                            <!-- KeyDown on every slider so Escape RELEASES a gamepad-engaged slider
+                                 rather than falling through to Game Bar, which reads it as close. See
+                                 Slider_KeyDown; it handles nothing else. -->
+                            <Slider x:Name="Pl1Slider"
+                                    Style="{StaticResource CardSliderStyle}"
+                                    Minimum="8" Maximum="35" StepFrequency="1"
+                                    TickFrequency="1"
+                                    KeyDown="Slider_KeyDown"
+                                    ValueChanged="Pl1Slider_ValueChanged" />
+
+                            <Grid Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Boost" Style="{StaticResource RowLabelStyle}" />
+                                <TextBlock x:Name="Pl2ValueText" Grid.Column="1" Style="{StaticResource ValueStyle}" />
+                            </Grid>
+                            <Slider x:Name="Pl2Slider"
+                                    Style="{StaticResource CardSliderStyle}"
+                                    Minimum="10" Maximum="45" StepFrequency="1"
+                                    TickFrequency="1"
+                                    KeyDown="Slider_KeyDown"
+                                    ValueChanged="Pl2Slider_ValueChanged" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 
