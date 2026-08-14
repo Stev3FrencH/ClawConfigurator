@@ -217,6 +217,46 @@ mapping is solid rather than inferred from a single sample:
 Verified round-trip: User Scenario → AI Engine → Endurance → User Scenario returns every value to
 its starting number.
 
+#### The mode is in the FIRMWARE too, and it gates the power limits — measured 2026-08-13
+
+**`Get_AP` / `Set_AP` sub-function 0, byte 3, low nibble.** The registry values above are MSI Center
+M's own model; this is the same concept in the EC, and it is the one that decides whether
+`Get_SlaveBattery|1`'s manual PL1/PL2 mean anything.
+
+| Mode | low nibble | Manual PL1/PL2 |
+|---|---|---|
+| **User Scenario** | **6** | **honoured** |
+| Endurance | 2 | ignored — MSI drives power |
+| AI Engine | 1 | ignored — MSI drives power |
+
+High nibble read `C` throughout, so the byte reads `C6` / `C2` / `C1`. Measured by reinstalling MSI
+Center M and sweeping every `Get_*` register across its three modes — byte 3 is the **only**
+non-telemetry byte that tracks the selector. Snapshots: `Diagnostics/acpi-snapshot-msi-*.json`.
+
+> **Note the encoding is its own.** The nibble is 6 / 2 / 1, which is *not* `ShiftMode` (6 / 3 / 2),
+> `Mode` (4 / 3 / 5) or `GamingEvent` (4 / 1 / 2). Only the User Scenario value coincides with
+> `ShiftMode`, and reading that coincidence as the mapping was the first wrong guess made here.
+
+**This is what broke TDP on 2026-08-13.** After the first full power cycle following MSI Center M's
+uninstall, byte 3 read `C1` — AI Engine. The widget wrote 15/17 W, `Get_SlaveBattery|1` read back
+15/17, every layer reported success, and the package still drew 37 W bursts settling to 25 W. It was
+not ignoring a limit: **under AI Engine that same register carries `19 25` = 25/37**, so the firmware
+was obeying its own automatic pair. Same shape as the fan-control flag — a value stored faithfully in
+a register nothing was reading.
+
+**MSI Center M sets this from its service, not its UI.** A sweep taken after reinstalling, without
+ever opening the window, already read `C6`. That is why this project never had to write it, and why
+the dependency stayed invisible: the EC held the byte across every warm reboot, and only a true
+power-down cleared it.
+
+> **Corrected here:** the charge-limit section below calls bytes 3 and 4 "presumed to identify the
+> register" and constant across captures. They were constant only because nothing had power-cycled
+> the EC. Byte 3 is a live mode field. The charge-limit write echoes it unchanged, which is why that
+> feature was never affected — echoing an unexplained byte turned out to be load-bearing rather than
+> merely cautious.
+
+Read it with `--perf-gate`; set it with `--set-perf-gate manual`, which writes only the low nibble.
+
 **Two consequences that matter more than the mapping itself.**
 
 1. **`ManualPL*` did not change during any mode transition.** The mode selector does not overwrite
