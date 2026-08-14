@@ -55,7 +55,7 @@ if (-not (Test-Elevated)) {
 }
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$helper = Join-Path $repoRoot 'src\Helper\bin\x64\Debug\net8.0-windows\McenterLite.Helper.exe'
+$helper = Join-Path $repoRoot 'src\Helper\bin\x64\Debug\net8.0-windows\ClawConfigurator.Helper.exe'
 
 if (-not (Test-Path $helper)) {
     throw "Helper not built at $helper - run:  dotnet build McenterLite.sln"

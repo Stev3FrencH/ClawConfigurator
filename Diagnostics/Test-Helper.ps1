@@ -37,7 +37,7 @@
     Run elevated. The pipe grants the current user full control, and the helper itself must be
     running - either from its scheduled task or started by hand:
 
-        McenterLite.Helper.exe --no-deploy
+        ClawConfigurator.Helper.exe --no-deploy
 
 .EXAMPLE
     .\Test-Helper.ps1
@@ -99,7 +99,7 @@ function Connect-Helper {
     try { $script:pipe.Connect(5000) }
     catch {
         throw ("Could not open \\.\pipe\$PipeName. The helper is not running. Start it with " +
-               "'McenterLite.Helper.exe --no-deploy' from an elevated prompt, or check its " +
+               "'ClawConfigurator.Helper.exe --no-deploy' from an elevated prompt, or check its " +
                "scheduled task at \ClawConfigurator\ClawConfiguratorHelper.")
     }
 
@@ -257,7 +257,7 @@ try {
         # Balanced - rather than replaying captured Original_* values, which no longer exist.
         # Lighting is deliberately left alone.
         #
-        # PREFER 'McenterLite.Helper.exe --restore' over this. The pipe is
+        # PREFER 'ClawConfigurator.Helper.exe --restore' over this. The pipe is
         # maxNumberOfServerInstances:1 and the widget never disconnects once shown, so this path
         # cannot connect at all if the Game Bar has been opened since the helper started.
         Write-Host ''

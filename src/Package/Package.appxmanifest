@@ -44,7 +44,7 @@
   <Identity
     Name="ClawConfigurator"
     Publisher="CN=msi-mcenter-lite"
-    Version="0.2.0.35" />
+    Version="0.2.0.36" />
 
   <Properties>
     <DisplayName>Claw Configurator</DisplayName>
@@ -163,7 +163,7 @@
         -->
         <desktop:Extension
           Category="windows.fullTrustProcess"
-          Executable="Helper\McenterLite.Helper.exe" />
+          Executable="Helper\ClawConfigurator.Helper.exe" />
 
       </Extensions>
     </Application>

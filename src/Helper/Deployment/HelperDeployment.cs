@@ -26,7 +26,7 @@ namespace McenterLite.Helper.Deployment
     /// </summary>
     internal static class HelperDeployment
     {
-        private const string HelperExeName = "McenterLite.Helper.exe";
+        private const string HelperExeName = "ClawConfigurator.Helper.exe";
 
         /// <summary>
         /// Where the managed code actually lives, and so what has to be compared to detect a
@@ -38,7 +38,7 @@ namespace McenterLite.Helper.Deployment
         /// "UpToDate" and the stale helper keeps running. Observed on 2026-08-12: a new package
         /// installed, the bootstrap said UpToDate, and the previous build stayed live.
         /// </remarks>
-        private const string HelperDllName = "McenterLite.Helper.dll";
+        private const string HelperDllName = "ClawConfigurator.Helper.dll";
 
         /// <summary>Where the deployed copy lives.</summary>
         public static string DeployedDirectory =>

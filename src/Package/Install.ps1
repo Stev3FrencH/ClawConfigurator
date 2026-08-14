@@ -164,7 +164,7 @@ if ($task) {
 
 try {
     $stopped = $false
-    foreach ($name in 'McenterLite.Helper', 'McenterLite.Widget') {
+    foreach ($name in 'ClawConfigurator.Helper', 'McenterLite.Widget') {
         Get-Process -Name $name -ErrorAction SilentlyContinue | ForEach-Object {
             Write-Host "  stopping $($_.ProcessName) (pid $($_.Id))"
             try { $_.Kill() } catch { Write-Warning "  could not stop pid $($_.Id): $_" }
@@ -176,7 +176,7 @@ try {
         # Wait for handles to actually close, not just for the processes to disappear.
         $deadline = (Get-Date).AddSeconds(15)
         while ((Get-Date) -lt $deadline) {
-            $alive = Get-Process -Name 'McenterLite.Helper', 'McenterLite.Widget' -ErrorAction SilentlyContinue
+            $alive = Get-Process -Name 'ClawConfigurator.Helper', 'McenterLite.Widget' -ErrorAction SilentlyContinue
             if (-not $alive) { break }
             Start-Sleep -Milliseconds 300
         }

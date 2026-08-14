@@ -20,6 +20,23 @@
     <ProjectGuid>{7B2C4E10-9A55-4E3B-9C1D-2F8A6D4B7E90}</ProjectGuid>
     <OutputType>AppContainerExe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
+    <!--
+      DELIBERATELY still McenterLite.Widget, unlike the helper, which was renamed to
+      ClawConfigurator.Helper on 2026-08-14.
+
+      The helper is a plain .NET exe: AssemblyName is just its output filename. This is a UAP
+      project, and the Appx tooling REWRITES the manifest's EntryPoint to
+      "<AssemblyName>.App" - it assumes the assembly name and the root namespace are the same
+      thing. Renaming the assembly alone was tried and produced a package declaring
+      EntryPoint="ClawConfigurator.Widget.App" against a class that is actually
+      McenterLite.Widget.App, which points activation at something that does not exist. Caught by
+      unpacking the built .msix rather than by any build error.
+
+      Renaming this properly means moving the NAMESPACE too - every .cs file plus every x:Class in
+      the XAML - which is real churn for a process name that only exists while the Game Bar is open.
+      Not worth it; the helper was the one that mattered, because it runs elevated at logon and its
+      path is what the troubleshooting docs tell you to inspect.
+    -->
     <RootNamespace>McenterLite.Widget</RootNamespace>
     <AssemblyName>McenterLite.Widget</AssemblyName>
     <DefaultLanguage>en-US</DefaultLanguage>

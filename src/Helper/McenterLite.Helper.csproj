@@ -23,8 +23,17 @@
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!--
+      AssemblyName is the OUTPUT FILENAME and is visible: it is what Task Manager shows for a
+      process running elevated at logon, and what the scheduled task's action points at. It was
+      renamed with the app on 2026-08-14 because a name matching nothing the user installed is a
+      fair thing to be uneasy about.
+
+      RootNamespace deliberately does NOT follow. The namespace is invisible, and moving it would
+      touch every file in the project plus the manifest's EntryPoint, for nothing.
+    -->
     <RootNamespace>McenterLite.Helper</RootNamespace>
-    <AssemblyName>McenterLite.Helper</AssemblyName>
+    <AssemblyName>ClawConfigurator.Helper</AssemblyName>
     <NoWarn>$(NoWarn);CA1416</NoWarn>
 
     <!--
