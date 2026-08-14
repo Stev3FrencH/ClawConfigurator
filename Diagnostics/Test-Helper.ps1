@@ -57,7 +57,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$PipeName = 'McenterLiteHelper'
+$PipeName = 'ClawConfiguratorHelper'
 
 # Must match src/Shared/Ipc/Function.cs. Ordinals there are explicit and never reused, so this
 # map only ever grows.
@@ -100,7 +100,7 @@ function Connect-Helper {
     catch {
         throw ("Could not open \\.\pipe\$PipeName. The helper is not running. Start it with " +
                "'McenterLite.Helper.exe --no-deploy' from an elevated prompt, or check its " +
-               "scheduled task at \McenterLite\McenterLiteHelper.")
+               "scheduled task at \ClawConfigurator\ClawConfiguratorHelper.")
     }
 
     # UTF-8 with NO byte-order mark. Windows PowerShell's default StreamWriter encoding emits a

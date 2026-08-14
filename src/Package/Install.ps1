@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Installs the M Center Lite Game Bar widget from a signed MSIX bundle.
+    Installs the Claw Configurator Game Bar widget from a signed MSIX bundle.
 
 .DESCRIPTION
     Deliberately minimal. This script installs the package and nothing else.
@@ -137,11 +137,16 @@ if ($CertificatePath) {
 # docs/hardware-notes.md - kill the child, the parent brings it back.
 Write-Host "Stopping any running instance..." -ForegroundColor Cyan
 
-$taskName = 'McenterLiteHelper'
+# Renamed with the app on 2026-08-14. This deliberately does NOT look for the old
+# McenterLiteHelper task: an install of the previous name is a different package with its own task,
+# and the documented migration is to uninstall it first. If both are somehow present, the helper's
+# single-instance mutex - which kept its original name for exactly this - stops the two driving the
+# EC at once.
+$taskName = 'ClawConfiguratorHelper'
 $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 if ($task) {
     # -TaskPath is REQUIRED here and comes from the task we just found. The helper registers itself
-    # under \McenterLite\, and while Get-ScheduledTask searches every folder, Stop- and
+    # under \ClawConfigurator\, and while Get-ScheduledTask searches every folder, Stop- and
     # Disable-ScheduledTask default to the root and fail with "The system cannot find the file
     # specified" - a warning that looks like the task is simply absent. Both calls then quietly did
     # nothing, leaving the task free to restart the helper mid-install, which is the exact failure
@@ -215,7 +220,7 @@ catch [Exception] {
 
     Write-Host "  same version already installed with different contents; replacing it" -ForegroundColor Yellow
 
-    $installed = Get-AppxPackage -Name 'McenterLite' | Select-Object -First 1
+    $installed = Get-AppxPackage -Name 'ClawConfigurator' | Select-Object -First 1
     if (-not $installed) { throw }
 
     # Removing the package deletes its LocalCache, and the helper's settings.json lives there -
@@ -225,10 +230,10 @@ catch [Exception] {
     # This used to be justified by the Original_* captured values as well. Those are gone as of
     # 2026-08-13: uninstall now restores FeatureDefaults, a table in code, precisely because values
     # stored here could not survive the event they existed for.
-    $settings = Join-Path $env:LOCALAPPDATA "Packages\$($installed.PackageFamilyName)\LocalCache\McenterLite\settings.json"
+    $settings = Join-Path $env:LOCALAPPDATA "Packages\$($installed.PackageFamilyName)\LocalCache\ClawConfigurator\settings.json"
     $preserved = $null
     if (Test-Path $settings) {
-        $preserved = Join-Path $env:TEMP 'McenterLite.settings.preserved.json'
+        $preserved = Join-Path $env:TEMP 'ClawConfigurator.settings.preserved.json'
         Copy-Item $settings $preserved -Force
         Write-Host "  preserved settings.json (the user's chosen values)" -ForegroundColor DarkGray
     }
@@ -237,7 +242,7 @@ catch [Exception] {
     Install-Package
 
     if ($preserved) {
-        $restoreTo = Join-Path $env:LOCALAPPDATA "Packages\$($installed.PackageFamilyName)\LocalCache\McenterLite"
+        $restoreTo = Join-Path $env:LOCALAPPDATA "Packages\$($installed.PackageFamilyName)\LocalCache\ClawConfigurator"
         New-Item -ItemType Directory -Path $restoreTo -Force | Out-Null
         Copy-Item $preserved (Join-Path $restoreTo 'settings.json') -Force
         Remove-Item $preserved -Force -ErrorAction SilentlyContinue
@@ -259,14 +264,14 @@ Write-Host "Installed." -ForegroundColor Green
 Write-Host ""
 Write-Host @"
 Next steps
-  1. Open the Game Bar (Win+G) and pin "M Center Lite".
+  1. Open the Game Bar (Win+G) and pin "Claw Configurator".
   2. On first run the helper asks for elevation ONCE, to deploy itself and register its
      scheduled task. Accept it, or no hardware control will work.
   3. The widget reconnects on its own once the helper is running; this can take a few seconds
      after the prompt.
 
 Logs
-  %LOCALAPPDATA%\Packages\<package family>\LocalCache\McenterLite\helper.log
+  %LOCALAPPDATA%\Packages\<package family>\LocalCache\ClawConfigurator\helper.log
 
 To uninstall
   Remove the app from Settings > Apps, then run the deployed helper once with --uninstall to

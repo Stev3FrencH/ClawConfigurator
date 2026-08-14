@@ -35,6 +35,18 @@ namespace McenterLite.Helper
         /// Prevents two builds from driving the same embedded controller at once - the failure
         /// this guards is not a corrupted setting but a hard reset.
         /// </summary>
+        /// <remarks>
+        /// <b>Deliberately NOT renamed when the app became Claw Configurator on 2026-08-14, and this
+        /// is load-bearing.</b> That rename changed the package identity, the scheduled task and the
+        /// pipe — so an install of the old name and one of the new no longer collide anywhere else.
+        /// This mutex is the only thing left that stops both helpers running at once and writing the
+        /// same EC, which is precisely the failure above.
+        ///
+        /// <para>
+        /// It looks like an inconsistency and it is not. Renaming it to match would remove the last
+        /// interlock during exactly the changeover that needs one.
+        /// </para>
+        /// </remarks>
         private const string SingleInstanceMutex = @"Global\McenterLiteHelper_SingleInstance";
 
         private static readonly CancellationTokenSource Shutdown = new CancellationTokenSource();
@@ -605,6 +617,16 @@ namespace McenterLite.Helper
     internal static class AppPaths
     {
         /// <summary>
+        /// The folder name under LocalCache, renamed with the app on 2026-08-14.
+        /// </summary>
+        /// <remarks>
+        /// A constant rather than four string literals, which is what it was. Renaming the app was
+        /// free here only because the identity change resets this directory anyway - there is no
+        /// data to migrate, because Windows hands the new identity an empty LocalCache.
+        /// </remarks>
+        private const string DataFolderName = "ClawConfigurator";
+
+        /// <summary>
         /// Resolves a writable data directory.
         /// </summary>
         /// <remarks>
@@ -619,14 +641,14 @@ namespace McenterLite.Helper
             {
                 var exeDir = AppContext.BaseDirectory ?? "";
 
-                // Deployed layout: ...\Packages\<PFN>\LocalCache\McenterLite\Helper\
+                // Deployed layout: ...\Packages\<PFN>\LocalCache\ClawConfigurator\Helper\
                 // Settings belong beside it, one level up from the Helper folder.
                 var marker = Path.DirectorySeparatorChar + "LocalCache" + Path.DirectorySeparatorChar;
                 int index = exeDir.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
                 if (index >= 0)
                 {
                     var localCache = exeDir.Substring(0, index + marker.Length);
-                    return Path.Combine(localCache, "McenterLite");
+                    return Path.Combine(localCache, DataFolderName);
                 }
 
                 // Running from inside the package: resolve the package's own LocalCache, so the
@@ -636,19 +658,19 @@ namespace McenterLite.Helper
                 {
                     var packages = Path.Combine(
                         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "Packages", familyName, "LocalCache", "McenterLite");
+                        "Packages", familyName, "LocalCache", DataFolderName);
                     return packages;
                 }
 
                 var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
                 if (!string.IsNullOrEmpty(appData))
-                    return Path.Combine(appData, "McenterLite");
+                    return Path.Combine(appData, DataFolderName);
 
                 return Path.Combine(exeDir, "data");
             }
             catch (Exception)
             {
-                return Path.Combine(Path.GetTempPath(), "McenterLite");
+                return Path.Combine(Path.GetTempPath(), DataFolderName);
             }
         }
     }

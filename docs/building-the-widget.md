@@ -202,17 +202,17 @@ from persistence malware — the reference project documents exactly that being 
 
 ## 8. First run
 
-1. Open the Game Bar with **Win+G** and pin **M Center Lite**.
+1. Open the Game Bar with **Win+G** and pin **Claw Configurator**.
 2. The widget calls `FullTrustProcessLauncher`, which starts the helper from inside the package.
 3. That instance sees nothing deployed, relaunches itself elevated with `--setup` — **one UAC
-   prompt** — copies itself to `LocalCache\McenterLite\Helper\`, registers the scheduled task,
+   prompt** — copies itself to `LocalCache\ClawConfigurator\Helper\`, registers the scheduled task,
    and exits.
 4. The task starts the deployed helper, which opens the pipe.
 5. The widget reconnects on its own. This can take a few seconds after the prompt is accepted.
 
 If the prompt is declined the widget says so and offers a retry; it does not re-prompt in a loop.
 
-Logs: `%LOCALAPPDATA%\Packages\<package family>\LocalCache\McenterLite\helper.log`
+Logs: `%LOCALAPPDATA%\Packages\<package family>\LocalCache\ClawConfigurator\helper.log`
 
 ---
 
@@ -379,7 +379,7 @@ These are real tests even with no MSI hardware present:
 - **The AppContainer can open the helper's pipe.** This is the single most likely thing to fail
   silently. If it does, check the `S-1-15-2-1` ACE in `PipeServer.BuildSecurity`.
 - One UAC prompt, not several.
-- The scheduled task exists at `\McenterLite\McenterLiteHelper` and survives a reboot.
+- The scheduled task exists at `\ClawConfigurator\ClawConfiguratorHelper` and survives a reboot.
 - **CPU boost and power mode work for real** — they are plain Windows APIs.
   Cross-check with `powercfg /q SCHEME_CURRENT SUB_PROCESSOR PERFBOOSTMODE`.
 - `--uninstall` removes the task and the deployed folder.
@@ -401,7 +401,7 @@ Run the helper with `--fake-hardware` for everything above; simulated hardware r
 `Supported=false`, so the hardware cards stay hidden and nothing pretends to work. That also
 exercises the initial-focus fallback, since it has to skip the hidden cards.
 
-Logs: `%LOCALAPPDATA%\Packages\<package family>\LocalCache\McenterLite\helper.log`
+Logs: `%LOCALAPPDATA%\Packages\<package family>\LocalCache\ClawConfigurator\helper.log`
 
 ---
 

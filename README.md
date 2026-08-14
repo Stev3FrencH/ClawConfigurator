@@ -180,12 +180,12 @@ what it does to the scheduled task and how it puts it back.
 
 ### After installing
 
-1. Open the Game Bar (**Win+G**) and pin **M Center Lite**.
+1. Open the Game Bar (**Win+G**) and pin **Claw Configurator**.
 2. Accept the one elevation prompt on first run — the helper uses it to deploy itself and
    register a scheduled task. Hardware controls do not work until this is accepted.
 3. The widget reconnects on its own a few seconds after the prompt.
 
-Logs land at `%LOCALAPPDATA%\Packages\<package family>\LocalCache\McenterLite\helper.log`.
+Logs land at `%LOCALAPPDATA%\Packages\<package family>\LocalCache\ClawConfigurator\helper.log`.
 
 **What a fresh install changes.** Your power limits, charge limit and controller mode are read off
 the hardware and left exactly as they are. Two things are set once, and are then yours to change:
@@ -206,11 +206,11 @@ desktop-mouse mode with the app that switched you gone is a state worth rescuing
 **first**, then remove the app:
 
 ```powershell
-& "$env:LOCALAPPDATA\Packages\McenterLite_xq4frxrkckec6\LocalCache\McenterLite\Helper\McenterLite.Helper.exe" --uninstall
+& "$env:LOCALAPPDATA\Packages\ClawConfigurator_xq4frxrkckec6\LocalCache\ClawConfigurator\Helper\McenterLite.Helper.exe" --uninstall
 ```
 
 That puts every feature back to its default, unregisters the scheduled task and removes the deployed
-copy. Then remove **M Center Lite** from *Settings > Apps*.
+copy. Then remove **Claw Configurator** from *Settings > Apps*.
 
 Doing it the other way round cannot work: the deployed helper and its settings both live inside the
 package's `LocalCache`, so removing the app first deletes the executable that would do the restore.
@@ -226,7 +226,7 @@ To see what the restore does **without** uninstalling anything, close the Game B
 code path on its own:
 
 ```powershell
-& "$env:LOCALAPPDATA\Packages\McenterLite_xq4frxrkckec6\LocalCache\McenterLite\Helper\McenterLite.Helper.exe" --restore
+& "$env:LOCALAPPDATA\Packages\ClawConfigurator_xq4frxrkckec6\LocalCache\ClawConfigurator\Helper\McenterLite.Helper.exe" --restore
 ```
 
 It applies every default, **forgets your saved choices**, and exits with the app still installed —
@@ -264,10 +264,10 @@ the widget on purpose — the profiles are plain text files you edit outside it.
 Explorer address bar:
 
 ```
-%LOCALAPPDATA%\Packages\McenterLite_xq4frxrkckec6\LocalCache\McenterLite\Lighting
+%LOCALAPPDATA%\Packages\ClawConfigurator_xq4frxrkckec6\LocalCache\ClawConfigurator\Lighting
 ```
 
-`McenterLite_xq4frxrkckec6` is the package family name. It is a hash of the `Identity` name and
+`ClawConfigurator_xq4frxrkckec6` is the package family name. It is a hash of the `Identity` name and
 publisher in `src/Package/Package.appxmanifest`, so it is the same on every machine and across
 versions — but if you have changed either, `(Get-AppxPackage McenterLite).PackageFamilyName` prints
 yours. `helper.log` is one folder up, in `McenterLite\`.
@@ -296,7 +296,7 @@ The **Fans** card has two buttons — **Auto** and your custom profile. Pressing
   the button.
 
 ```
-%LOCALAPPDATA%\Packages\McenterLite_xq4frxrkckec6\LocalCache\McenterLite\Fan
+%LOCALAPPDATA%\Packages\ClawConfigurator_xq4frxrkckec6\LocalCache\ClawConfigurator\Fan
 ```
 
 The device has **two fans**, and each holds an idle duty used below 47 °C plus one duty at each of
@@ -330,7 +330,7 @@ subscribed, so removing it left the event firing into an empty room.
 Put one action name in the file, edit and press — it is read at the moment of the press:
 
 ```
-%LOCALAPPDATA%\Packages\McenterLite_xq4frxrkckec6\LocalCache\McenterLite\Button\Button.txt
+%LOCALAPPDATA%\Packages\ClawConfigurator_xq4frxrkckec6\LocalCache\ClawConfigurator\Button\Button.txt
 ```
 
 | | |

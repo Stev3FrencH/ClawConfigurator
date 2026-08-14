@@ -26,7 +26,7 @@ namespace McenterLite.Helper.Ipc
         /// anywhere, because a missing pipe is indistinguishable from a helper that has not
         /// started yet.
         /// </summary>
-        public const string PipeName = "McenterLiteHelper";
+        public const string PipeName = "ClawConfiguratorHelper";
 
         private readonly Func<PipeEnvelope, PipeEnvelope> _handler;
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();

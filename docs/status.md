@@ -35,7 +35,7 @@ notes behind the roadmap below.
 >
 > **That keeps the package identity fixed, which is the real win.** MSIX identity is `Name` + a hash
 > of the `Publisher` DN, and `Publisher` must match the certificate subject exactly. Staying
-> self-signed keeps the Package Family Name at `McenterLite_xq4frxrkckec6` — the path holding
+> self-signed keeps the Package Family Name at `ClawConfigurator_xq4frxrkckec6` — the path holding
 > settings, the deployed helper and the user's profile files. A different certificate would change
 > the DN, change the PFN, and make Windows treat this as a **different app**: no upgrade path, the
 > old task and helper still running, profiles stranded, and every hardcoded path in the README and
@@ -211,7 +211,7 @@ powershell -ExecutionPolicy Bypass -File .\Diagnostics\Start-FakeHelper.ps1
 > **neither message mentions the helper**. Learned the slow way on 2026-08-12, after `0x80073CF3`
 > was first misread as a missing framework dependency.
 >
-> Killing the process is not enough either: the `McenterLiteHelper` scheduled task owns its
+> Killing the process is not enough either: the `ClawConfiguratorHelper` scheduled task owns its
 > lifetime and can restart it mid-install. `Install.ps1` now stops *and disables* the task, then
 > re-enables it in a `finally`. Same supervisor trap as `MSI_Center_M_Server`, on our own code.
 
