@@ -24,7 +24,7 @@ depends on.
 |---|---|---|
 | `src/Widget` | `McenterLite.Widget` — the UWP AppContainer UI | VS 2022 + UWP workload |
 | `src/Package` | the signed `.msix` that actually installs | Windows Application Packaging Project |
-| `src/Helper` | `McenterLite.Helper.exe`, bundled into the package | plain .NET SDK |
+| `src/Helper` | `ClawConfigurator.Helper.exe`, bundled into the package | plain .NET SDK |
 
 The helper is already proven on the device. This session is about the UI and the packaging
 around it.
@@ -129,7 +129,7 @@ confidence — it embeds absolute-ish tooling paths and a project GUID.
 
 ### Getting the helper into the package
 
-The manifest declares `Executable="Helper\McenterLite.Helper.exe"`, so the helper must land in a
+The manifest declares `Executable="Helper\ClawConfigurator.Helper.exe"`, so the helper must land in a
 `Helper` folder inside the package, published **self-contained** — the package cannot rely on a
 .NET runtime being present on the Claw.
 
@@ -142,7 +142,7 @@ executable is not there afterwards. Nothing manual is required.
 > while every build succeeded and every package looked correct. A stale binary is still a valid
 > binary, so nothing warns you — the symptom surfaces only on device, as a card that never
 > populates or an IPC `Function` ordinal the widget and helper disagree about. If you ever suspect
-> it again, check the timestamp of `src/Package/Helper/McenterLite.Helper.exe` against your last
+> it again, check the timestamp of `src/Package/Helper/ClawConfigurator.Helper.exe` against your last
 > helper change.
 
 A ProjectReference cannot replace that target: it would bring in a framework-dependent build, and
@@ -417,7 +417,7 @@ Symptoms whose cause is not obvious from the message.
 | **`MakeAppx` fails naming a PNG** | Assets not generated. Run `New-PlaceholderAssets.ps1`, and copy the folder into the packaging project too. |
 | Package builds but **will not install** | Certificate subject does not match the manifest `Publisher` exactly. Both must be `CN=msi-mcenter-lite`. |
 | Package installs but **the widget never appears in the Game Bar** | The generated manifest was used instead of `src/Package/Package.appxmanifest`, so the `microsoft.gameBarUIExtension` registration is missing. |
-| Widget appears but says **"could not reach the helper"** forever | Either the helper is not at `Helper\McenterLite.Helper.exe` inside the package, or the elevation prompt was declined. Check `helper.log`. |
+| Widget appears but says **"could not reach the helper"** forever | Either the helper is not at `Helper\ClawConfigurator.Helper.exe` inside the package, or the elevation prompt was declined. Check `helper.log`. |
 | Widget renders but **every card is hidden** | Expected on a machine that is not a Claw 8 EX — `DeviceCaps.Supported` is false and hardware cards hide themselves. CPU boost and power mode should still show. |
 | **Cards appear, controls do nothing** | The pipe connected but the AppContainer cannot write. Check the `S-1-15-2-1` ACE in `PipeServer.BuildSecurity`. |
 | Widget crashes **immediately on open** | Almost certainly an unresolved `StaticResource`. Those are runtime failures, not build failures. |
