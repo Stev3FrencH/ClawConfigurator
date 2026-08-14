@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Runtime directives for the .NET Native toolchain, which compiles this project in Release only.
+  Debug builds run on CoreCLR and ignore this file entirely - so nothing here can be verified by
+  building Debug, and its absence cannot be noticed there either. That is exactly how it went
+  missing: the project was authored by hand rather than from the VS template, and the template's
+  copy of this file is the only reason most UWP apps have one.
+
+  .NET Native compiles ahead of time and discards metadata it cannot prove is needed. Reflection
+  is what it cannot prove, and the failure mode is a MissingMetadataException at the moment of the
+  reflecting call - not at build time. In a Game Bar widget that surfaces as a card that never
+  populates, with no console and no crash dialog to read.
+
+  The one call that makes this load-bearing is in Ipc/HelperConnection.cs:
+
+      if (!Enum.IsDefined(typeof(Function), fnId)) continue;
+
+  That gates EVERY message arriving from the helper. Enum.IsDefined needs the enum's field
+  metadata; without it the call throws rather than returning false, and the widget goes silent
+  across all six features at once while the helper log shows it sending perfectly good frames.
+  McenterLite.Shared also reaches Enum.GetNames/Enum.Parse through a generic parameter
+  (LightingProfile.TryParseEnum<T>), which is the form the toolchain is least able to reason about.
+
+  "*Application*" is the toolchain's wildcard for the assemblies in this package that are not
+  framework assemblies - here McenterLite.Widget and McenterLite.Shared. Rooting them costs some
+  package size and compile time and buys immunity from the whole class of problem, which is the
+  right trade for six features whose only IPC is enum-keyed.
+-->
+<Directives xmlns="http://schemas.microsoft.com/netfx/2013/01/metadata">
+  <Application>
+    <Assembly Name="*Application*" Dynamic="Required All" />
+  </Application>
+</Directives>

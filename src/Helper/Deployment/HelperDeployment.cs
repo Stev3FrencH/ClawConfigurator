@@ -84,10 +84,27 @@ namespace McenterLite.Helper.Deployment
         {
             if (!File.Exists(DeployedExecutable)) return State.NotDeployed;
 
-            // Both, and the DLL is the one that matters - see HelperDllName. The apphost is
-            // checked too because a runtime or publish-settings change can move it without
-            // touching the managed code.
-            foreach (var name in new[] { HelperDllName, HelperExeName })
+            // WHICH FILES IDENTIFY A BUILD DEPENDS ON HOW IT WAS PUBLISHED, and getting this wrong
+            // costs a UAC prompt on every single start.
+            //
+            // Debug is a multi-file publish: the .exe is an apphost stub that does not change when
+            // C# changes, so comparing it alone reports a code-only update as UpToDate - observed
+            // 2026-08-12, which is why HelperDllName is compared at all.
+            //
+            // Release sets PublishSingleFile, so there IS NO .dll on disk: the managed code is
+            // bundled inside the .exe, and the .exe therefore DOES change whenever the C# does.
+            // Comparing a file that cannot exist made IsSameBuild return false forever, so this
+            // returned VersionMismatch on every start - redeploying, re-registering the task and
+            // re-elevating each time, for the life of the install. Found 2026-08-14 on the first
+            // Release build; it cannot reproduce in Debug, because in Debug the .dll is there.
+            //
+            // So: compare the managed DLL only when the publish actually produced one, and always
+            // compare the exe. Each configuration then compares the file that carries its code.
+            var names = new[] { HelperDllName, HelperExeName }
+                .Where(name => name != HelperDllName ||
+                               File.Exists(Path.Combine(AppContext.BaseDirectory, name)));
+
+            foreach (var name in names)
             {
                 var source = Path.Combine(AppContext.BaseDirectory, name);
                 var deployed = Path.Combine(DeployedDirectory, name);

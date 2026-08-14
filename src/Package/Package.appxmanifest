@@ -44,7 +44,7 @@
   <Identity
     Name="ClawConfigurator"
     Publisher="CN=msi-mcenter-lite"
-    Version="0.2.0.36" />
+    Version="0.2.0.40" />
 
   <Properties>
     <DisplayName>Claw Configurator</DisplayName>

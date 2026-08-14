@@ -105,6 +105,25 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      Runtime directives for .NET Native (Release only). See the file's own comment for why it
+      exists; this comment is about why it is Content rather than None.
+
+      Microsoft.NetNative.targets collects directives with
+
+          <_IlcInputRdXmlFiles Include="@(AppxPackagePayload)"
+              Condition="...EndsWith('.rd.xml')" />
+
+      so a directives file is only seen if it is part of the package PAYLOAD. None items never
+      reach payload, Content items always do. Marked Content deliberately: as None this file would
+      sit in the project looking correct, be silently ignored by the compiler, and leave us
+      believing the reflection problem was handled. That is a worse position than having no file at
+      all, because it removes the reason to keep looking.
+
+      Same mechanism feeds the XAML-generated .xr.xml files, which is the precedent.
+    -->
+    <Content Include="Properties\Default.rd.xml" />
+
     <Content Include="Assets\StoreLogo.png" />
     <Content Include="Assets\Square44x44Logo.png" />
     <Content Include="Assets\Square150x150Logo.png" />
