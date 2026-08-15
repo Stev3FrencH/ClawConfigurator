@@ -1,51 +1,82 @@
 # msi-mcenter-lite
 
-A lightweight front-end for the settings MSI's M Center owns, targeting **only** the MSI Claw 8 EX
-AI+ (Panther Lake, `CG3EM` / board `1T91`), delivered as an Xbox Game Bar widget.
+**The app is called Claw Configurator.** The repository kept its original name — see
+[The name](#the-name).
 
-> **The goal is to replace MSI Center M, and it no longer has to be running.** This started as a
-> front-end that drove MSI Center M's own registry model, and both shipped hardware features have
-> since moved off it: power limits go through `MSI_ACPI` (ACPI-WMI) and controller mode through the
-> controller's vendor HID channel. Neither needs MSI Center M running, and neither should need it
-> installed. See [docs/hardware-notes.md](docs/hardware-notes.md).
->
-> **Proven 2026-08-13: MSI Center M is uninstalled and all five features still work.** The app, its
-> Game Bar widget and the SDK are gone, and after a reboot the helper probed and re-applied every
-> feature — `MSI_ACPI` comes from the ACPI tables through Windows' own WMI mapper, not from anything
-> MSI ships. See [`Diagnostics/msi-center-m-after.md`](Diagnostics/msi-center-m-after.md).
+A replacement for MSI Center M on the MSI Claw 8 EX AI+ (Panther Lake, `CG3EM` / board `1T91`),
+delivered as an Xbox Game Bar widget. **MSI Center M is not required, and is not installed on the
+development device.**
 
-> **Status: the widget builds, packages, installs, and runs on the real Claw.** Power limits,
-> controller mode, CPU Boost and OS Power Mode are all verified working end-to-end, including
-> reflecting changes made outside the widget — Windows Settings, the taskbar flyout, and the
-> physical MSI mode button.
+> **Status: released as `0.2.0.40`, verified on device across cold boots.** Seven features work,
+> the first real Release build is cut and signed, and install and uninstall are scripted and
+> documented for someone who did not build it — see [`docs/install.md`](docs/install.md).
 >
-> **Scope has widened back.** Fan control, battery charge limit and RGB LED were removed
-> (2026-08-08) on the reasoning that MSI Center did them better. **That reasoning expired** once the
-> plan became to uninstall MSI Center M, and all three are now back — see
-> [docs/status.md](docs/status.md) for what each one still carries.
-> Intel GPU controls (G6) remain an unimplemented stub.
+> **Not yet validated: installing on a freshly-installed Windows 11.** Everything to date has been
+> proven on a machine that also builds this, which cannot honestly test the certificate import or
+> the framework dependencies. That is the next task.
+
+## The name
+
+The project began as a thin front-end over settings **MSI Center M** owned, driving its registry
+model rather than the hardware. "M Center Lite" described that accurately, and `msi-mcenter-lite`
+followed from it.
+
+It stopped being true. Every feature now drives firmware directly — ACPI-WMI and vendor HID — MSI
+Center M has been uninstalled since 2026-08-13, and the app is no longer *lite* anything: it does
+things MSI Center M does not, like the fan duty floor and the repurposed hardware button. A name
+that describes a dependency the project spent its life removing is a name that misleads.
+
+So on **2026-08-14** the app became **Claw Configurator**, including its package identity. Three
+consequences worth knowing:
+
+- **The Package Family Name changed** to `ClawConfigurator_xq4frxrkckec6`. Windows treats a changed
+  identity as a *different app*, so an older M Center Lite install does not upgrade — uninstall it
+  first, or you get both. Settings and profiles start fresh under the new identity.
+- **The repository keeps its name.** Renaming it would break every existing clone URL and inbound
+  link to buy a tidier name, and the two are easy enough to hold apart: `msi-mcenter-lite` is where
+  the code lives, Claw Configurator is what installs.
+- **Two internal names were deliberately left alone**, both documented where they appear: the
+  widget assembly `McenterLite.Widget`, because the Appx tooling rewrites the manifest's
+  `EntryPoint` to `<AssemblyName>.App` and renaming the assembly without the namespace produces a
+  package that builds cleanly and cannot launch; and the helper's single-instance mutex, which is
+  the interlock stopping an old and a new build from driving the embedded controller at once, and
+  therefore has to match across the very versions the rename separates.
 
 ## Scope
 
-Eight features were planned. Three were descoped on 2026-08-08 and have been brought back, because
-the reason for dropping them — "MSI Center does it better" — stops applying once MSI Center M is
-uninstalled. All three returned on 2026-08-12.
+Eight features were planned. Three were descoped on 2026-08-08 and brought back on 2026-08-12,
+because the reason for dropping them — "MSI Center does it better" — stopped applying once MSI
+Center M was going to be uninstalled. Two more were added afterwards that were never planned at all,
+both discovered while removing MSI Center M.
 
 | # | Feature | Path | Status |
 |---|---|---|---|
-| 1 | TDP (PL1 / PL2) | `MSI_ACPI.Set_SlaveBattery` | ✅ verified on device, standalone |
-| 2 | Fan control | `MSI_ACPI.Get_Fan`/`Set_Fan` + `Set_AP` flag | ✅ verified on device, probe and widget |
-| 3 | Battery charge limit | `MSI_ACPI.Get_AP`/`Set_AP` | ✅ verified on device, standalone |
-| 4 | RGB LED | vendor HID report `0x0F` | ✅ verified on device, standalone |
-| 5 | Controller mode — Gamepad / Desktop | vendor HID `0x24`/`0x26`/`0x27` | ✅ verified on device, standalone |
+| 1 | TDP (PL1 / PL2) | `MSI_ACPI.Set_SlaveBattery` | ✅ verified, incl. cold boot |
+| 2 | Fan control | `MSI_ACPI.Get_Fan`/`Set_Fan` + `Set_AP` flag | ✅ verified, probe and widget |
+| 3 | Battery charge limit | `MSI_ACPI.Get_AP`/`Set_AP` | ✅ verified on device |
+| 4 | RGB LED | vendor HID report `0x0F` | ✅ verified on device |
+| 5 | Controller mode — Gamepad / Desktop | vendor HID `0x24`/`0x26`/`0x27` | ✅ verified on device |
 | 6 | CPU Boost | documented Win32 | ✅ verified on device |
 | 7 | OS Power Mode | documented Win32 | ✅ verified on device |
-| 8 | Intel GPU controls (IGCL) | `ControlLib.dll` | blocked on gate G6 |
+| 8 | Intel GPU controls (IGCL) | `ControlLib.dll` | unimplemented, blocked on gate G6 |
+| 9 | Performance mode — AI Engine / Endurance / Manual | `MSI_ACPI.Set_AP` sub-fn 0, byte 3 | ✅ verified, incl. cold boot |
+| 10 | The hardware button | `MSI_Event` `0x220029` | ✅ verified on device |
 
-Each returning feature carries the same gating question, and it is the first thing to settle in
-each case: **can it be driven with MSI Center M absent?** That question changed the design of both
-features shipped so far — in both, a registry value that round-tripped convincingly turned out to
-be a *mirror* of the real control surface rather than the surface itself.
+**Feature 9 was not a feature at first — it was a bug.** The mode byte *gates* the power limits:
+with the wrong value, PL1/PL2 are accepted, read back correctly, and ignored. MSI Center M's
+service had been setting it at every boot, so removing MSI Center M broke TDP in a way no reboot
+would reveal, because the embedded controller keeps the value across warm boots and resets it only
+on a true power cycle. Once understood it was cheap to expose properly.
+
+**Feature 10 was never broken.** The button on the top of the device stopped doing anything when
+MSI Center M was uninstalled, and it turned out nothing was listening — the firmware raises the
+same event either way. It now toggles the RTSS overlay by default, and is configurable.
+
+Every feature had to clear the same gate, and it is the first thing to settle in each case: **can
+it be driven with MSI Center M absent?** That question changed several designs. Twice, a registry
+value that round-tripped convincingly turned out to be a *mirror* of the real control surface
+rather than the surface itself — it vanishes with MSI Center M, and lags the hardware while it is
+there.
 
 Live metrics and per-game profiles are out of scope.
 
@@ -55,12 +86,14 @@ Live metrics and per-game profiles are out of scope.
   Windows APIs. No WinRing0, inpoutx64, PawnIO, kx.exe, MSR or MCHBAR access. This rules out the
   `kx.exe` MCHBAR route to TDP — which costs nothing, because `MSI_ACPI` reaches the same register
   through firmware Windows already exposes.
-- **Independent of MSI Center M, and increasingly so.** The original design accepted MSI Center M
-  as a dependency to make the no-driver constraint affordable. That trade turned out to be
-  unnecessary: both shipped features now drive firmware directly. **Prefer a firmware path over a
-  registry one even when both work** — twice now, the registry value has been a mirror maintained
-  by MSI Center M rather than a control surface, which means it vanishes with MSI Center M and can
-  lag behind the hardware in the meantime.
+- **Independent of MSI Center M — settled, not aspirational.** The original design accepted MSI
+  Center M as a dependency to make the no-driver constraint affordable. That trade turned out to be
+  unnecessary: every feature drives firmware directly, and MSI Center M has been uninstalled since
+  2026-08-13 with all of them still working. `MSI_ACPI` comes from the ACPI tables via Windows' own
+  WMI mapper, not from anything MSI ships. **Prefer a firmware path over a registry one even when
+  both work** — twice the registry value proved to be a mirror maintained by MSI Center M rather
+  than a control surface, so it vanishes with MSI Center M and lags the hardware while it is there.
+  See [`Diagnostics/msi-center-m-after.md`](Diagnostics/msi-center-m-after.md).
 - **The helper is authoritative.** Every write is read back and the actual value returned; the
   widget renders that, never its own optimistic value.
 - **Every value is clamped server-side.** The pipe is ACL'd to all app packages, so the widget's
@@ -110,12 +143,14 @@ export PATH="$HOME/.dotnet:$PATH"
 
 ## Installing
 
-> **Installing it, rather than developing it?** See
-> [`docs/install.md`](docs/install.md) — install and uninstall written for someone who did not build
-> this, including what the certificate import actually grants and how to fix a failed framework
-> dependency. The rest of this section is about building and installing from source.
+> **Installing it, rather than developing it?** Take the packaged build from
+> [Releases](https://github.com/Stev3FrencH/msi-mcenter-lite/releases) and follow
+> [`docs/install.md`](docs/install.md) — written for someone who did not build this, including what
+> the certificate import actually grants and how to fix a failed framework dependency. It carries
+> the uninstall too. **The rest of this section is about building and installing from source**, and
+> assumes you have the repository and the signing key.
 
-The widget has to be built, packaged and signed first, on
+Built from source, the widget has to be built, packaged and signed first, on
 whatever Windows machine has Visual Studio 2022 set up (see
 [`docs/building-the-widget.md`](docs/building-the-widget.md)). That machine does **not** have to
 be the Claw. Signing happens there too, using that machine's certificate private key — the Claw
@@ -126,10 +161,11 @@ the key itself.
 
 Copy this to the Claw — a USB drive or network share is fine:
 
-- `src/Package/AppPackages/McenterLite.Package_<version>_x64_Test/` — the whole folder. It already
-  contains the signed `.msix` and the `Dependencies\x64\*.appx` files (VCLibs, the .NET runtime,
-  Microsoft.UI.Xaml) that `Install.ps1` needs.
-- `src/Package/Install.ps1`
+- `src/Package/AppPackages/McenterLite.Package_<version>_Test/` — **the whole folder**, not just the
+  package inside it. It already holds the signed `.msixbundle` and the `Dependencies\x64\*.appx`
+  files (VCLibs, the .NET Native framework and runtime, Microsoft.UI.Xaml) that `Install.ps1` needs.
+  A Debug build names the folder `..._Debug_Test`; Release omits the word.
+- `src/Package/Install.ps1` and `src/Package/Uninstall.ps1`
 - `src/Package/msi-mcenter-lite.cer` — the exported *public* certificate. Never the private key,
   which stays on the build machine.
 
@@ -143,8 +179,10 @@ Then, in an **elevated** PowerShell on the Claw, from wherever the folder above 
 powershell -ExecutionPolicy Bypass -File .\Install.ps1
 ```
 
-It finds the newest `.msix` beneath its own folder and the `.cer` beside it, so no paths are
-needed. Pass `-PackagePath` / `-CertificatePath` to override. The `-ExecutionPolicy Bypass` prefix
+It finds the newest package beneath its own folder and the `.cer` beside it, so no paths are
+needed. Pass `-PackagePath` / `-CertificatePath` to override. **Keep the package inside its folder**
+— the dependencies are located relative to it, so moving it out on its own silently leaves them
+behind. The `-ExecutionPolicy Bypass` prefix
 matters: a script copied from another machine is blocked by default, and the error
 ("running scripts is disabled on this system") does not mention the file's origin.
 
@@ -208,7 +246,8 @@ Windows power card. To exercise the whole UI on a development machine:
 powershell -ExecutionPolicy Bypass -File .\Diagnostics\Start-FakeHelper.ps1
 ```
 
-That runs the helper against simulated hardware so all four cards appear. CPU boost and OS power
+That runs the helper against simulated hardware so all five hardware cards appear — Controller,
+Power, Battery, Fans and Lighting. CPU boost and OS power
 mode stay real — the fake layer keeps the Win32 provider deliberately. See the script's help for
 what it does to the scheduled task and how it puts it back.
 
@@ -452,6 +491,9 @@ embedded controller; that was true only for the brief window when power limits w
 Center's registry model and fan control had been removed. It is **not** true now:
 
 - **Power limits** go to the EC through `MSI_ACPI.Set_SlaveBattery`.
+- **Performance mode** writes the low nibble of `Set_AP` sub-function 0, byte 3. This is the byte
+  that *gates* the power limits, which is why it is a feature at all — read-modify-write of one
+  nibble, because the rest of that byte is not ours.
 - **Controller mode** writes the controller's own firmware over the vendor HID channel.
 - **Charge limit** goes to the EC through `MSI_ACPI.Set_AP`.
 - **Fan control** writes the EC's duty tables through `MSI_ACPI.Set_Fan`, and hands the fans to
