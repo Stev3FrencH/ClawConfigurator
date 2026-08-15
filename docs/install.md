@@ -14,6 +14,28 @@ Download `ClawConfigurator-<version>.zip` from
 hardware card and only *CPU Boost* and *OS Power Mode* do anything. Nothing breaks — but you would
 be installing a nearly empty widget, so it is worth knowing first.
 
+**On a freshly-installed Windows, install MSI Center M once — then remove it again.** This is the
+one step that has nothing to do with this app, and it is the one that is impossible to guess. The
+`MSI_ACPI` WMI class every hardware feature here drives has to be *registered* before anything can
+call it, and on a clean Windows 11 nothing has done that yet. Installing MSI Center M does it. Skip
+this and the app installs cleanly, the widget opens, and every hardware card stays dead.
+
+1. Install **MSI Center M** from
+   [MSI's support page for the Claw 8 EX AI+](https://www.msi.com/Handheld/Claw-8-EX-AI-Plus-CG3EMX/support),
+   under *Utility*.
+2. **Restart when it prompts you.** The registration is not in place until the machine has come back
+   up.
+3. After the reboot, **uninstall MSI Center M straight away.** There is no need to open it, sign in,
+   or configure anything — it has already done the only thing it was installed for.
+
+What you keep is the registration, not MSI Center M: it survives the uninstall, which is why the
+development device has had no MSI Center M on it since 2026-08-13 with every feature still working.
+Nothing in this app reads anything MSI Center M leaves behind.
+
+Keeping MSI Center M installed also works, and skips step 3 — but the two then own the same fans and
+the same power limits, and neither knows about the other. See the fan note in
+[the README](../README.md#editing-the-fan-profile).
+
 **Turn on Developer Mode**, at *Settings → Privacy & security → For developers*. This app is
 sideloaded rather than installed from the Store, and without this the install fails on policy
 grounds with an error that does not mention sideloading.
@@ -138,6 +160,7 @@ exact match.
 | Fails on policy / sideloading | Developer Mode off | *Settings → Privacy & security → For developers* |
 | **`0x80073CFB`** | Same version already installed with different contents | `Install.ps1` handles this by removing the old one first; it preserves your `settings.json` |
 | Widget says **"could not reach the helper"** forever | The elevation prompt was declined, or the helper cannot start | Check whether `helper.log` exists at all — if it is absent the helper never started, which is not a settings problem |
+| App installs and runs, but **every hardware card is missing** on an actual Claw 8 EX AI+ | `MSI_ACPI` was never registered — a Windows install that has never had MSI Center M on it | Install MSI Center M once, reboot, uninstall it; see [Before you start](#before-you-start). Confirm with `Get-CimClass -Namespace root\wmi MSI_ACPI` |
 | Elevation prompt on **every** launch | The deployed helper is being judged stale every start | A defect; report it with `helper.log` |
 
 ---

@@ -2,7 +2,8 @@
 
 A replacement for MSI Center M on the MSI Claw 8 EX AI+ (Panther Lake, `CG3EM` / board `1T91`),
 delivered as an Xbox Game Bar widget. **MSI Center M is not required, and is not installed on the
-development device.**
+development device** — though a Windows install that has never seen it needs it once, briefly, to
+register the WMI class this app calls. See [`docs/install.md`](docs/install.md#before-you-start).
 
 > **Status: released as `0.2.0.40`, verified on device across cold boots.** Seven features work,
 > the first real Release build is cut and signed, and install and uninstall are scripted and
@@ -11,6 +12,11 @@ development device.**
 > **Not yet validated: installing on a freshly-installed Windows 11.** Everything to date has been
 > proven on a machine that also builds this, which cannot honestly test the certificate import or
 > the framework dependencies. That is the next task.
+>
+> **A clean Windows needs MSI Center M installed once, then removed**, before this app has anything
+> to drive — it is what registers the `MSI_ACPI` WMI class. The registration outlives the uninstall;
+> MSI Center M itself is not needed and is not installed here. See
+> [`docs/install.md`](docs/install.md#before-you-start).
 
 ## The name
 
@@ -87,7 +93,11 @@ Live metrics and per-game profiles are out of scope.
   Center M as a dependency to make the no-driver constraint affordable. That trade turned out to be
   unnecessary: every feature drives firmware directly, and MSI Center M has been uninstalled since
   2026-08-13 with all of them still working. `MSI_ACPI` comes from the ACPI tables via Windows' own
-  WMI mapper, not from anything MSI ships. **Prefer a firmware path over a registry one even when
+  WMI mapper, not from anything MSI ships. **The one exception is registration, not operation**: on a
+  Windows install that has never had MSI Center M, the class is not registered until MSI Center M is
+  installed once. That is a one-time setup step, after which MSI Center M can be removed and the
+  registration stays — see [`docs/install.md`](docs/install.md#before-you-start).
+  **Prefer a firmware path over a registry one even when
   both work** — twice the registry value proved to be a mirror maintained by MSI Center M rather
   than a control surface, so it vanishes with MSI Center M and lags the hardware while it is there.
   See [`Diagnostics/msi-center-m-after.md`](Diagnostics/msi-center-m-after.md).
@@ -166,9 +176,14 @@ Copy this to the Claw — a USB drive or network share is fine:
 - `src/Package/msi-mcenter-lite.cer` — the exported *public* certificate. Never the private key,
   which stays on the build machine.
 
-One-time, on the Claw itself (a machine setting, so it does not travel with the files above):
-enable **Developer Mode** — *Settings → Privacy & security → For developers*. Required for
-sideloading.
+Two one-time things on the Claw itself, neither of which travels with the files above:
+
+- Enable **Developer Mode** — *Settings → Privacy & security → For developers*. Required for
+  sideloading.
+- On a Windows install that has never had **MSI Center M** on it, install it from MSI's support
+  page, reboot when prompted, and then uninstall it immediately. That registers `MSI_ACPI`, which
+  everything here calls; the registration survives the uninstall. Already had it at some point?
+  Nothing to do. Full detail in [`docs/install.md`](docs/install.md#before-you-start).
 
 Then, in an **elevated** PowerShell on the Claw, from wherever the folder above was copied to:
 
@@ -211,7 +226,7 @@ Hand over three things — the `AppPackages/...` folder, `Install.ps1` and `Unin
 `msi-mcenter-lite.cer`. Never the `.pfx`: that is the signing key itself, and anyone holding it can
 sign anything in this name.
 
-Tell them these four things, because none of them are discoverable and the first one deserves an
+Tell them these five things, because none of them are discoverable and the first one deserves an
 informed decision rather than a click-through:
 
 1. **Importing the certificate means trusting a stranger's signing key.** This app is signed with a
@@ -230,6 +245,10 @@ informed decision rather than a click-through:
 4. **The one elevation prompt on first run is not optional.** The helper uses it to deploy itself and
    register its scheduled task; decline it and every hardware control stays dead with no obvious
    reason why.
+5. **A Windows that has never had MSI Center M on it needs it once.** Install it from MSI's support
+   page, reboot when prompted, uninstall it straight away — that is what registers the `MSI_ACPI`
+   class, and the registration outlives the uninstall. Without it the app installs and opens with
+   every hardware card dead, which looks like a broken build rather than a missing prerequisite.
 
 To uninstall, they run `Uninstall.ps1` — not *Settings → Apps*, which does only half the job and
 leaves the device on this app's settings. See [Uninstalling](#uninstalling).
