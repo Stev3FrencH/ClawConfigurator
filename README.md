@@ -1,7 +1,4 @@
-# msi-mcenter-lite
-
-**The app is called Claw Configurator.** The repository kept its original name — see
-[The name](#the-name).
+**The app is called Claw Configurator.** 
 
 A replacement for MSI Center M on the MSI Claw 8 EX AI+ (Panther Lake, `CG3EM` / board `1T91`),
 delivered as an Xbox Game Bar widget. **MSI Center M is not required, and is not installed on the
