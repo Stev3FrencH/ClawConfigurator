@@ -9,10 +9,6 @@ register the WMI class this app calls. See [`docs/install.md`](docs/install.md#b
 > the first real Release build is cut and signed, and install and uninstall are scripted and
 > documented for someone who did not build it — see [`docs/install.md`](docs/install.md).
 >
-> **Not yet validated: installing on a freshly-installed Windows 11.** Everything to date has been
-> proven on a machine that also builds this, which cannot honestly test the certificate import or
-> the framework dependencies. That is the next task.
->
 > **A clean Windows needs MSI Center M installed once, then removed**, before this app has anything
 > to drive — it is what registers the `MSI_ACPI` WMI class. The registration outlives the uninstall;
 > MSI Center M itself is not needed and is not installed here. See
