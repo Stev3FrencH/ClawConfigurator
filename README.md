@@ -1,5 +1,3 @@
-# msi-mcenter-lite
-
 **The app is called Claw Configurator.** The repository kept its original name — see
 [The name](#the-name).
 
