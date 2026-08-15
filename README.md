@@ -18,6 +18,44 @@ register the WMI class this app calls. See [`docs/install.md`](docs/install.md#b
 > MSI Center M itself is not needed and is not installed here. See
 > [`docs/install.md`](docs/install.md#before-you-start).
 
+## Scope
+
+Eight features were planned. Three were descoped on 2026-08-08 and brought back on 2026-08-12,
+because the reason for dropping them — "MSI Center does it better" — stopped applying once MSI
+Center M was going to be uninstalled. Two more were added afterwards that were never planned at all,
+both discovered while removing MSI Center M.
+
+| # | Feature | Path | Status |
+|---|---|---|---|
+| 1 | TDP (PL1 / PL2) | `MSI_ACPI.Set_SlaveBattery` | ✅ verified, incl. cold boot |
+| 2 | Fan control | `MSI_ACPI.Get_Fan`/`Set_Fan` + `Set_AP` flag | ✅ verified, probe and widget |
+| 3 | Battery charge limit | `MSI_ACPI.Get_AP`/`Set_AP` | ✅ verified on device |
+| 4 | RGB LED | vendor HID report `0x0F` | ✅ verified on device |
+| 5 | Controller mode — Gamepad / Desktop | vendor HID `0x24`/`0x26`/`0x27` | ✅ verified on device |
+| 6 | CPU Boost | documented Win32 | ✅ verified on device |
+| 7 | OS Power Mode | documented Win32 | ✅ verified on device |
+| 8 | Intel GPU controls (IGCL) | `ControlLib.dll` | unimplemented, blocked on gate G6 |
+| 9 | Performance mode — AI Engine / Endurance / Manual | `MSI_ACPI.Set_AP` sub-fn 0, byte 3 | ✅ verified, incl. cold boot |
+| 10 | The MSI Center hardware button re-mapper | `MSI_Event` `0x220029` | ✅ verified on device |
+
+**Feature 9 was not a feature at first — it was a bug.** The mode byte *gates* the power limits:
+with the wrong value, PL1/PL2 are accepted, read back correctly, and ignored. MSI Center M's
+service had been setting it at every boot, so removing MSI Center M broke TDP in a way no reboot
+would reveal, because the embedded controller keeps the value across warm boots and resets it only
+on a true power cycle. Once understood it was cheap to expose properly.
+
+**Feature 10 was never broken.** The button on the top of the device stopped doing anything when
+MSI Center M was uninstalled, and it turned out nothing was listening — the firmware raises the
+same event either way. It now toggles the RTSS overlay by default, and is configurable.
+
+Every feature had to clear the same gate, and it is the first thing to settle in each case: **can
+it be driven with MSI Center M absent?** That question changed several designs. Twice, a registry
+value that round-tripped convincingly turned out to be a *mirror* of the real control surface
+rather than the surface itself — it vanishes with MSI Center M, and lags the hardware while it is
+there.
+
+Live metrics and per-game profiles are out of scope.
+
 ## The name
 
 The project began as a thin front-end over settings **MSI Center M** owned, driving its registry
@@ -44,44 +82,6 @@ consequences worth knowing:
   package that builds cleanly and cannot launch; and the helper's single-instance mutex, which is
   the interlock stopping an old and a new build from driving the embedded controller at once, and
   therefore has to match across the very versions the rename separates.
-
-## Scope
-
-Eight features were planned. Three were descoped on 2026-08-08 and brought back on 2026-08-12,
-because the reason for dropping them — "MSI Center does it better" — stopped applying once MSI
-Center M was going to be uninstalled. Two more were added afterwards that were never planned at all,
-both discovered while removing MSI Center M.
-
-| # | Feature | Path | Status |
-|---|---|---|---|
-| 1 | TDP (PL1 / PL2) | `MSI_ACPI.Set_SlaveBattery` | ✅ verified, incl. cold boot |
-| 2 | Fan control | `MSI_ACPI.Get_Fan`/`Set_Fan` + `Set_AP` flag | ✅ verified, probe and widget |
-| 3 | Battery charge limit | `MSI_ACPI.Get_AP`/`Set_AP` | ✅ verified on device |
-| 4 | RGB LED | vendor HID report `0x0F` | ✅ verified on device |
-| 5 | Controller mode — Gamepad / Desktop | vendor HID `0x24`/`0x26`/`0x27` | ✅ verified on device |
-| 6 | CPU Boost | documented Win32 | ✅ verified on device |
-| 7 | OS Power Mode | documented Win32 | ✅ verified on device |
-| 8 | Intel GPU controls (IGCL) | `ControlLib.dll` | unimplemented, blocked on gate G6 |
-| 9 | Performance mode — AI Engine / Endurance / Manual | `MSI_ACPI.Set_AP` sub-fn 0, byte 3 | ✅ verified, incl. cold boot |
-| 10 | The hardware button | `MSI_Event` `0x220029` | ✅ verified on device |
-
-**Feature 9 was not a feature at first — it was a bug.** The mode byte *gates* the power limits:
-with the wrong value, PL1/PL2 are accepted, read back correctly, and ignored. MSI Center M's
-service had been setting it at every boot, so removing MSI Center M broke TDP in a way no reboot
-would reveal, because the embedded controller keeps the value across warm boots and resets it only
-on a true power cycle. Once understood it was cheap to expose properly.
-
-**Feature 10 was never broken.** The button on the top of the device stopped doing anything when
-MSI Center M was uninstalled, and it turned out nothing was listening — the firmware raises the
-same event either way. It now toggles the RTSS overlay by default, and is configurable.
-
-Every feature had to clear the same gate, and it is the first thing to settle in each case: **can
-it be driven with MSI Center M absent?** That question changed several designs. Twice, a registry
-value that round-tripped convincingly turned out to be a *mirror* of the real control surface
-rather than the surface itself — it vanishes with MSI Center M, and lags the hardware while it is
-there.
-
-Live metrics and per-game profiles are out of scope.
 
 ## Design constraints
 
